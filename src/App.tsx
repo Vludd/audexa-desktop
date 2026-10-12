@@ -1,4 +1,5 @@
 import { useState } from "react"
+
 import { useLocale } from "@/i18n"
 import type { Page } from "./types"
 
@@ -10,6 +11,7 @@ import {
 import { useRooms } from "./hooks/useRooms"
 import { useScenarios } from "./hooks/useScenarios"
 import { useSchedule } from "./hooks/useSchedule"
+import { useLogs } from "./hooks/useLogs"
 
 import Sidebar from "./components/Sidebar"
 import Toaster from "./components/ui/Toaster"
@@ -21,27 +23,35 @@ import Schedule from "./pages/Schedule"
 import AudioFiles from "./pages/AudioFiles"
 import Settings from "./pages/Settings"
 import Logs from "./pages/Logs"
-import { useLogs } from "./hooks/useLogs"
 
 export default function App() {
   useLocale()
-  const [page, setPage] = useState<Page>("dashboard")
+
+  const [page, setPage] =
+    useState<Page>("dashboard")
 
   const {
     rooms,
     operations,
-    syncLine,
+
     playRoom,
     stopRoom,
     pauseRoom,
-    playSyncLine,
-    stopSyncLine,
-    setRoomVolume,
+
+    previewRoomVolume,
+    saveRoomVolume,
+
+    updateRoomFromForm,
     stopAllRooms,
+
     updateRoom,
     addRoom,
     deleteRoom,
     duplicateRoom,
+
+    isLoading: roomsLoading,
+    error: roomsError,
+    refetch: refetchRooms,
   } = useRooms()
 
   const {
@@ -71,12 +81,18 @@ export default function App() {
     toggleSchedule,
   } = useSchedule()
 
-  const { logs, clearLogs } = useLogs()
+  const {
+    logs,
+    clearLogs,
+  } = useLogs()
 
   return (
     <div className="flex h-screen min-w-0 flex-col overflow-hidden bg-background">
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <Sidebar current={page} onChange={setPage} />
+        <Sidebar
+          current={page}
+          onChange={setPage}
+        />
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
           {page === "dashboard" && (
@@ -88,7 +104,9 @@ export default function App() {
               onPauseRoom={pauseRoom}
               onStopRoom={stopRoom}
               onStopAll={stopAllRooms}
-              onNavigate={(p) => setPage(p as Page)}
+              onNavigate={(nextPage) =>
+                setPage(nextPage as Page)
+              }
             />
           )}
 
@@ -96,17 +114,32 @@ export default function App() {
             <Rooms
               rooms={rooms}
               operations={operations}
-              syncLine={syncLine}
+
               onPlay={playRoom}
               onStop={stopRoom}
               onPause={pauseRoom}
-              playSyncLine={playSyncLine}
-              stopSyncLine={stopSyncLine}
-              onVolumeChange={setRoomVolume}
+
+              onVolumePreview={previewRoomVolume}
+              onVolumeCommit={saveRoomVolume}
+
               onAddRoom={addRoom}
-              onUpdateRoom={(id, data) => updateRoom(id, data)}
+              onUpdateRoom={updateRoomFromForm}
               onDeleteRoom={deleteRoom}
               onDuplicateRoom={duplicateRoom}
+
+              isLoading={roomsLoading}
+
+              error={
+                roomsError instanceof Error
+                  ? roomsError
+                  : roomsError
+                    ? new Error(String(roomsError))
+                    : null
+              }
+
+              onRetry={() => {
+                void refetchRooms()
+              }}
             />
           )}
 
@@ -120,12 +153,16 @@ export default function App() {
               onCreate={createScenario}
               onUpdate={updateScenario}
               onDelete={deleteScenario}
-              onDuplicate={duplicateScenario}
+              onDuplicate={
+                duplicateScenario
+              }
               onAddStep={addStep}
               onUpdateStep={updateStep}
               onRemoveStep={removeStep}
               onMoveStep={moveStep}
-              onValidate={validateScenario}
+              onValidate={
+                validateScenario
+              }
             />
           )}
 
@@ -136,7 +173,9 @@ export default function App() {
               onAdd={addSchedule}
               onUpdate={updateSchedule}
               onDelete={deleteSchedule}
-              onDuplicate={duplicateSchedule}
+              onDuplicate={
+                duplicateSchedule
+              }
               onToggle={toggleSchedule}
             />
           )}
@@ -145,9 +184,16 @@ export default function App() {
             <AudioFiles />
           )}
 
-          {page === "settings" && <Settings rooms={rooms} />}
+          {page === "settings" && (
+            <Settings rooms={rooms} />
+          )}
 
-          {page === "logs" && <Logs logs={logs} onClear={clearLogs} />}
+          {page === "logs" && (
+            <Logs
+              logs={logs}
+              onClear={clearLogs}
+            />
+          )}
         </main>
       </div>
 

@@ -116,16 +116,28 @@ export default function Settings({ rooms }: SettingsProps) {
         const config =
           configResult.status === "fulfilled"
             ? configResult.value
-            : audioSettingsApi.readLocal()
+            : null
 
         setSavedAudioConfig(config)
         setIsLoadingConfig(false)
 
+        if (configResult.status === "rejected") {
+          toast.error(t("settings.lineMapping.saveFailed"), {
+            description:
+              configResult.reason instanceof Error
+                ? configResult.reason.message
+                : t("settings.lineMapping.saveFailedDescription"),
+          })
+        }
+
         if (devicesResult.status === "fulfilled") {
-          applyDevicesResponse(devicesResult.value, config.deviceId)
+          applyDevicesResponse(
+            devicesResult.value,
+            config?.deviceId ?? null,
+          )
         } else {
           setDevices([])
-          setSelectedDeviceId(config.deviceId ?? "")
+          setSelectedDeviceId(config?.deviceId ?? "")
           setDevicesError(
             devicesResult.reason instanceof Error
               ? devicesResult.reason.message

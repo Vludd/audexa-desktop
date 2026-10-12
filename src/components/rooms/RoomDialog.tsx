@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Plus, Save } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+import { audioApi } from "@/api/audio"
 import type { Room } from "@/types"
 import { t } from "@/i18n"
 
@@ -26,7 +28,7 @@ interface Props {
   room?: Room | null
 
   onOpenChange: (open: boolean) => void
-  onSave: (data: RoomFormData) => void
+  onSave: (data: RoomFormData) => void | Promise<void>
 }
 
 export default function RoomDialog({
@@ -37,28 +39,53 @@ export default function RoomDialog({
 }: Props) {
   const isEditing = Boolean(room)
 
-  const [name, setName] = useState("")
-  const [audioFileId, setAudioFileId] = useState("")
-  const [volume, setVolume] = useState("100")
+  const [name, setName] = useState(
+    room?.name ?? "",
+  )
 
-  const [nameError, setNameError] = useState("")
+  const [audioFileId, setAudioFileId] =
+    useState(
+      room?.audioFileId ?? "",
+    )
+
+  const [volume, setVolume] =
+    useState(
+      String(room?.volume ?? 100),
+    )
+
+  const [nameError, setNameError] =
+    useState("")
+
+  const [submitError, setSubmitError] =
+    useState("")
+
+  const [isSaving, setIsSaving] =
+    useState(false)
+
+  const {
+    data: audioFiles = [],
+    isLoading: isAudioLoading,
+    isError: isAudioError,
+  } = useQuery({
+    queryKey: ["audio-files"],
+    queryFn: audioApi.getAll,
+    enabled: open,
+  })
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      setNameError("")
-      onOpenChange(false)
+    if (isSaving) {
       return
     }
 
-    setName(room?.name ?? "")
-    setAudioFileId(room?.audioFileId ?? "")
-    setVolume(String(room?.volume ?? 100))
-    setNameError("")
+    if (!nextOpen) {
+      setNameError("")
+      setSubmitError("")
+    }
 
-    onOpenChange(true)
+    onOpenChange(nextOpen)
   }
 
-  const handleSubmit = (
+  const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault()
@@ -71,6 +98,7 @@ export default function RoomDialog({
     }
 
     setNameError("")
+    setSubmitError("")
 
     const parsedVolume = Number(volume)
 
@@ -78,11 +106,23 @@ export default function RoomDialog({
       ? Math.min(100, Math.max(0, parsedVolume))
       : 100
 
-    onSave({
-      name: normalizedName,
-      audioFileId: audioFileId.trim() || null,
-      volume: normalizedVolume,
-    })
+    try {
+      setIsSaving(true)
+
+      await onSave({
+        name: normalizedName,
+        audioFileId: audioFileId || null,
+        volume: normalizedVolume,
+      })
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось сохранить комнату.",
+      )
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -102,7 +142,7 @@ export default function RoomDialog({
             <DialogDescription>
               {isEditing
                 ? t("rooms.dialog.editDescription", {
-                    id: String(room?.id).padStart(2, "0"),
+                    id: String(room?.id),
                   })
                 : t("rooms.dialog.createDescription")}
             </DialogDescription>
@@ -126,9 +166,16 @@ export default function RoomDialog({
                   if (nameError) {
                     setNameError("")
                   }
+
+                  if (submitError) {
+                    setSubmitError("")
+                  }
                 }}
-                placeholder={t("rooms.dialog.namePlaceholder")}
+                placeholder={t(
+                  "rooms.dialog.namePlaceholder",
+                )}
                 autoFocus
+                disabled={isSaving}
                 aria-invalid={Boolean(nameError)}
               />
 
@@ -147,18 +194,45 @@ export default function RoomDialog({
                 {t("rooms.dialog.audioFile")}
               </label>
 
-              <Input
+              <select
                 id="room-audio-file"
                 value={audioFileId}
                 onChange={(event) =>
                   setAudioFileId(event.target.value)
                 }
-                placeholder="audio-01"
-              />
+                disabled={
+                  isSaving || isAudioLoading
+                }
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">
+                  {isAudioLoading
+                    ? "Загрузка аудиофайлов..."
+                    : "Без аудиофайла"}
+                </option>
 
-              <p className="text-xs text-muted-foreground">
-                {t("rooms.dialog.audioFileHelp")}
-              </p>
+                {audioFiles.map((file) => (
+                  <option
+                    key={file.id}
+                    value={file.id}
+                  >
+                    {file.name}
+                    {file.filename
+                      ? ` · ${file.filename}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+
+              {isAudioError ? (
+                <p className="text-xs text-destructive">
+                  Не удалось загрузить аудиофайлы.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Выберите аудиофайл из Audio Library.
+                </p>
+              )}
             </div>
 
             <div className="grid gap-1.5">
@@ -180,6 +254,7 @@ export default function RoomDialog({
                     setVolume(event.target.value)
                   }
                   className="w-24"
+                  disabled={isSaving}
                 />
 
                 <span className="text-sm text-muted-foreground">
@@ -187,27 +262,48 @@ export default function RoomDialog({
                 </span>
               </div>
             </div>
+
+            {submitError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {submitError}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => handleOpenChange(false)}
+              onClick={() =>
+                handleOpenChange(false)
+              }
+              disabled={isSaving}
             >
               {t("common.cancel")}
             </Button>
 
-            <Button type="submit">
-              {isEditing ? (
-                <Save className="size-4" />
+            <Button
+              type="submit"
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Сохранение...
+                </>
               ) : (
-                <Plus className="size-4" />
-              )}
+                <>
+                  {isEditing ? (
+                    <Save className="size-4" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
 
-              {isEditing
-                ? t("common.save")
-                : t("common.add")}
+                  {isEditing
+                    ? t("common.save")
+                    : t("common.add")}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>

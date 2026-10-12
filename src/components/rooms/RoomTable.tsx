@@ -33,6 +33,7 @@ import StatusBadge from "@/components/StatusBadge"
 import { Slider } from "../ui/slider"
 import { formatTime, getProgress } from "@/lib/audio"
 import { t } from "@/i18n"
+import { useRef } from "react"
 
 type RoomListItem = {
   room: Room
@@ -51,7 +52,12 @@ interface Props {
   onDuplicate: (room: Room) => void
   onDelete: (room: Room) => void
 
-  onVolumeChange: (id: string, vol: number) => void
+  onVolumePreview: (id: string, volume: number) => void
+  onVolumeCommit: (
+    id: string,
+    volume: number,
+    previousVolume: number,
+  ) => void | Promise<void>
 }
 
 export default function RoomTable({
@@ -63,8 +69,11 @@ export default function RoomTable({
   onEdit,
   onDuplicate,
   onDelete,
-  onVolumeChange
+  onVolumePreview,
+  onVolumeCommit
 }: Props) {
+
+  const volumeBeforeDrag = useRef<number | null>(null)
 
   return (
     <Card className="overflow-hidden">
@@ -137,25 +146,37 @@ export default function RoomTable({
                 <TableCell>
                   <div className="flex min-w-[150px] items-center gap-3">
                     <Slider
-                      trackClassName="bg-muted-foreground/25"
                       value={[room.volume]}
-                      min={0}
-                      max={100}
-                      step={1}
-                      disabled={isPending}
                       onValueChange={(value) => {
-                        const volume = Array.isArray(value)
-                          ? value[0]
-                          : value
+                        const volume = Array.isArray(value) ? value[0] : value
 
-                        if (typeof volume === "number") {
-                          onVolumeChange(room.id, volume)
+                        if (typeof volume !== "number") {
+                          return
                         }
+
+                        if (volumeBeforeDrag.current === null) {
+                          volumeBeforeDrag.current = room.volume
+                        }
+
+                        onVolumePreview(room.id, volume)
                       }}
-                      aria-label={t("rooms.table.roomVolume", {
-                        name: room.name,
-                      })}
-                      className="w-24"
+                      onValueCommitted={(value) => {
+                        const volume = Array.isArray(value) ? value[0] : value
+
+                        if (typeof volume !== "number") {
+                          return
+                        }
+
+                        const previousVolume = volumeBeforeDrag.current ?? room.volume
+
+                        volumeBeforeDrag.current = null
+
+                        void onVolumeCommit(
+                          room.id,
+                          volume,
+                          previousVolume,
+                        )
+                      }}
                     />
 
                     <span className="min-w-9 text-right text-xs font-medium tabular-nums">
