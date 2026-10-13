@@ -27,7 +27,16 @@ import RoomTable from "@/components/rooms/RoomTable"
 
 import RoomToolbar from "@/components/rooms/RoomToolbar"
 
+import { Card, CardContent } from "@/components/ui/card"
 import ConfirmDialog from "@/components/ui/confirm-dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 import { useConfirm } from "@/hooks/useConfirm"
 
@@ -372,9 +381,7 @@ export default function Rooms({
         />
 
         {isLoading ? (
-          <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-            Загрузка комнат...
-          </div>
+          viewGrid ? <RoomCardSkeleton /> : <RoomTableSkeleton />
         ) : error ? (
           <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-destructive/40 text-center">
             <div>
@@ -544,4 +551,114 @@ export default function Rooms({
       />
     </div>
   )
+}
+
+function RoomCardSkeleton() {
+  return (
+    <div
+      aria-label="Загрузка комнат"
+      aria-busy="true"
+      className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3"
+    >
+      {Array.from({ length: 6 }, (_, index) => (
+        <Card key={index} className="animate-pulse">
+          <CardContent>
+            <div className="mb-2.5 flex items-start justify-between">
+              <div className="w-full space-y-2">
+                <SkeletonBlock className="h-7 w-10" />
+                <SkeletonBlock className="h-4 w-3/4" />
+                <SkeletonBlock className="h-5 w-20 rounded-full" />
+              </div>
+              <SkeletonBlock className="size-8 shrink-0" />
+            </div>
+
+            <SkeletonBlock className="mb-2.5 h-3 w-2/3" />
+
+            <div className="mb-3 space-y-2">
+              <div className="flex justify-between">
+                <SkeletonBlock className="h-3 w-10" />
+                <SkeletonBlock className="h-3 w-10" />
+              </div>
+              <SkeletonBlock className="h-1.5 w-full rounded-full" />
+            </div>
+
+            <div className="mb-2.5 flex items-center gap-2">
+              <SkeletonBlock className="h-2 w-24 rounded-full" />
+              <SkeletonBlock className="h-4 w-9" />
+            </div>
+
+            <div className="flex gap-1.5">
+              <SkeletonBlock className="h-8 flex-1" />
+              <SkeletonBlock className="h-8 flex-1" />
+              <SkeletonBlock className="h-8 flex-1" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function RoomTableSkeleton() {
+  return (
+    <Card
+      aria-label="Загрузка комнат"
+      aria-busy="true"
+      className="animate-pulse overflow-hidden"
+    >
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-16 text-center">#</TableHead>
+            <TableHead>{t("rooms.table.room")}</TableHead>
+            <TableHead className="w-16">{t("rooms.table.status")}</TableHead>
+            <TableHead>{t("rooms.table.file")}</TableHead>
+            <TableHead>{t("rooms.table.volume")}</TableHead>
+            <TableHead className="w-72">{t("rooms.table.actions")}</TableHead>
+            <TableHead className="w-12" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 5 }, (_, index) => (
+            <TableRow key={index}>
+              <TableCell className="text-center">
+                <SkeletonBlock className="mx-auto h-4 w-6" />
+              </TableCell>
+              <TableCell>
+                <SkeletonBlock className="mb-2 h-4 w-32" />
+                <div className="mb-2 flex justify-between">
+                  <SkeletonBlock className="h-3 w-10" />
+                  <SkeletonBlock className="h-3 w-10" />
+                </div>
+                <SkeletonBlock className="h-1.5 w-full rounded-full" />
+              </TableCell>
+              <TableCell>
+                <SkeletonBlock className="h-5 w-16 rounded-full" />
+              </TableCell>
+              <TableCell>
+                <SkeletonBlock className="h-4 w-36" />
+              </TableCell>
+              <TableCell>
+                <SkeletonBlock className="h-2 w-24 rounded-full" />
+              </TableCell>
+              <TableCell>
+                <div className="flex gap-1.5">
+                  <SkeletonBlock className="h-8 w-16" />
+                  <SkeletonBlock className="h-8 w-16" />
+                  <SkeletonBlock className="h-8 w-16" />
+                </div>
+              </TableCell>
+              <TableCell>
+                <SkeletonBlock className="size-8" />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  )
+}
+
+function SkeletonBlock({ className }: { className: string }) {
+  return <div aria-hidden="true" className={`rounded bg-muted ${className}`} />
 }
