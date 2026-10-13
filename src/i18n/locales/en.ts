@@ -64,6 +64,8 @@ export const en: Widen<typeof ru> = {
 
     fileNotAssigned: "No file assigned",
 
+    fileUnavailable: "Audio file unavailable",
+
     confirm: "Confirm",
 
     executing: "Working...",

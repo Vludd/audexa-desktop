@@ -35,6 +35,7 @@ export const ru = {
     pausing: "Пауза...",
     notAssigned: "Не назначено",
     fileNotAssigned: "Файл не назначен",
+    fileUnavailable: "Аудиофайл недоступен",
     confirm: "Подтвердить",
     executing: "Выполнение...",
     closeNotification: "Закрыть уведомление",
