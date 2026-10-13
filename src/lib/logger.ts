@@ -2,13 +2,15 @@ import type { LogEntry, LogLevel, LogSource } from "@/types"
 import { formatTime as formatLocalizedTime, t } from "@/i18n"
 
 const STORAGE_KEY = "audexa.frontend.logs.v1"
-const SETTINGS_STORAGE_KEY =
-  "audexa.frontend.logging.settings.v1"
+const SETTINGS_STORAGE_KEY = "audexa.frontend.logging.settings.v1"
 
 const LOG_RETENTION_DAYS = 7
 const MAX_LOGS = 2000
-const LOG_RETENTION_MS =
-  LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000
+const MAX_LOG_STORAGE_BYTES = 2 * 1024 * 1024
+const MAX_CONTEXT_CHARS = 12_000
+const LOG_EMIT_DELAY_MS = 100
+const LOG_PERSIST_DELAY_MS = 750
+const LOG_RETENTION_MS = LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000
 
 type LogContext = Record<string, unknown>
 
@@ -24,18 +26,16 @@ export interface LoggingSettings {
   level: LogLevel
 }
 
-export type LogStorageInfo =
-  | {
-      type: "localStorage"
-      label: string
-      description: string
-    }
-  | {
-      type: "file"
-      label: string
-      description: string
-      path: string
-    }
+export type LogStorageInfo = {
+  type: "localStorage"
+  label: string
+  description: string
+} | {
+  type: "file"
+  label: string
+  description: string
+  path: string
+}
 
 interface AudexaLogStorageInfo {
   type: "file"
@@ -61,6 +61,15 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
 
 let loggingSettings = loadLoggingSettings()
 let entries: LogEntry[] = loadLogs()
+let entriesSize = entries.reduce(
+  (total, entry) => total + estimateEntryBytes(entry),
+  0,
+)
+let pendingEntries: LogEntry[] = []
+let pendingEntriesSize = 0
+let emitTimer: ReturnType<typeof setTimeout> | undefined
+let persistTimer: ReturnType<typeof setTimeout> | undefined
+const loadedEntryCount = entries.length
 
 const listeners = new Set<() => void>()
 const settingsListeners = new Set<() => void>()
@@ -74,16 +83,13 @@ function isLogLevel(value: unknown): value is LogLevel {
   )
 }
 
-
 function loadLoggingSettings(): LoggingSettings {
   if (typeof window === "undefined") {
     return DEFAULT_LOGGING_SETTINGS
   }
 
   try {
-    const raw = window.localStorage.getItem(
-      SETTINGS_STORAGE_KEY,
-    )
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
 
     if (!raw) {
       return DEFAULT_LOGGING_SETTINGS
@@ -91,11 +97,7 @@ function loadLoggingSettings(): LoggingSettings {
 
     const parsed = JSON.parse(raw)
 
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      isLogLevel(parsed.level)
-    ) {
+    if (parsed && typeof parsed === "object" && isLogLevel(parsed.level)) {
       return {
         level: parsed.level,
       }
@@ -144,9 +146,7 @@ export function setLoggingLevel(level: LogLevel) {
   emitSettings()
 }
 
-export function subscribeLoggingSettings(
-  listener: () => void,
-) {
+export function subscribeLoggingSettings(listener: () => void) {
   settingsListeners.add(listener)
 
   const handleStorage = (event: StorageEvent) => {
@@ -163,13 +163,9 @@ export function subscribeLoggingSettings(
   return () => {
     settingsListeners.delete(listener)
 
-    window.removeEventListener(
-      "storage",
-      handleStorage,
-    )
+    window.removeEventListener("storage", handleStorage)
   }
 }
-
 
 /**
  * Returns information about the actual log storage.
@@ -190,8 +186,7 @@ export function subscribeLoggingSettings(
  */
 export function getLogStorageInfo(): LogStorageInfo {
   if (typeof window !== "undefined") {
-    const nativeStorage =
-      window.__AUDEXA_LOG_STORAGE__
+    const nativeStorage = window.__AUDEXA_LOG_STORAGE__
 
     if (
       nativeStorage?.type === "file" &&
@@ -201,9 +196,7 @@ export function getLogStorageInfo(): LogStorageInfo {
       return {
         type: "file",
         label: t("settings.logging.storage.file"),
-        description: t(
-          "settings.logging.storage.fileDescription",
-        ),
+        description: t("settings.logging.storage.fileDescription"),
         path: nativeStorage.path,
       }
     }
@@ -212,20 +205,13 @@ export function getLogStorageInfo(): LogStorageInfo {
   return {
     type: "localStorage",
     label: t("settings.logging.storage.localStorage"),
-    description: t(
-      "settings.logging.storage.localStorageDescription",
-    ),
+    description: t("settings.logging.storage.localStorageDescription"),
   }
 }
 
-
 function shouldWrite(level: LogLevel) {
-  return (
-    LOG_LEVEL_PRIORITY[level] >=
-    LOG_LEVEL_PRIORITY[loggingSettings.level]
-  )
+  return LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[loggingSettings.level]
 }
-
 
 function loadLogs(): LogEntry[] {
   if (typeof window === "undefined") {
@@ -233,9 +219,7 @@ function loadLogs(): LogEntry[] {
   }
 
   try {
-    const raw = window.localStorage.getItem(
-      STORAGE_KEY,
-    )
+    const raw = window.localStorage.getItem(STORAGE_KEY)
 
     if (!raw) {
       return []
@@ -247,17 +231,13 @@ function loadLogs(): LogEntry[] {
       return []
     }
 
-    return cleanupLogs(
-      parsed.filter(isLogEntry),
-    )
+    return cleanupLogs(parsed.filter(isLogEntry))
   } catch {
     return []
   }
 }
 
-function isLogEntry(
-  value: unknown,
-): value is LogEntry {
+function isLogEntry(value: unknown): value is LogEntry {
   if (!value || typeof value !== "object") {
     return false
   }
@@ -275,17 +255,12 @@ function isLogEntry(
   )
 }
 
-function cleanupLogs(
-  logs: LogEntry[],
-): LogEntry[] {
-  const cutoff =
-    Date.now() - LOG_RETENTION_MS
+function cleanupLogs(logs: LogEntry[]): LogEntry[] {
+  const cutoff = Date.now() - LOG_RETENTION_MS
 
   return logs
     .filter((entry) => {
-      const timestamp = Date.parse(
-        entry.timestamp,
-      )
+      const timestamp = Date.parse(entry.timestamp)
 
       if (Number.isNaN(timestamp)) {
         return false
@@ -293,14 +268,9 @@ function cleanupLogs(
 
       return timestamp >= cutoff
     })
-    .sort(
-      (a, b) =>
-        Date.parse(a.timestamp) -
-        Date.parse(b.timestamp),
-    )
+    .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
     .slice(-MAX_LOGS)
 }
-
 
 function persist() {
   if (typeof window === "undefined") {
@@ -308,45 +278,122 @@ function persist() {
   }
 
   try {
-    const cleaned = cleanupLogs(entries)
-
-    entries = cleaned
-
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(entries),
-    )
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {
     // Logging must never break the application
     // if localStorage is unavailable.
   }
 }
 
+function persistNow() {
+  if (persistTimer !== undefined) {
+    clearTimeout(persistTimer)
+    persistTimer = undefined
+  }
+  persist()
+}
+
 function emit() {
   listeners.forEach((listener) => listener())
 }
 
+function estimateEntryBytes(entry: LogEntry) {
+  return JSON.stringify(entry).length * 2
+}
+
+function trimEntries() {
+  const cutoff = Date.now() - LOG_RETENTION_MS
+  let firstRetainedIndex = 0
+
+  while (firstRetainedIndex < entries.length) {
+    const timestamp = Date.parse(entries[firstRetainedIndex].timestamp)
+    const expired = Number.isNaN(timestamp) || timestamp < cutoff
+
+    if (
+      !expired &&
+      entries.length - firstRetainedIndex <= MAX_LOGS &&
+      entriesSize <= MAX_LOG_STORAGE_BYTES
+    ) {
+      break
+    }
+
+    entriesSize -= estimateEntryBytes(entries[firstRetainedIndex])
+    firstRetainedIndex += 1
+  }
+
+  if (firstRetainedIndex > 0) {
+    entries = entries.slice(firstRetainedIndex)
+  }
+}
+
+trimEntries()
+if (entries.length !== loadedEntryCount) {
+  persist()
+}
+
+function flushPendingEntries() {
+  if (emitTimer !== undefined) {
+    clearTimeout(emitTimer)
+    emitTimer = undefined
+  }
+
+  if (pendingEntries.length === 0) {
+    return
+  }
+
+  entries = entries.concat(pendingEntries)
+  entriesSize += pendingEntriesSize
+  pendingEntries = []
+  pendingEntriesSize = 0
+  trimEntries()
+  emit()
+
+  if (persistTimer === undefined) {
+    persistTimer = setTimeout(() => {
+      persistTimer = undefined
+      persist()
+    }, LOG_PERSIST_DELAY_MS)
+  }
+}
+
+function scheduleLogFlush() {
+  if (emitTimer === undefined) {
+    emitTimer = setTimeout(flushPendingEntries, LOG_EMIT_DELAY_MS)
+  }
+}
+
+function flushLogs() {
+  flushPendingEntries()
+  persistNow()
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", flushLogs)
+}
 
 function formatTime(timestamp: Date) {
   return formatLocalizedTime(timestamp)
 }
 
-function sanitizeContext(
-  context?: LogContext,
-) {
+function sanitizeContext(context?: LogContext) {
   if (!context) {
     return undefined
   }
 
   try {
-    JSON.stringify(context)
+    const serialized = JSON.stringify(context)
 
-    return context
+    if (serialized.length <= MAX_CONTEXT_CHARS) {
+      return context
+    }
+
+    return {
+      truncated: true,
+      preview: serialized.slice(0, MAX_CONTEXT_CHARS),
+    }
   } catch {
     return {
-      serializationError: t(
-        "logs.messages.contextSerializationError",
-      ),
+      serializationError: t("logs.messages.contextSerializationError"),
     }
   }
 }
@@ -368,9 +415,7 @@ function write(input: LogInput) {
   const now = new Date()
 
   const entry: LogEntry = {
-    id: `${now.getTime()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`,
+    id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
 
     timestamp: now.toISOString(),
 
@@ -384,22 +429,15 @@ function write(input: LogInput) {
 
     message: input.message,
 
-    context: sanitizeContext(
-      input.context,
-    ),
+    context: sanitizeContext(input.context),
   }
 
-  entries = cleanupLogs([
-    ...entries,
-    entry,
-  ])
-
-  persist()
-  emit()
+  pendingEntries.push(entry)
+  pendingEntriesSize += estimateEntryBytes(entry)
+  scheduleLogFlush()
 
   return entry
 }
-
 
 export const logger = {
   debug(
@@ -463,73 +501,73 @@ export const logger = {
   },
 }
 
-
 export function getLogs() {
   return entries
 }
 
 export function clearLogs() {
-  entries = []
+  pendingEntries = []
+  pendingEntriesSize = 0
 
-  persist()
+  if (emitTimer !== undefined) {
+    clearTimeout(emitTimer)
+    emitTimer = undefined
+  }
+
+  entries = []
+  entriesSize = 0
+
+  persistNow()
   emit()
 }
 
 export function removeLog(id: string) {
-  entries = entries.filter(
-    (entry) => entry.id !== id,
+  flushPendingEntries()
+  entries = entries.filter((entry) => entry.id !== id)
+  entriesSize = entries.reduce(
+    (total, entry) => total + estimateEntryBytes(entry),
+    0,
   )
 
-  persist()
+  persistNow()
   emit()
 }
 
-export function subscribeLogs(
-  listener: () => void,
-) {
+export function subscribeLogs(listener: () => void) {
   listeners.add(listener)
 
-  const handleStorage = (
-    event: StorageEvent,
-  ) => {
+  const handleStorage = (event: StorageEvent) => {
     if (event.key !== STORAGE_KEY) {
       return
     }
 
     entries = loadLogs()
+    entriesSize = entries.reduce(
+      (total, entry) => total + estimateEntryBytes(entry),
+      0,
+    )
 
     listener()
   }
 
-  window.addEventListener(
-    "storage",
-    handleStorage,
-  )
+  window.addEventListener("storage", handleStorage)
 
   return () => {
     listeners.delete(listener)
 
-    window.removeEventListener(
-      "storage",
-      handleStorage,
-    )
+    window.removeEventListener("storage", handleStorage)
   }
 }
 
+export function exportLogs(format: "json" | "csv" | "txt" = "json") {
+  const logs = pendingEntries.length ? entries.concat(pendingEntries) : entries
 
-export function exportLogs(
-  format: "json" | "csv" | "txt" = "json",
-) {
   if (format === "json") {
-    return JSON.stringify(
-      entries,
-      null,
-      2,
-    )
+    return JSON.stringify(logs, null, 2)
   }
 
   if (format === "txt") {
-    return entries
+    return logs
       .map(
         (entry) =>
           `${entry.timestamp} [${entry.level}] [${entry.source}] ${entry.event}: ${entry.message}`,
@@ -537,10 +575,9 @@ export function exportLogs(
       .join("\n")
   }
 
-  const header =
-    "timestamp,time,level,source,event,message"
+  const header = "timestamp,time,level,source,event,message"
 
-  const rows = entries.map((entry) =>
+  const rows = logs.map((entry) =>
     [
       entry.timestamp,
       entry.time,
@@ -553,17 +590,9 @@ export function exportLogs(
       .join(","),
   )
 
-  return [
-    header,
-    ...rows,
-  ].join("\n")
+  return [header, ...rows].join("\n")
 }
 
-function csvEscape(
-  value: string,
-) {
-  return `"${value.replace(
-    /"/g,
-    '""',
-  )}"`
+function csvEscape(value: string) {
+  return `"${value.replace(/"/g, '""')}"`
 }

@@ -3,9 +3,7 @@ import { useMemo, useState } from "react"
 import type { LogEntry } from "@/types"
 import Header from "@/components/Header"
 import { t } from "@/i18n"
-import LogsToolbar, {
-  type LogFilter,
-} from "@/components/logs/LogsToolbar"
+import LogsToolbar, { type LogFilter } from "@/components/logs/LogsToolbar"
 import LogViewer from "@/components/logs/LogViewer"
 
 interface Props {
@@ -21,22 +19,13 @@ export default function Logs({ logs, onClear }: Props) {
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
 
-    return [...logs]
-      .sort(
-        (a, b) =>
-          Date.parse(b.timestamp) - Date.parse(a.timestamp),
-      )
+    return logs
       .filter((log) => {
-        if (
-          !includeDebug &&
-          filter === "all" &&
-          log.level === "DEBUG"
-        ) {
+        if (!includeDebug && filter === "all" && log.level === "DEBUG") {
           return false
         }
 
-        const matchesLevel =
-          filter === "all" || log.level === filter
+        const matchesLevel = filter === "all" || log.level === filter
 
         if (!matchesLevel) {
           return false
@@ -51,10 +40,9 @@ export default function Logs({ logs, onClear }: Props) {
           log.event,
           log.source,
           JSON.stringify(log.context ?? {}),
-        ].some((value) =>
-          value.toLowerCase().includes(normalizedQuery),
-        )
+        ].some((value) => value.toLowerCase().includes(normalizedQuery))
       })
+      .reverse()
   }, [filter, includeDebug, logs, query])
 
   return (
@@ -75,13 +63,15 @@ export default function Logs({ logs, onClear }: Props) {
         onClear={onClear}
       />
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        <LogViewer logs={filtered} />
+      <main className="flex min-h-0 flex-1 flex-col gap-2 p-4">
+        <div className="min-h-0 flex-1">
+          <LogViewer logs={filtered} />
+        </div>
 
-        <div className="mt-2 text-xs text-muted-foreground">
+        <div className="shrink-0 text-xs text-muted-foreground">
           {t("pages.logs.records")}: {filtered.length} / {logs.length}
         </div>
-      </div>
+      </main>
     </div>
   )
 }

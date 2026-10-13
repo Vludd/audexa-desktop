@@ -33,7 +33,6 @@ export default function LoggingSettings() {
   const settings = useSyncExternalStore(
     subscribeLoggingSettings,
     getLoggingSettings,
-    getLoggingSettings,
   )
 
   const storage = getLogStorageInfo()
