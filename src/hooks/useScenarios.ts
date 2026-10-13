@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react"
 
 import { mockScenarios } from "@/data/mock"
-import type { Room, Scenario, ScenarioStep } from "@/types"
+import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
 import { t } from "@/i18n"
 
 interface RoomActions {
@@ -31,10 +31,17 @@ export interface ScenarioValidation {
   warnings: string[]
 }
 
+interface ScenarioData {
+  rooms: Room[]
+  audioFiles: AudioFile[]
+}
+
 export function useScenarios({
   updateRoom,
   stopAllRooms,
-}: RoomActions) {
+  rooms,
+  audioFiles,
+}: RoomActions & ScenarioData) {
   const [scenarios, setScenarios] =
     useState<Scenario[]>(mockScenarios)
 
@@ -49,7 +56,7 @@ export function useScenarios({
 
         updateRoom(step.roomId, {
           status: "playing",
-          audioFileId: step.file || null,
+          audioFileId: step.audioFileId,
           volume: step.volume,
           position: 0,
         })
@@ -65,7 +72,7 @@ export function useScenarios({
     })
   }, [stopAllRooms])
 
-  const createScenario = useCallback(() => {
+  const createScenario = useCallback((patch: ScenarioUpdate = {}) => {
     let newId = 1
 
     setScenarios((current) => {
@@ -87,6 +94,7 @@ export function useScenarios({
         syncTranslation: false,
         crossfade: false,
         notifications: true,
+        ...patch,
       }
 
       return [...current, scenario]
@@ -170,7 +178,8 @@ export function useScenarios({
           const newStep: ScenarioStep = {
             id: nextId,
             roomId: step?.roomId ?? "",
-            roomName: step?.roomName ?? t("scenarios.editor.notSelected"),
+            roomName: step?.roomName ?? "",
+            audioFileId: step?.audioFileId ?? null,
             file: step?.file ?? "",
             volume: step?.volume ?? 100,
             delay: step?.delay ?? 0,
@@ -300,11 +309,19 @@ export function useScenarios({
           errors.push(
             t("scenarios.validation.roomRequired", { number }),
           )
+        } else if (!rooms.some((room) => room.id === step.roomId)) {
+          errors.push(
+            t("scenarios.validation.roomUnavailable", { number }),
+          )
         }
 
-        if (!step.file) {
+        if (!step.audioFileId) {
           errors.push(
             t("scenarios.validation.audioRequired", { number }),
+          )
+        } else if (!audioFiles.some((file) => file.id === step.audioFileId)) {
+          errors.push(
+            t("scenarios.validation.audioUnavailable", { number }),
           )
         }
 
@@ -333,7 +350,7 @@ export function useScenarios({
         warnings,
       }
     },
-    [],
+    [rooms, audioFiles],
   )
 
   return {

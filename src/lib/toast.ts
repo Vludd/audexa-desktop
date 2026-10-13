@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-export type ToastVariant = "success" | "warning" | "error"
+export type ToastVariant = "success" | "info" | "warning" | "error"
 
 export interface ToastOptions {
   description?: ReactNode
@@ -65,6 +65,9 @@ function show(
 export const toast = {
   success(title: string, options?: ToastOptions) {
     return show("success", title, options)
+  },
+  info(title: string, options?: ToastOptions) {
+    return show("info", title, options)
   },
   warning(title: string, options?: ToastOptions) {
     return show("warning", title, options)

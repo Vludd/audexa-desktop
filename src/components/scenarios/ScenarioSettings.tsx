@@ -1,146 +1,195 @@
-import type React from "react"
+import { useState, type ReactNode } from "react"
 
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import type { Scenario } from "@/types"
 import type { ScenarioUpdate } from "@/hooks/useScenarios"
 import { t } from "@/i18n"
 
 interface Props {
-  scenario: Scenario
-  onUpdate: (patch: ScenarioUpdate) => void
+  open: boolean
+  scenario: Scenario | null
+  mode: "create" | "edit"
+  onOpenChange: (open: boolean) => void
+  onSave: (patch: ScenarioUpdate) => void
 }
 
 export default function ScenarioSettings({
+  open,
   scenario,
-  onUpdate,
+  mode,
+  onOpenChange,
+  onSave,
 }: Props) {
+  const [draft, setDraft] = useState<ScenarioUpdate>(() =>
+    scenario
+      ? {
+          name: scenario.name,
+          description: scenario.description,
+          status: scenario.status,
+          playMode: scenario.playMode,
+          repeat: scenario.repeat,
+          stopPrevious: scenario.stopPrevious,
+        }
+      : {},
+  )
+
+  if (!scenario) return null
+
+  const value = {
+    name: draft.name ?? scenario.name,
+    description: draft.description ?? scenario.description,
+    status: draft.status ?? scenario.status,
+    playMode: draft.playMode ?? scenario.playMode,
+    repeat: draft.repeat ?? scenario.repeat,
+    stopPrevious: draft.stopPrevious ?? scenario.stopPrevious,
+  }
+
+  const update = (patch: ScenarioUpdate) => {
+    setDraft((current) => ({ ...current, ...patch }))
+  }
+
+  const handleSave = () => {
+    onSave(draft)
+    onOpenChange(false)
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-      <div className="rounded-lg border bg-card p-3.5">
-        <div className="mb-3 text-sm font-semibold">
-          {t("scenarios.settings.general")}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "create"
+              ? t("scenarios.settings.createTitle")
+              : t("scenarios.settings.editTitle")}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "create"
+              ? t("scenarios.settings.createDescription")
+              : t("scenarios.settings.editDescription")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-1">
+          <FieldRow label={t("scenarios.settings.name")}>
+            <Input
+              value={value.name}
+              onChange={(event) => update({ name: event.target.value })}
+              placeholder={t("scenarios.settings.namePlaceholder")}
+            />
+          </FieldRow>
+
+          <FieldRow label={t("scenarios.settings.description")}>
+            <Input
+              value={value.description}
+              onChange={(event) =>
+                update({ description: event.target.value })
+              }
+              placeholder={t("scenarios.settings.descriptionPlaceholder")}
+            />
+          </FieldRow>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label={t("scenarios.settings.playbackMode")}>
+              <Select
+                value={value.playMode}
+                onValueChange={(next) =>
+                  update({
+                    playMode:
+                      next === "parallel" ? "parallel" : "sequential",
+                  })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sequential">
+                    {t("scenarios.settings.sequential")}
+                  </SelectItem>
+                  <SelectItem value="parallel">
+                    {t("scenarios.settings.parallel")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldRow>
+
+            <FieldRow label={t("scenarios.settings.repeat")}>
+              <Select
+                value={value.repeat}
+                onValueChange={(next) =>
+                  update({
+                    repeat: next === "loop" ? "loop" : "once",
+                  })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">
+                    {t("scenarios.settings.once")}
+                  </SelectItem>
+                  <SelectItem value="loop">
+                    {t("scenarios.settings.loop")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldRow>
+          </div>
+
+          <div className="rounded-lg border bg-muted/30 px-3.5 py-2.5">
+            <CheckRow
+              label={t("scenarios.settings.active")}
+              checked={value.status === "active"}
+              onCheckedChange={(checked) =>
+                update({ status: checked ? "active" : "inactive" })
+              }
+            />
+            <CheckRow
+              label={t("scenarios.settings.stopPrevious")}
+              checked={value.stopPrevious ?? true}
+              onCheckedChange={(checked) =>
+                update({ stopPrevious: checked })
+              }
+            />
+          </div>
         </div>
 
-        <FieldRow label={t("scenarios.settings.name")}>
-          <Input
-            value={scenario.name}
-            onChange={(event) =>
-              onUpdate({
-                name: event.target.value,
-              })
-            }
-            className="h-9"
-          />
-        </FieldRow>
-
-        <FieldRow label={t("scenarios.settings.description")}>
-          <Textarea
-            value={scenario.description}
-            onChange={(event) =>
-              onUpdate({
-                description: event.target.value,
-              })
-            }
-            rows={2}
-          />
-        </FieldRow>
-
-        <FieldRow label={t("scenarios.settings.playbackMode")}>
-          <select
-            value={scenario.playMode}
-            onChange={(event) =>
-              onUpdate({
-                playMode:
-                  event.target.value === "parallel"
-                    ? "parallel"
-                    : "sequential",
-              })
-            }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
           >
-            <option value="sequential">
-              {t("scenarios.settings.sequential")}
-            </option>
-
-            <option value="parallel">
-              {t("scenarios.settings.parallel")}
-            </option>
-          </select>
-        </FieldRow>
-
-        <FieldRow label={t("scenarios.settings.repeat")}>
-          <select
-            value={scenario.repeat}
-            onChange={(event) =>
-              onUpdate({
-                repeat:
-                  event.target.value === "loop"
-                    ? "loop"
-                    : "once",
-              })
-            }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="button"
+            disabled={!value.name.trim()}
+            onClick={handleSave}
           >
-            <option value="once">
-              {t("scenarios.settings.once")}
-            </option>
-
-            <option value="loop">
-              {t("scenarios.settings.loop")}
-            </option>
-          </select>
-        </FieldRow>
-      </div>
-
-      <div className="rounded-lg border bg-card p-3.5">
-        <div className="mb-3 text-sm font-semibold">
-          {t("scenarios.settings.additional")}
-        </div>
-
-        <CheckRow
-          label={t("scenarios.settings.autoStart")}
-          checked={scenario.autoStart}
-          onCheckedChange={(value) =>
-            onUpdate({ autoStart: value })
-          }
-        />
-
-        <CheckRow
-          label={t("scenarios.settings.stopPrevious")}
-          checked={scenario.stopPrevious}
-          onCheckedChange={(value) =>
-            onUpdate({ stopPrevious: value })
-          }
-        />
-
-        <CheckRow
-          label={t("scenarios.settings.syncTranslation")}
-          checked={scenario.syncTranslation}
-          onCheckedChange={(value) =>
-            onUpdate({ syncTranslation: value })
-          }
-        />
-
-        <CheckRow
-          label={t("scenarios.settings.crossfade")}
-          checked={scenario.crossfade}
-          onCheckedChange={(value) =>
-            onUpdate({ crossfade: value })
-          }
-        />
-
-        <CheckRow
-          label={t("scenarios.settings.notifications")}
-          checked={scenario.notifications}
-          onCheckedChange={(value) =>
-            onUpdate({ notifications: value })
-          }
-        />
-      </div>
-    </div>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -149,14 +198,13 @@ function FieldRow({
   children,
 }: {
   label: string
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
-    <div className="mb-3">
-      <label className="mb-1.5 block text-xs text-muted-foreground">
+    <div className="grid gap-1.5">
+      <label className="text-xs font-medium text-muted-foreground">
         {label}
       </label>
-
       {children}
     </div>
   )
@@ -172,15 +220,9 @@ function CheckRow({
   onCheckedChange: (value: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b py-2.5 last:border-0">
-      <span className="text-sm">
-        {label}
-      </span>
-
-      <Switch
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-      />
+    <div className="flex items-center justify-between gap-4 py-1.5">
+      <span className="text-sm">{label}</span>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
 }

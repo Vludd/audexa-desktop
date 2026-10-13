@@ -563,6 +563,10 @@ export const en: Widen<typeof ru> = {
       search: "Search scenarios...",
     },
 
+    confirmDelete: {
+      title: "Delete scenario?",
+      description: 'Scenario "{name}" will be deleted. This action cannot be undone.',
+    },
     list: {
       title: "Scenario list",
 
@@ -606,6 +610,13 @@ export const en: Widen<typeof ru> = {
     },
 
     settings: {
+      createTitle: "New scenario",
+      createDescription: "Set the main scenario parameters before creating it.",
+      editTitle: "Scenario settings",
+      editDescription: "Change the main parameters and scenario state.",
+      namePlaceholder: "For example, Tour #1",
+      descriptionPlaceholder: "Briefly describe the scenario purpose",
+      active: "Active",
       general: "General settings",
 
       name: "Name",
@@ -655,6 +666,14 @@ export const en: Widen<typeof ru> = {
       chooseRoom: "Select a room",
 
       chooseAudioFile: "Select an audio file",
+
+      dragHandle: "Drag step",
+
+      volumeFor: "Volume for step {number}",
+
+      deleteTitle: "Delete step?",
+      
+      deleteDescription: "Step {number} will be removed from the scenario.",
     },
 
     quickActions: {
@@ -684,7 +703,11 @@ export const en: Widen<typeof ru> = {
 
       roomRequired: "Step {number}: no room selected.",
 
+      roomUnavailable: "Step {number}: the selected room is unavailable.",
+
       audioRequired: "Step {number}: no audio file selected.",
+
+      audioUnavailable: "Step {number}: the selected audio file is unavailable.",
 
       volumeRange: "Step {number}: volume must be between 0 and 100%.",
 

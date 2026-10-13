@@ -13,6 +13,7 @@ import {
 } from "./data/mock"
 
 import { useRooms } from "./hooks/useRooms"
+import { useAudioFiles } from "./hooks/useAudioFiles"
 import { useScenarios } from "./hooks/useScenarios"
 import { useSchedule } from "./hooks/useSchedule"
 import { useLogs } from "./hooks/useLogs"
@@ -48,6 +49,10 @@ export default function App() {
     useState<Page>("dashboard")
 
   const { status } = useAudioSystem()
+
+  const { files: audioFiles } = useAudioFiles({
+    initialFiles: mockAudioFiles,
+  })
 
   const {
     rooms,
@@ -89,6 +94,8 @@ export default function App() {
   } = useScenarios({
     updateRoom,
     stopAllRooms,
+    rooms,
+    audioFiles,
   })
 
   const {
@@ -166,7 +173,7 @@ export default function App() {
             <Scenarios
               scenarios={scenarios}
               rooms={rooms}
-              audioFiles={mockAudioFiles}
+              audioFiles={audioFiles}
               onPlay={playScenario}
               onStop={stopScenario}
               onCreate={createScenario}

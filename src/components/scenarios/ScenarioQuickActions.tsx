@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import type { Scenario } from "@/types"
 import type { ScenarioValidation } from "@/hooks/useScenarios"
 import { t } from "@/i18n"
+import { toast } from "@/lib/toast"
 
 interface Props {
   scenario?: Scenario
@@ -36,19 +37,16 @@ export default function ScenarioQuickActions({
 
   const canRun =
     Boolean(scenario) &&
+    scenario?.status === "active" &&
     Boolean(validation?.valid)
 
   const handlePlay = () => {
     if (!scenario) return
 
     if (!validation?.valid) {
-      window.alert(
-        [
-          t("scenarios.quickActions.cannotRun"),
-          "",
-          ...(validation?.errors ?? []),
-        ].join("\n"),
-      )
+      toast.error(t("scenarios.quickActions.cannotRun"), {
+        description: validation?.errors.join(" "),
+      })
 
       return
     }
@@ -113,7 +111,7 @@ export default function ScenarioQuickActions({
               return
             }
 
-            window.alert(
+            toast.info(
               t("scenarios.quickActions.testRun", {
                 name: scenario.name,
               }),

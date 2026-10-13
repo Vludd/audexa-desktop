@@ -4,6 +4,7 @@ export interface ScenarioStep {
   id: number
   roomId: EntityId
   roomName: string
+  audioFileId: EntityId | null
   file: string
   volume: number
   delay: number

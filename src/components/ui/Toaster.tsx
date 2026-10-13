@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react"
-import { CheckCircle2, TriangleAlert, X, XCircle } from "lucide-react"
+import { CheckCircle2, Info, TriangleAlert, X, XCircle } from "lucide-react"
 
 import {
   getToasts,
@@ -15,6 +15,11 @@ const variantStyles = {
     icon: CheckCircle2,
     iconClass: "text-emerald-600 dark:text-emerald-400",
     progressClass: "bg-emerald-500",
+  },
+  info: {
+    icon: Info,
+    iconClass: "text-blue-600 dark:text-blue-400",
+    progressClass: "bg-blue-500",
   },
   warning: {
     icon: TriangleAlert,
