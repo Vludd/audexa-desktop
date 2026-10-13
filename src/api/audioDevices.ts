@@ -19,6 +19,8 @@ export interface AudioDevice {
   inputCount: number
   outputs: AudioChannel[]
   inputs: AudioChannel[]
+  sampleRate: number | null
+  bufferSize: number | null
 }
 
 interface AudioDevicesResponse {

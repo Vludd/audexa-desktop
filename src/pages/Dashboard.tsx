@@ -37,6 +37,7 @@ export default function Dashboard({
         <Header
           title={t("pages.dashboard.title")}
           subtitle={t("pages.dashboard.subtitle")}
+          systemOk={system.state === "ready"}
         />
 
         <main className="min-h-0 flex-1 overflow-auto p-4">

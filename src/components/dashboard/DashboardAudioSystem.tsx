@@ -6,69 +6,76 @@ interface DashboardAudioSystemProps {
   system: SystemStatus
 }
 
-export default function DashboardAudioSystem({
-  system,
-}: DashboardAudioSystemProps) {
+const stateLabel: Record<SystemStatus["state"], string> = {
+  unconfigured: "Не настроено",
+  initializing: "Инициализация",
+  ready: "ONLINE",
+  degraded: "DEGRADED",
+  disconnected: "DISCONNECTED",
+  error: "ERROR",
+}
+
+export default function DashboardAudioSystem({ system }: DashboardAudioSystemProps) {
+  const healthy = system.state === "ready"
+  const degraded = system.state === "degraded"
+
   return (
     <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
       <div className="flex items-center border-b px-4 py-3">
-        <h3 className="text-sm font-semibold">
-          {t("dashboard.audioSystem.title")}
-        </h3>
+        <h3 className="text-sm font-semibold">{t("dashboard.audioSystem.title")}</h3>
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-3.5">
-        <InfoRow
-          label={t("dashboard.audioSystem.device")}
-          value={system.device}
-        />
+        <InfoRow label={t("dashboard.audioSystem.device")} value={system.device ?? "—"} />
 
         <InfoRow
           label={t("dashboard.audioSystem.status")}
           value={
-            <Badge
-              variant={system.online ? "success" : "destructive"}
-            >
-              {system.online ? "ONLINE" : "OFFLINE"}
+            <Badge variant={healthy ? "success" : degraded ? "warning" : "destructive"}>
+              {stateLabel[system.state]}
             </Badge>
           }
         />
 
         <InfoRow
           label={t("dashboard.audioSystem.outputs")}
-          value={system.outputs}
+          value={`${system.availableOutputs} / ${system.outputs}`}
+        />
+
+        <InfoRow
+          label="Mapping"
+          value={`${system.mappedOutputs} / ${system.mappings}`}
         />
 
         <InfoRow
           label={t("dashboard.audioSystem.frequency")}
-          value={`${system.sampleRate / 1000} ${t("units.kilohertz")}`}
+          value={
+            system.sampleRate
+              ? `${system.sampleRate / 1000} ${t("units.kilohertz")}`
+              : "—"
+          }
         />
 
         <InfoRow
           label={t("dashboard.audioSystem.buffer")}
-          value={`${system.bufferSize} ${t("dashboard.audioSystem.samples")}`}
+          value={system.bufferSize ? `${system.bufferSize} ${t("dashboard.audioSystem.samples")}` : "—"}
         />
       </div>
+
+      {system.error && (
+        <div className="border-t px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
+          {system.error}
+        </div>
+      )}
     </div>
   )
 }
 
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string
-  value: React.ReactNode
-}) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="mb-0.5 text-[11px] text-muted-foreground">
-        {label}
-      </div>
-
-      <div className="truncate text-sm font-medium">
-        {value}
-      </div>
+      <div className="mb-0.5 text-[11px] text-muted-foreground">{label}</div>
+      <div className="truncate text-sm font-medium">{value}</div>
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import { useState } from "react"
 
+import { useAudioSystem } from "@/context/useAudioSystem"
+
 import { useLocale } from "@/i18n"
 import type { Page } from "./types"
 
 import {
   mockAudioFiles,
-  mockSystemStatus,
 } from "./data/mock"
 
 import { useRooms } from "./hooks/useRooms"
@@ -15,6 +16,7 @@ import { useLogs } from "./hooks/useLogs"
 
 import Sidebar from "./components/Sidebar"
 import Toaster from "./components/ui/Toaster"
+import StatusBar from "./components/StatusBar"
 
 import Dashboard from "./pages/Dashboard"
 import Rooms from "./pages/Rooms"
@@ -29,6 +31,8 @@ export default function App() {
 
   const [page, setPage] =
     useState<Page>("dashboard")
+
+  const { status } = useAudioSystem()
 
   const {
     rooms,
@@ -99,7 +103,7 @@ export default function App() {
             <Dashboard
               rooms={rooms}
               schedule={schedule}
-              system={mockSystemStatus}
+              system={status}
               logs={logs}
               onPauseRoom={pauseRoom}
               onStopRoom={stopRoom}
@@ -196,6 +200,11 @@ export default function App() {
           )}
         </main>
       </div>
+
+      <StatusBar
+        status={status}
+        onOpenSettings={() => setPage("settings")}
+      />
 
       <Toaster />
     </div>

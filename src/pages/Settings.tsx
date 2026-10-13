@@ -63,22 +63,38 @@ export default function Settings({ rooms }: SettingsProps) {
       response: Awaited<ReturnType<typeof audioDevicesApi.getAll>>,
       preferredDeviceId?: string | null,
     ) => {
-      setDevices(response.devices)
+      // Backend intentionally returns the complete Windows audio inventory.
+      // Settings only exposes render-capable devices because capture-only
+      // endpoints (microphones / microphone arrays) are not useful here.
+      const outputDevices = response.devices.filter(
+        (device) => device.outputCount > 0 && device.outputs.length > 0,
+      )
+
+      // Keep the currently configured device visible even when it is
+      // temporarily disconnected. This is important: configuration is
+      // persistent, connection state is not.
+      const configuredDevice = preferredDeviceId
+        ? response.devices.find((device) => device.id === preferredDeviceId)
+        : undefined
+
+      const visibleDevices = configuredDevice &&
+        !outputDevices.some((device) => device.id === configuredDevice.id)
+        ? [configuredDevice, ...outputDevices]
+        : outputDevices
+
+      setDevices(visibleDevices)
       setDevicesSupported(response.supported)
 
       setSelectedDeviceId((current) => {
-        if (current && response.devices.some((device) => device.id === current)) {
+        if (current && visibleDevices.some((device) => device.id === current)) {
           return current
         }
 
-        if (
-          preferredDeviceId &&
-          response.devices.some((device) => device.id === preferredDeviceId)
-        ) {
+        if (preferredDeviceId && visibleDevices.some((device) => device.id === preferredDeviceId)) {
           return preferredDeviceId
         }
 
-        return response.devices.find((device) => device.status === "online")?.id ?? response.devices[0]?.id ?? ""
+        return visibleDevices.find((device) => device.status === "online")?.id ?? visibleDevices[0]?.id ?? ""
       })
 
       setDevicesError(

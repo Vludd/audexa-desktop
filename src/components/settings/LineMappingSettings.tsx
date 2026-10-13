@@ -34,8 +34,10 @@ function buildMappings(
   rooms: Room[],
   outputs: AudioDevice["outputs"],
   savedMappings: Mapping[],
+  preserveSavedMappings: boolean,
 ): Mapping[] {
   const savedByRoom = new Map(savedMappings.map((mapping) => [mapping.roomId, mapping]))
+  const validOutputIds = new Set(outputs.map((output) => output.id))
   const used = new Set(
     savedMappings
       .map((mapping) => mapping.outputId)
@@ -44,7 +46,12 @@ function buildMappings(
 
   return rooms.map((room, index) => {
     const saved = savedByRoom.get(room.id)
-    if (saved) {
+
+    // A mapping belongs to the configured audio device. When the user
+    // switches devices, an output id from the previous device must never
+    // leak into the new configuration. The backend validates this too,
+    // but the frontend should send a clean configuration in the first place.
+    if (saved && (preserveSavedMappings || (saved.outputId && validOutputIds.has(saved.outputId)))) {
       return saved
     }
 
@@ -68,7 +75,8 @@ export default function LineMappingSettings({
   const outputs = selectedDevice?.outputs ?? EMPTY_OUTPUTS
   const savedMappings = savedConfig?.mappings ?? []
   const validOutputIds = new Set(outputs.map((output) => output.id))
-  const initialMappings = buildMappings(rooms, outputs, savedMappings)
+  const preserveSavedMappings = selectedDevice?.id === (savedConfig?.deviceId ?? null)
+  const initialMappings = buildMappings(rooms, outputs, savedMappings, preserveSavedMappings)
   const initialTranslationOutput =
     savedConfig?.translationOutputId && validOutputIds.has(savedConfig.translationOutputId)
       ? savedConfig.translationOutputId

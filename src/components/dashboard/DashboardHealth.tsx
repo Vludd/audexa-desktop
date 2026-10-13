@@ -32,10 +32,10 @@ export default function DashboardHealth({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <HealthCard
-        icon={system.online ? CheckCircle2 : XCircle}
+        icon={system.state === "ready" ? CheckCircle2 : XCircle}
         label={t("dashboard.health.system")}
-        value={system.online ? t("common.online") : t("common.offline")}
-        status={system.online ? "success" : "error"}
+        value={system.state === "ready" ? t("common.online") : system.state === "degraded" ? "DEGRADED" : system.state === "initializing" ? "INIT" : t("common.offline")}
+        status={system.state === "ready" ? "success" : system.state === "degraded" ? "warning" : "error"}
       />
 
       <HealthCard
@@ -50,7 +50,7 @@ export default function DashboardHealth({
       <HealthCard
         icon={Radio}
         label={t("dashboard.health.outputs")}
-        value={system.outputs}
+        value={`${system.availableOutputs} / ${system.outputs}`}
         description={t("dashboard.health.available")}
       />
 
