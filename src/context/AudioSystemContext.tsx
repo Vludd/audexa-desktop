@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -114,9 +115,11 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const refreshInFlight = useRef(false)
 
   const refresh = useCallback(async () => {
-    setError(null)
+    if (refreshInFlight.current) return
+    refreshInFlight.current = true
 
     try {
       const [nextConfig, nextDevices] = await Promise.all([
@@ -127,16 +130,19 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
       setConfig(nextConfig)
       setDevices(nextDevices.devices)
       setSupported(nextDevices.supported)
-
-      if (nextDevices.error && nextDevices.devices.length === 0) {
-        setError(nextDevices.error)
-      }
+      setError(
+        nextDevices.error && nextDevices.devices.length === 0
+          ? nextDevices.error
+          : null,
+      )
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Не удалось загрузить аудиосистему",
       )
+    } finally {
+      refreshInFlight.current = false
     }
   }, [])
 
@@ -179,28 +185,11 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     if (isLoading) return
 
     const timer = window.setInterval(() => {
-      void audioDevicesApi
-        .getAll()
-        .then((response) => {
-          setDevices(response.devices)
-          setSupported(response.supported)
-          if (response.error && response.devices.length === 0) {
-            setError(response.error)
-          } else {
-            setError(null)
-          }
-        })
-        .catch((requestError) => {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : "Не удалось проверить аудиоустройство",
-          )
-        })
+      void refresh()
     }, 5000)
 
     return () => window.clearInterval(timer)
-  }, [isLoading])
+  }, [isLoading, refresh])
 
   const saveConfig = useCallback(async (nextConfig: AudioSettingsConfig) => {
     setIsSaving(true)

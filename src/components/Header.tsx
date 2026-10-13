@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { CheckCircle, XCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { useAudioSystem } from "@/context/useAudioSystem"
 import { formatDate, formatTime, t } from "@/i18n"
 import LanguageSwitcher from "@/components/LanguageSwitcher"
 import ThemeSwitcher from "@/components/ThemeSwitcher"
@@ -9,11 +10,12 @@ import ThemeSwitcher from "@/components/ThemeSwitcher"
 interface Props {
   title: string
   subtitle?: string
-  systemOk?: boolean
 }
 
-export default function Header({ title, subtitle, systemOk = true }: Props) {
+export default function Header({ title, subtitle }: Props) {
   const [now, setNow] = useState(new Date())
+  const { status } = useAudioSystem()
+  const systemOk = status.state === "ready"
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)

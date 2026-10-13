@@ -62,6 +62,10 @@ export const ru = {
     allLinesOk: "Все линии в норме",
     checkConnection: "Проверьте подключение",
   },
+  network: {
+    backendDisconnected: "Соединение с сервером потеряно",
+    backendConnected: "Соединение с сервером восстановлено",
+  },
   statusBar: {
     audioDevice: "Аудиоустройство",
     outputs: "Выходы",

@@ -1,8 +1,11 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
+import { subscribeBackendStatus } from "@/api/client"
 import { useAudioSystem } from "@/context/useAudioSystem"
 
 import { useLocale } from "@/i18n"
+import { t } from "@/i18n"
+import { toast } from "@/lib/toast"
 import type { Page } from "./types"
 
 import {
@@ -28,6 +31,18 @@ import Logs from "./pages/Logs"
 
 export default function App() {
   useLocale()
+
+  useEffect(() => {
+    const unsubscribe = subscribeBackendStatus((online) => {
+      if (online) {
+        toast.success(t("network.backendConnected"))
+      } else {
+        toast.error(t("network.backendDisconnected"))
+      }
+    })
+
+    return unsubscribe
+  }, [])
 
   const [page, setPage] =
     useState<Page>("dashboard")

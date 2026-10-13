@@ -36,7 +36,9 @@ export function subscribeBackendStatus(
 ) {
   backendListeners.add(listener)
 
-  return () => backendListeners.delete(listener)
+  return () => {
+    backendListeners.delete(listener)
+  }
 }
 
 export function apiUrl(path: string): string {

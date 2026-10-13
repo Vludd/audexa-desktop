@@ -108,6 +108,12 @@ export const en: Widen<typeof ru> = {
     checkConnection: "Check the connection",
   },
 
+  network: {
+    backendDisconnected: "Connection to the server was lost",
+
+    backendConnected: "Connection to the server was restored",
+  },
+
   statusBar: {
     audioDevice: "Audio device",
 
