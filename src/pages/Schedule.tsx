@@ -28,7 +28,7 @@ interface Props {
 
 const INITIAL_FORM: ScheduleFormData = {
   time: "10:00",
-  scenarioId: 0,
+  scenarioId: "",
   scenarioName: "",
   days: [
     "mon",

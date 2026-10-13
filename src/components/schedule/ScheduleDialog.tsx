@@ -69,7 +69,7 @@ export default function ScheduleDialog({
 
   const canSave =
     Boolean(form.time) &&
-    form.scenarioId > 0 &&
+    Boolean(form.scenarioId) &&
     form.days.length > 0
 
   return (
@@ -109,12 +109,13 @@ export default function ScheduleDialog({
                   ? String(form.scenarioId)
                   : undefined
               }
-              onValueChange={(value) =>
+              onValueChange={(value) => {
+                if (!value) return
                 onChange({
                   ...form,
-                  scenarioId: Number(value),
+                  scenarioId: value,
                 })
-              }
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder={t("schedule.dialog.chooseScenario")} />

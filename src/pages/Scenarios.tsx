@@ -16,25 +16,28 @@ interface Props {
   scenarios: Scenario[]
   rooms: Room[]
   audioFiles: AudioFile[]
-  onPlay: (id: number) => void
-  onStop: (id: number) => void
-  onCreate: (patch?: ScenarioUpdate) => number
-  onUpdate: (id: number, patch: ScenarioUpdate) => void
-  onDelete: (id: number) => void
-  onDuplicate: (id: number) => number
-  onAddStep: (scenarioId: number, step?: Partial<ScenarioStep>) => void
+  onPlay: (id: string) => void
+  onStop: (id: string) => void
+  onCreate: (patch?: ScenarioUpdate) => Promise<string>
+  onUpdate: (id: string, patch: ScenarioUpdate) => void
+  onDelete: (id: string) => void
+  onDuplicate: (id: string) => Promise<string>
+  onAddStep: (scenarioId: string, step?: Partial<ScenarioStep>) => void
   onUpdateStep: (
-    scenarioId: number,
-    stepId: number,
+    scenarioId: string,
+    stepId: string,
     patch: Partial<ScenarioStep>,
   ) => void
-  onRemoveStep: (scenarioId: number, stepId: number) => void
-  onMoveStep: (scenarioId: number, fromIndex: number, toIndex: number) => void
+  onRemoveStep: (scenarioId: string, stepId: string) => void
+  onMoveStep: (scenarioId: string, fromIndex: number, toIndex: number) => void
   onValidate: (scenario: Scenario) => ScenarioValidation
+  isLoading?: boolean
+  error?: unknown
+  onRetry?: () => void
 }
 
 const createDraft: Scenario = {
-  id: 0,
+  id: "",
   name: "",
   description: "",
   steps: [],
@@ -63,8 +66,11 @@ export default function Scenarios({
   onRemoveStep,
   onMoveStep,
   onValidate,
+  isLoading = false,
+  error,
+  onRetry,
 }: Props) {
-  const [selected, setSelected] = useState<number | null>(scenarios[0]?.id ?? null)
+  const [selected, setSelected] = useState<string | null>(scenarios[0]?.id ?? null)
   const [query, setQuery] = useState("")
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsMode, setSettingsMode] = useState<"create" | "edit">("edit")
@@ -73,6 +79,7 @@ export default function Scenarios({
 
   const selectedScenario = scenarios.find((item) => item.id === selected)
   const scenario = selectedScenario ?? scenarios[0]
+  const selectedId = scenario?.id ?? null
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -86,14 +93,17 @@ export default function Scenarios({
   }, [scenarios, query])
 
   const handleCreate = () => {
-    setCreateDraftState({ ...createDraft })
+    setCreateDraftState({
+      ...createDraft,
+      name: t("scenarios.notifications.newName"),
+    })
     setSettingsMode("create")
     setSettingsOpen(true)
   }
 
-  const handleSettingsSave = (patch: ScenarioUpdate) => {
+  const handleSettingsSave = async (patch: ScenarioUpdate) => {
     if (settingsMode === "create") {
-      const id = onCreate(patch)
+      const id = await onCreate(patch)
       setSelected(id)
       setQuery("")
       return
@@ -124,8 +134,7 @@ export default function Scenarios({
 
   const handleDuplicate = () => {
     if (!scenario) return
-    const id = onDuplicate(scenario.id)
-    setSelected(id)
+    void onDuplicate(scenario.id).then(setSelected).catch(() => undefined)
   }
 
   return (
@@ -147,7 +156,31 @@ export default function Scenarios({
       />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto xl:flex-row xl:overflow-hidden">
-        <ScenarioList scenarios={filtered} selected={selected} onSelect={setSelected} />
+        {isLoading ? (
+          <div className="flex min-w-0 flex-1 items-center justify-center">
+            <p className="text-sm text-muted-foreground">Загрузка сценариев…</p>
+          </div>
+        ) : error ? (
+          <div className="flex min-w-0 flex-1 items-center justify-center">
+            <div className="text-center">
+              <p className="text-sm font-medium">Не удалось загрузить сценарии</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {error instanceof Error ? error.message : "Проверьте соединение с backend."}
+              </p>
+              {onRetry && (
+                <button
+                  type="button"
+                  className="mt-3 text-xs font-medium underline underline-offset-4"
+                  onClick={onRetry}
+                >
+                  Повторить
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+        <ScenarioList scenarios={filtered} selected={selectedId} onSelect={setSelected} />
 
         {scenario ? (
           <ScenarioEditor
@@ -182,6 +215,8 @@ export default function Scenarios({
           onStop={onStop}
           onValidate={onValidate}
         />
+          </>
+        )}
       </div>
 
       <ScenarioSettings
@@ -190,11 +225,11 @@ export default function Scenarios({
         scenario={settingsMode === "create" ? createDraftState : scenario ?? null}
         mode={settingsMode}
         onOpenChange={setSettingsOpen}
-        onSave={(patch) => {
+        onSave={async (patch) => {
           if (settingsMode === "create") {
             setCreateDraftState((current) => ({ ...current, ...patch }))
           }
-          handleSettingsSave(patch)
+          await handleSettingsSave(patch)
         }}
       />
 

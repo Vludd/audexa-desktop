@@ -13,7 +13,7 @@ export interface ScheduleItem {
   id: number
   enabled: boolean
   time: string
-  scenarioId: number
+  scenarioId: string
   scenarioName: string
   days: Weekday[]
   repeat: ScheduleRepeat
@@ -23,7 +23,7 @@ export interface ScheduleItem {
 
 export interface ScheduleFormData {
   time: string
-  scenarioId: number
+  scenarioId: string
   scenarioName: string
   days: Weekday[]
   repeat: ScheduleRepeat

@@ -4,13 +4,11 @@ import { apiRequest } from "@/api/client"
 interface BackendRoom {
   id: string
   name: string
-  audioFileId: string | null
   volume: number
 }
 
 export interface RoomRequest {
   name: string
-  audioFileId: string | null
   volume: number
 }
 
@@ -21,7 +19,6 @@ function mapRoom(
     id: room.id,
     name: room.name,
     status: "stopped",
-    audioFileId: room.audioFileId,
     volume: room.volume,
     position: 0,
     duration: 0,
@@ -59,8 +56,6 @@ export const roomsApi = {
           method: "POST",
           body: JSON.stringify({
             name: request.name,
-            audioFileId:
-              request.audioFileId,
             volume: request.volume,
           }),
         },
@@ -80,8 +75,6 @@ export const roomsApi = {
           method: "PUT",
           body: JSON.stringify({
             name: request.name,
-            audioFileId:
-              request.audioFileId,
             volume: request.volume,
           }),
         },

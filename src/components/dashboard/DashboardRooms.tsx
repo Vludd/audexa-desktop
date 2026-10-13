@@ -150,9 +150,6 @@ export default function DashboardRooms({
                         {room.name}
                       </div>
 
-                      <div className="truncate text-xs text-muted-foreground">
-                        {room.audioFileId ?? t("common.fileNotAssigned")}
-                      </div>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">

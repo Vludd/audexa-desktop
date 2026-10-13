@@ -37,6 +37,14 @@ type PlaybackState =
   | "stopped"
   | "error"
 
+const MIN_VOLUME_DB = -60
+const MAX_VOLUME_DB = 12
+
+function decibelsToGain(decibels: number) {
+  if (decibels <= MIN_VOLUME_DB) return 0
+  return 10 ** (decibels / 20)
+}
+
 function isSupportedAudioFile(file: File) {
   const name = file.name.toLowerCase()
 
@@ -95,11 +103,11 @@ export function useAudioFiles({
   const [currentTime, setCurrentTime] = useState(0)
 
   const [duration, setDuration] = useState(0)
-
-  const [volume, setVolumeState] = useState(1)
-
+  const [previewVolume, setPreviewVolume] = useState(1)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const gainNodeRef = useRef<GainNode | null>(null)
 
 
   const selectedFile = useMemo(
@@ -143,9 +151,18 @@ export function useAudioFiles({
     }
 
     const audio = new Audio()
-
     audio.preload = "metadata"
-    audio.volume = volume
+    audio.crossOrigin = "anonymous"
+    audio.volume = previewVolume
+
+    const audioContext = new AudioContext()
+    const source = audioContext.createMediaElementSource(audio)
+    const gainNode = audioContext.createGain()
+    gainNode.gain.value = 1
+    source.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    audioContextRef.current = audioContext
+    gainNodeRef.current = gainNode
 
     audio.ontimeupdate = () => {
       setCurrentTime(audio.currentTime)
@@ -211,7 +228,7 @@ export function useAudioFiles({
     audioRef.current = audio
 
     return audio
-  }, [currentFileId, setPlayback, volume])
+  }, [currentFileId, previewVolume, setPlayback])
 
 
   const play = useCallback(
@@ -226,23 +243,38 @@ export function useAudioFiles({
 
       const requestId = ++playRequestRef.current
 
-      const audio = ensureAudioElement()
-
       setPlaybackError(null)
       setPlaybackState("starting")
 
-      if (currentFileId !== fileId) {
-        audio.pause()
-
-        audio.src = audioApi.getStreamUrl(fileId)
-        audio.currentTime = 0
-
-        setCurrentFileId(fileId)
-        setCurrentTime(0)
-        setDuration(file.duration || 0)
-      }
+      let audio: HTMLAudioElement | null = null
 
       try {
+        audio = ensureAudioElement()
+
+        if (currentFileId !== fileId) {
+          audio.pause()
+
+          audio.src = audioApi.getStreamUrl(fileId)
+          audio.currentTime = 0
+
+          const fileVolume = Math.max(
+            MIN_VOLUME_DB,
+            Math.min(file.volumeDb, MAX_VOLUME_DB),
+          )
+
+          if (gainNodeRef.current) {
+            gainNodeRef.current.gain.value = decibelsToGain(fileVolume)
+          }
+
+          setCurrentFileId(fileId)
+          setCurrentTime(0)
+          setDuration(file.duration || 0)
+        }
+
+        if (audioContextRef.current?.state === "suspended") {
+          await audioContextRef.current.resume()
+        }
+
         await audio.play()
       } catch (error) {
         if (
@@ -258,7 +290,7 @@ export function useAudioFiles({
           return
         }
 
-        if (!audio.paused) {
+        if (audio && !audio.paused) {
           return
         }
 
@@ -279,11 +311,7 @@ export function useAudioFiles({
         )
       }
     },
-    [
-      currentFileId,
-      ensureAudioElement,
-      files,
-    ],
+    [currentFileId, ensureAudioElement, files],
   )
 
   const playCurrent = useCallback(async () => {
@@ -379,18 +407,105 @@ export function useAudioFiles({
     [seek],
   )
 
-  const setVolume = useCallback((value: number) => {
-    const normalizedValue = Math.max(
-      0,
-      Math.min(value, 1),
-    )
-
-    setVolumeState(normalizedValue)
-
+  const changePreviewVolume = useCallback((value: number) => {
+    const normalizedVolume = Math.max(0, Math.min(value, 1))
+    setPreviewVolume(normalizedVolume)
     if (audioRef.current) {
-      audioRef.current.volume = normalizedValue
+      audioRef.current.volume = normalizedVolume
     }
   }, [])
+
+  const gainMutation = useMutation({
+    mutationFn: ({
+      id,
+      volumeDb,
+    }: {
+      id: string
+      volumeDb: number
+    }) =>
+      audioApi.update(id, {
+        name:
+          files.find((file) => file.id === id)?.name ?? "",
+        volumeDb,
+      }),
+    onMutate: async ({ id, volumeDb }) => {
+      await queryClient.cancelQueries({
+        queryKey: AUDIO_FILES_QUERY_KEY,
+      })
+
+      const previousFiles =
+        queryClient.getQueryData<AudioFile[]>(AUDIO_FILES_QUERY_KEY)
+
+      queryClient.setQueryData<AudioFile[]>(
+        AUDIO_FILES_QUERY_KEY,
+        (current = []) =>
+          current.map((file) =>
+            file.id === id ? { ...file, volumeDb } : file,
+          ),
+      )
+
+      return { previousFiles }
+    },
+    onSuccess: (updatedFile) => {
+      queryClient.setQueryData<AudioFile[]>(
+        AUDIO_FILES_QUERY_KEY,
+        (current = []) =>
+          current.map((file) =>
+            file.id === updatedFile.id ? updatedFile : file,
+          ),
+      )
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousFiles) {
+        queryClient.setQueryData(
+          AUDIO_FILES_QUERY_KEY,
+          context.previousFiles,
+        )
+      } else {
+        void queryClient.invalidateQueries({
+          queryKey: AUDIO_FILES_QUERY_KEY,
+        })
+      }
+      toast.error(t("audio.errors.volume"), {
+        description:
+          error instanceof Error ? error.message : undefined,
+      })
+    },
+  })
+
+  const previewFileGain = useCallback(
+    (id: string, value: number) => {
+      const normalizedVolume = Math.round(
+        Math.max(MIN_VOLUME_DB, Math.min(value, MAX_VOLUME_DB)),
+      )
+
+      queryClient.setQueryData<AudioFile[]>(
+        AUDIO_FILES_QUERY_KEY,
+        (current = []) =>
+          current.map((file) =>
+            file.id === id
+              ? { ...file, volumeDb: normalizedVolume }
+              : file,
+          ),
+      )
+
+      if (id === currentFileId && gainNodeRef.current) {
+        gainNodeRef.current.gain.value = decibelsToGain(normalizedVolume)
+      }
+    },
+    [currentFileId, queryClient],
+  )
+
+  const commitFileGain = useCallback(
+    (id: string, gainDb: number) => {
+      const volumeDb = Math.round(
+        Math.max(MIN_VOLUME_DB, Math.min(gainDb, MAX_VOLUME_DB)),
+      )
+
+      gainMutation.mutate({ id, volumeDb })
+    },
+    [gainMutation],
+  )
 
 
   const selectFile = useCallback((id: string) => {
@@ -503,6 +618,8 @@ export function useAudioFiles({
     }) =>
       audioApi.update(id, {
         name,
+        volumeDb:
+          files.find((file) => file.id === id)?.volumeDb ?? 0,
       }),
 
     onSuccess: (file) => {
@@ -751,14 +868,20 @@ export function useAudioFiles({
   useEffect(() => {
     return () => {
       const audio = audioRef.current
-
-      if (!audio) {
-        return
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute("src")
+        audio.load()
       }
 
-      audio.pause()
-      audio.removeAttribute("src")
-      audio.load()
+      audioRef.current = null
+      gainNodeRef.current = null
+
+      const audioContext = audioContextRef.current
+      audioContextRef.current = null
+      if (audioContext && audioContext.state !== "closed") {
+        void audioContext.close()
+      }
     }
   }, [])
 
@@ -808,7 +931,7 @@ export function useAudioFiles({
 
     currentTime,
     duration,
-    volume,
+    previewVolume,
 
     play,
     playCurrent,
@@ -817,7 +940,9 @@ export function useAudioFiles({
     stop,
     seek,
     skip,
-    setVolume,
+    changePreviewVolume,
+    previewFileGain,
+    commitFileGain,
 
     renameFile,
     deleteFile,

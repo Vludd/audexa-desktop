@@ -34,7 +34,6 @@ import { Slider } from "../ui/slider"
 import { formatTime, getProgress } from "@/lib/audio"
 import { t } from "@/i18n"
 import { useRef } from "react"
-import { cn } from "cn"
 
 type RoomListItem = {
   room: Room
@@ -43,7 +42,6 @@ type RoomListItem = {
 
 interface Props {
   rooms: RoomListItem[]
-  audioFileNames: ReadonlyMap<string, string>
   operations: Record<string, RoomOperation>
 
   onPlay: (id: string) => void
@@ -64,7 +62,6 @@ interface Props {
 
 export default function RoomTable({
   rooms,
-  audioFileNames,
   operations,
   onPlay,
   onStop,
@@ -86,7 +83,6 @@ export default function RoomTable({
             <TableHead className="w-16 text-center">#</TableHead>
             <TableHead>{t("rooms.table.room")}</TableHead>
             <TableHead className="w-16">{t("rooms.table.status")}</TableHead>
-            <TableHead>{t("rooms.table.file")}</TableHead>
             <TableHead>{t("rooms.table.volume")}</TableHead>
             <TableHead className="w-72">{t("rooms.table.actions")}</TableHead>
             <TableHead className="w-12" />
@@ -138,18 +134,6 @@ export default function RoomTable({
                   <div className="flex items-center gap-2">
                     <StatusBadge status={room.status} />
                   </div>
-                </TableCell>
-
-                <TableCell className="max-w-[280px]">
-                  <span className={cn(
-                    "block truncate text-xs text-muted-foreground",
-                    !room.audioFileId && "text-destructive"
-                  )}>
-                    {room.audioFileId
-                      ? audioFileNames.get(room.audioFileId) ??
-                        t("common.fileUnavailable")
-                      : t("common.fileNotAssigned")}
-                  </span>
                 </TableCell>
 
                 <TableCell>

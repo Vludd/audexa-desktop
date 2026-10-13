@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Slider } from "@/components/ui/slider"
 import { formatTime } from "@/lib/audio"
 
 import AudioFileActions from "./AudioFileActions"
@@ -32,6 +33,8 @@ interface Props {
   onTogglePlay: (id: string) => void
   onRename: (id: string) => void
   onDelete: (id: string) => void
+  onGainPreview: (id: string, gainDb: number) => void
+  onGainCommit: (id: string, gainDb: number) => void
 }
 
 function fmtSize(bytes: number) {
@@ -55,6 +58,8 @@ export default function AudioTable({
   onTogglePlay,
   onRename,
   onDelete,
+  onGainPreview,
+  onGainCommit,
 }: Props) {
   const allSelected =
     files.length > 0 &&
@@ -95,6 +100,9 @@ export default function AudioTable({
             <TableHead>{t("audio.table.sampleRate")}</TableHead>
             <TableHead>{t("audio.table.duration")}</TableHead>
             <TableHead>{t("audio.table.size")}</TableHead>
+            <TableHead className="min-w-48">
+              {t("audio.table.gain")}
+            </TableHead>
 
             <TableHead className="w-20" />
           </TableRow>
@@ -235,6 +243,44 @@ export default function AudioTable({
 
                 <TableCell className="text-sm text-muted-foreground">
                   {fmtSize(file.size)}
+                </TableCell>
+
+                <TableCell
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <div className="flex min-w-40 items-center gap-2">
+                    <Slider
+                      value={[file.volumeDb]}
+                      min={-60}
+                      max={12}
+                      step={1}
+                      onValueChange={(value) => {
+                        const gainDb = Array.isArray(value)
+                          ? value[0]
+                          : value
+                        if (typeof gainDb === "number") {
+                          onGainPreview(file.id, gainDb)
+                        }
+                      }}
+                      onValueCommitted={(value) => {
+                        const gainDb = Array.isArray(value)
+                          ? value[0]
+                          : value
+                        if (typeof gainDb === "number") {
+                          onGainCommit(file.id, gainDb)
+                        }
+                      }}
+                      aria-label={t("audio.table.gainFor", {
+                        name: file.name,
+                      })}
+                      title={t("audio.player.gainHint")}
+                    />
+                    <span className="w-11 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {file.volumeDb > 0 ? "+" : ""}
+                      {file.volumeDb} dB
+                    </span>
+                  </div>
                 </TableCell>
 
                 <TableCell>

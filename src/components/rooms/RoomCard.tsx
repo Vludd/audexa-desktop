@@ -37,7 +37,6 @@ import { t } from "@/i18n"
 
 interface Props {
   room: Room
-  audioFileName: string | null
   displayNumber: number
   operation?: RoomOperation
 
@@ -63,7 +62,6 @@ interface Props {
 
 export default function RoomCard({
   room,
-  audioFileName,
   displayNumber,
   operation,
 
@@ -394,16 +392,6 @@ export default function RoomCard({
               </div>
             )}
           </div>
-        </div>
-
-        <div className={cn(
-          "mb-2.5 truncate text-[11px] text-muted-foreground",
-          !room.audioFileId &&
-            "text-destructive",
-        )}>
-          {room.audioFileId
-            ? audioFileName ?? t("common.fileUnavailable")
-            : t("common.fileNotAssigned")}
         </div>
 
         <div className="mb-3">

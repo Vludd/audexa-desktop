@@ -17,8 +17,8 @@ import { toast } from "@/lib/toast"
 interface Props {
   scenario?: Scenario
 
-  onPlay: (id: number) => void
-  onStop: (id: number) => void
+  onPlay: (id: string) => void
+  onStop: (id: string) => void
 
   onValidate: (
     scenario: Scenario,

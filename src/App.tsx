@@ -91,9 +91,11 @@ export default function App() {
     removeStep,
     moveStep,
     validateScenario,
+    isLoading: scenariosLoading,
+    error: scenariosError,
+    refetch: refetchScenarios,
   } = useScenarios({
     updateRoom,
-    stopAllRooms,
     rooms,
     audioFiles,
   })
@@ -189,6 +191,11 @@ export default function App() {
               onValidate={
                 validateScenario
               }
+              isLoading={scenariosLoading}
+              error={scenariosError}
+              onRetry={() => {
+                void refetchScenarios()
+              }}
             />
           )}
 

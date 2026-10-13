@@ -434,6 +434,10 @@ export const en: Widen<typeof ru> = {
 
       size: "Size",
 
+      gain: "Gain",
+
+      gainFor: "Gain for {name} in decibels",
+
       pause: "Pause",
 
       play: "Play",
@@ -462,7 +466,12 @@ export const en: Widen<typeof ru> = {
 
       mute: "Mute",
 
-      volume: "Volume",
+      volume: "Preview volume",
+
+      previewVolume: "Preview volume",
+
+      gainHint:
+        "Gain is applied during playback only. Positive values can cause clipping; the source file is not modified.",
     },
 
 
@@ -523,6 +532,7 @@ export const en: Widen<typeof ru> = {
       playbackStart: "Failed to start audio playback",
 
       upload: "Failed to add audio file",
+      volume: "Failed to save audio file volume",
 
       unsupportedFormat: "Unsupported format",
 

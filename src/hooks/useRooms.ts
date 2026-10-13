@@ -18,7 +18,6 @@ const ROOMS_QUERY_KEY = ["rooms"] as const
 
 export interface RoomInput {
   name: string
-  audioFileId: string | null
   volume: number
 }
 
@@ -55,7 +54,6 @@ export function useRooms() {
     mutationFn: (input: RoomInput) =>
       roomsApi.create({
         name: input.name,
-        audioFileId: input.audioFileId,
         volume: input.volume,
       }),
 
@@ -80,7 +78,6 @@ export function useRooms() {
     }) =>
       roomsApi.update(id, {
         name: input.name,
-        audioFileId: input.audioFileId,
         volume: input.volume,
       }),
 
@@ -130,8 +127,6 @@ export function useRooms() {
           id,
           {
             name: room.name,
-            audioFileId:
-              room.audioFileId,
             volume,
           },
         )
@@ -398,8 +393,6 @@ export function useRooms() {
         name: `${source.name} — ${t(
           "rooms.duplicateSuffix",
         )}`,
-        audioFileId:
-          source.audioFileId,
         volume: source.volume,
       })
     },

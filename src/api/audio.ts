@@ -11,6 +11,8 @@ interface BackendAudioFile {
   size: number
   sampleRate: number
   channels: number
+  volume: number
+  volumeDb: number
   createdAt: string
 }
 
@@ -22,10 +24,12 @@ export interface CreateAudioFileRequest {
   size: number
   sampleRate: number
   channels: number
+  volumeDb?: number
 }
 
 export interface UpdateAudioFileRequest {
   name: string
+  volumeDb: number
 }
 
 function parseDuration(value: string): number {
@@ -62,6 +66,7 @@ function mapAudioFile(
     channels: file.channels,
     duration: parseDuration(file.duration),
     size: file.size,
+    volumeDb: file.volumeDb,
     createdAt: file.createdAt,
   }
 }

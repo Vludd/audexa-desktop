@@ -1,15 +1,15 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { mockScenarios } from "@/data/mock"
+import { scenariosApi } from "@/api/scenarios"
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
 import { t } from "@/i18n"
+import { toast } from "@/lib/toast"
+
+const SCENARIOS_QUERY_KEY = ["scenarios"] as const
 
 interface RoomActions {
   updateRoom: (id: string, patch: Partial<Room>) => void
-  stopAllRooms: (options?: {
-    resetPosition?: boolean
-    includeSyncLine?: boolean
-  }) => void
 }
 
 export interface ScenarioUpdate {
@@ -38,51 +38,152 @@ interface ScenarioData {
 
 export function useScenarios({
   updateRoom,
-  stopAllRooms,
   rooms,
   audioFiles,
 }: RoomActions & ScenarioData) {
-  const [scenarios, setScenarios] =
-    useState<Scenario[]>(mockScenarios)
+  const queryClient = useQueryClient()
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const saveChains = useRef<Record<string, Promise<void>>>({})
+  const latestScenarios = useRef<Scenario[]>([])
 
-  const playScenario = useCallback(
-    (id: number) => {
-      const scenario = scenarios.find((item) => item.id === id)
-
-      if (!scenario) return
-
-      scenario.steps.forEach((step) => {
-        if (!step.roomId) return
-
-        updateRoom(step.roomId, {
-          status: "playing",
-          audioFileId: step.audioFileId,
-          volume: step.volume,
-          position: 0,
-        })
-      })
-    },
-    [scenarios, updateRoom],
+  const context = useMemo(() => ({ rooms, audioFiles }), [audioFiles, rooms])
+  const contextKey = JSON.stringify({
+    rooms: rooms.map(({ id, name }) => [id, name]),
+    audioFiles: audioFiles.map(({ id, filename, duration }) => [
+      id,
+      filename,
+      duration,
+    ]),
+  })
+  const queryKey = useMemo(
+    () => [...SCENARIOS_QUERY_KEY, contextKey] as const,
+    [contextKey],
   )
 
-  const stopScenario = useCallback(() => {
-    stopAllRooms({
-      resetPosition: false,
-      includeSyncLine: false,
-    })
-  }, [stopAllRooms])
+  const {
+    data: scenarios = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: () => scenariosApi.getAll(context),
+  })
 
-  const createScenario = useCallback((patch: ScenarioUpdate = {}) => {
-    let newId = 1
+  useEffect(() => {
+    latestScenarios.current = scenarios
+  }, [scenarios])
 
-    setScenarios((current) => {
-      newId =
-        current.length > 0
-          ? Math.max(...current.map((item) => item.id)) + 1
-          : 1
+  useEffect(() => {
+    const timers = saveTimers.current
+    return () => {
+      Object.values(timers).forEach(clearTimeout)
+    }
+  }, [])
 
-      const scenario: Scenario = {
-        id: newId,
+  const updateCache = useCallback(
+    (updater: (current: Scenario[]) => Scenario[]) => {
+      queryClient.setQueryData<Scenario[]>(queryKey, (current = []) => {
+        const next = updater(current)
+        latestScenarios.current = next
+        return next
+      })
+    },
+    [queryClient, queryKey],
+  )
+
+  const saveMutation = useMutation({
+    mutationFn: (scenario: Scenario) => {
+      if (!canPersistScenario(scenario, rooms, audioFiles)) {
+        throw new Error("Сценарий содержит незаполненные или некорректные шаги")
+      }
+      return scenariosApi.update(scenario, context)
+    },
+    onSuccess: (updated, submitted) => {
+      updateCache((current) =>
+        current.map((item) =>
+          item.id === updated.id && item === submitted ? updated : item,
+        ),
+      )
+    },
+    onError: (error) => {
+      toast.error("Не удалось сохранить сценарий", {
+        description: error instanceof Error ? error.message : String(error),
+      })
+      void refetch()
+    },
+  })
+
+  const scheduleSave = useCallback(
+    (scenario: Scenario) => {
+      const id = scenario.id
+      if (!canPersistScenario(scenario, rooms, audioFiles)) {
+        const existing = saveTimers.current[id]
+        if (existing) clearTimeout(existing)
+        delete saveTimers.current[id]
+        return
+      }
+
+      const existing = saveTimers.current[id]
+      if (existing) clearTimeout(existing)
+
+      saveTimers.current[id] = setTimeout(() => {
+        delete saveTimers.current[id]
+        const previousSave = saveChains.current[id] ?? Promise.resolve()
+        const nextSave = previousSave
+          .catch(() => undefined)
+          .then(async () => {
+            const latest = latestScenarios.current.find(
+              (item) => item.id === id,
+            )
+            if (!latest || !canPersistScenario(latest, rooms, audioFiles)) return
+            await saveMutation.mutateAsync(latest)
+          })
+
+        saveChains.current[id] = nextSave
+        void nextSave.finally(() => {
+          if (saveChains.current[id] === nextSave) {
+            delete saveChains.current[id]
+          }
+        }).catch(() => undefined)
+      }, 450)
+    },
+    [audioFiles, rooms, saveMutation],
+  )
+
+  const updateLocalScenario = useCallback(
+    (id: string, patch: ScenarioUpdate) => {
+      updateCache((current) =>
+        current.map((scenario) =>
+          scenario.id === id ? { ...scenario, ...patch } : scenario,
+        ),
+      )
+
+      const updated = latestScenarios.current.find((item) => item.id === id)
+      if (updated) scheduleSave(updated)
+    },
+    [scheduleSave, updateCache],
+  )
+
+  const createMutation = useMutation({
+    mutationFn: (scenario: Scenario) => scenariosApi.create(scenario, context),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey })
+    },
+    onSuccess: (created) => {
+      updateCache((current) => [...current, created])
+    },
+    onError: (error) => {
+      toast.error("Не удалось создать сценарий", {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    },
+  })
+
+  const createScenario = useCallback(
+    async (patch: ScenarioUpdate = {}): Promise<string> => {
+      const draft: Scenario = {
+        id: "",
         name: t("scenarios.notifications.newName"),
         description: "",
         steps: [],
@@ -97,171 +198,128 @@ export function useScenarios({
         ...patch,
       }
 
-      return [...current, scenario]
-    })
-
-    return newId
-  }, [])
-
-  const updateScenario = useCallback(
-    (id: number, patch: ScenarioUpdate) => {
-      setScenarios((current) =>
-        current.map((scenario) =>
-          scenario.id === id
-            ? {
-                ...scenario,
-                ...patch,
-              }
-            : scenario,
-        ),
-      )
+      const created = await createMutation.mutateAsync(draft)
+      return created.id
     },
-    [],
+    [createMutation],
   )
 
-  const deleteScenario = useCallback((id: number) => {
-    setScenarios((current) =>
-      current.filter((scenario) => scenario.id !== id),
-    )
-  }, [])
+  const updateScenario = useCallback(
+    (id: string, patch: ScenarioUpdate) => {
+      updateLocalScenario(id, patch)
+    },
+    [updateLocalScenario],
+  )
 
-  const duplicateScenario = useCallback((id: number) => {
-    let newId = 1
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => scenariosApi.delete(id),
+    onSuccess: (_, id) => {
+      const timer = saveTimers.current[id]
+      if (timer) clearTimeout(timer)
+      delete saveTimers.current[id]
+      updateCache((current) => current.filter((scenario) => scenario.id !== id))
+    },
+    onError: (error) => {
+      toast.error("Не удалось удалить сценарий", {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    },
+  })
 
-    setScenarios((current) => {
-      const source = current.find((item) => item.id === id)
+  const deleteScenario = useCallback(
+    async (id: string) => {
+      await deleteMutation.mutateAsync(id)
+    },
+    [deleteMutation],
+  )
 
-      if (!source) {
-        return current
-      }
-
-      newId =
-        current.length > 0
-          ? Math.max(...current.map((item) => item.id)) + 1
-          : 1
+  const duplicateScenario = useCallback(
+    async (id: string): Promise<string> => {
+      const source = latestScenarios.current.find((item) => item.id === id)
+      if (!source) throw new Error("Scenario not found")
 
       const copy: Scenario = {
         ...structuredClone(source),
-        id: newId,
+        id: "",
         name: `${source.name} ${t("scenarios.notifications.copySuffix")}`,
         status: "inactive",
-        steps: source.steps.map((step, index) => ({
-          ...step,
-          id: index + 1,
-        })),
+        steps: source.steps.map((step) => ({ ...step, id: "" })),
       }
 
-      return [...current, copy]
-    })
-
-    return newId
-  }, [])
+      const created = await createMutation.mutateAsync(copy)
+      return created.id
+    },
+    [createMutation],
+  )
 
   const addStep = useCallback(
-    (
-      scenarioId: number,
-      step?: Partial<ScenarioStep>,
-    ) => {
-      setScenarios((current) =>
+    (scenarioId: string, step?: Partial<ScenarioStep>) => {
+      updateCache((current) =>
         current.map((scenario) => {
-          if (scenario.id !== scenarioId) {
-            return scenario
-          }
-
-          const nextId =
-            scenario.steps.length > 0
-              ? Math.max(
-                  ...scenario.steps.map((item) => item.id),
-                ) + 1
-              : 1
+          if (scenario.id !== scenarioId) return scenario
 
           const newStep: ScenarioStep = {
-            id: nextId,
+            id: crypto.randomUUID(),
             roomId: step?.roomId ?? "",
             roomName: step?.roomName ?? "",
             audioFileId: step?.audioFileId ?? null,
             file: step?.file ?? "",
-            volume: step?.volume ?? 100,
             delay: step?.delay ?? 0,
             duration: step?.duration ?? 0,
           }
 
-          return {
-            ...scenario,
-            steps: [...scenario.steps, newStep],
-          }
+          return { ...scenario, steps: [...scenario.steps, newStep] }
         }),
       )
+
+      const updated = latestScenarios.current.find((item) => item.id === scenarioId)
+      if (updated) scheduleSave(updated)
     },
-    [],
+    [scheduleSave, updateCache],
   )
 
   const updateStep = useCallback(
-    (
-      scenarioId: number,
-      stepId: number,
-      patch: Partial<ScenarioStep>,
-    ) => {
-      setScenarios((current) =>
-        current.map((scenario) => {
-          if (scenario.id !== scenarioId) {
-            return scenario
-          }
-
-          return {
-            ...scenario,
-            steps: scenario.steps.map((step) =>
-              step.id === stepId
-                ? {
-                    ...step,
-                    ...patch,
-                  }
-                : step,
-            ),
-          }
-        }),
+    (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => {
+      updateCache((current) =>
+        current.map((scenario) =>
+          scenario.id === scenarioId
+            ? {
+                ...scenario,
+                steps: scenario.steps.map((step) =>
+                  step.id === stepId ? { ...step, ...patch } : step,
+                ),
+              }
+            : scenario,
+        ),
       )
+
+      const updated = latestScenarios.current.find((item) => item.id === scenarioId)
+      if (updated) scheduleSave(updated)
     },
-    [],
+    [scheduleSave, updateCache],
   )
 
   const removeStep = useCallback(
-    (scenarioId: number, stepId: number) => {
-      setScenarios((current) =>
-        current.map((scenario) => {
-          if (scenario.id !== scenarioId) {
-            return scenario
-          }
-
-          const steps = scenario.steps
-            .filter((step) => step.id !== stepId)
-            .map((step, index) => ({
-              ...step,
-              id: index + 1,
-            }))
-
-          return {
-            ...scenario,
-            steps,
-          }
-        }),
+    (scenarioId: string, stepId: string) => {
+      updateCache((current) =>
+        current.map((scenario) =>
+          scenario.id === scenarioId
+            ? { ...scenario, steps: scenario.steps.filter((step) => step.id !== stepId) }
+            : scenario,
+        ),
       )
+
+      const updated = latestScenarios.current.find((item) => item.id === scenarioId)
+      if (updated) scheduleSave(updated)
     },
-    [],
+    [scheduleSave, updateCache],
   )
 
   const moveStep = useCallback(
-    (
-      scenarioId: number,
-      fromIndex: number,
-      toIndex: number,
-    ) => {
-      setScenarios((current) =>
+    (scenarioId: string, fromIndex: number, toIndex: number) => {
+      updateCache((current) =>
         current.map((scenario) => {
-          if (scenario.id !== scenarioId) {
-            return scenario
-          }
-
+          if (scenario.id !== scenarioId) return scenario
           if (
             fromIndex < 0 ||
             toIndex < 0 ||
@@ -273,20 +331,44 @@ export function useScenarios({
 
           const steps = [...scenario.steps]
           const [moved] = steps.splice(fromIndex, 1)
-
           steps.splice(toIndex, 0, moved)
-
-          return {
-            ...scenario,
-            steps: steps.map((step, index) => ({
-              ...step,
-              id: index + 1,
-            })),
-          }
+          return { ...scenario, steps }
         }),
       )
+
+      const updated = latestScenarios.current.find((item) => item.id === scenarioId)
+      if (updated) scheduleSave(updated)
     },
-    [],
+    [scheduleSave, updateCache],
+  )
+
+  const playScenario = useCallback(
+    (id: string) => {
+      const scenario = latestScenarios.current.find((item) => item.id === id)
+      if (!scenario) return
+
+      scenario.steps.forEach((step) => {
+        if (!step.roomId || !step.audioFileId) return
+        updateRoom(step.roomId, {
+          status: "playing",
+          position: 0,
+        })
+      })
+    },
+    [updateRoom],
+  )
+
+  const stopScenario = useCallback(
+    (id: string) => {
+      const scenario = latestScenarios.current.find((item) => item.id === id)
+      if (!scenario) return
+
+      const roomIds = new Set(scenario.steps.map((step) => step.roomId))
+      roomIds.forEach((roomId) => {
+        if (roomId) updateRoom(roomId, { status: "stopped", position: 0 })
+      })
+    },
+    [updateRoom],
   )
 
   const validateScenario = useCallback(
@@ -294,80 +376,66 @@ export function useScenarios({
       const errors: string[] = []
       const warnings: string[] = []
 
-      if (!scenario.name.trim()) {
-        errors.push(t("scenarios.validation.nameRequired"))
-      }
-
-      if (scenario.steps.length === 0) {
-        errors.push(t("scenarios.validation.stepRequired"))
-      }
+      if (!scenario.name.trim()) errors.push(t("scenarios.validation.nameRequired"))
+      if (scenario.steps.length === 0) errors.push(t("scenarios.validation.stepRequired"))
 
       scenario.steps.forEach((step, index) => {
         const number = index + 1
-
-        if (!step.roomId) {
-          errors.push(
-            t("scenarios.validation.roomRequired", { number }),
-          )
-        } else if (!rooms.some((room) => room.id === step.roomId)) {
-          errors.push(
-            t("scenarios.validation.roomUnavailable", { number }),
-          )
+        if (!step.roomId) errors.push(t("scenarios.validation.roomRequired", { number }))
+        else if (!rooms.some((room) => room.id === step.roomId)) {
+          errors.push(t("scenarios.validation.roomUnavailable", { number }))
         }
-
-        if (!step.audioFileId) {
-          errors.push(
-            t("scenarios.validation.audioRequired", { number }),
-          )
-        } else if (!audioFiles.some((file) => file.id === step.audioFileId)) {
-          errors.push(
-            t("scenarios.validation.audioUnavailable", { number }),
-          )
+        if (!step.audioFileId) errors.push(t("scenarios.validation.audioRequired", { number }))
+        else if (!audioFiles.some((file) => file.id === step.audioFileId)) {
+          errors.push(t("scenarios.validation.audioUnavailable", { number }))
         }
-
-        if (step.volume < 0 || step.volume > 100) {
-          errors.push(
-            t("scenarios.validation.volumeRange", { number }),
-          )
-        }
-
         if (step.delay < 0) {
-          errors.push(
-            t("scenarios.validation.delayNonnegative", { number }),
-          )
+          errors.push(t("scenarios.validation.delayNonnegative", { number }))
         }
-
         if (step.duration <= 0) {
-          warnings.push(
-            t("scenarios.validation.durationRequired", { number }),
-          )
+          warnings.push(t("scenarios.validation.durationRequired", { number }))
         }
       })
 
-      return {
-        valid: errors.length === 0,
-        errors,
-        warnings,
-      }
+      return { valid: errors.length === 0, errors, warnings }
     },
     [rooms, audioFiles],
   )
 
   return {
     scenarios,
+    isLoading,
+    error,
+    refetch,
     playScenario,
     stopScenario,
-
     createScenario,
     updateScenario,
     deleteScenario,
     duplicateScenario,
-
     addStep,
     updateStep,
     removeStep,
     moveStep,
-
     validateScenario,
   }
+}
+
+function canPersistScenario(
+  scenario: Scenario,
+  rooms: Room[],
+  audioFiles: AudioFile[],
+): boolean {
+  if (!scenario.name.trim()) return false
+  if (scenario.status === "active" && scenario.steps.length === 0) return false
+
+  return scenario.steps.every(
+    (step) =>
+      Boolean(step.roomId) &&
+      rooms.some((room) => room.id === step.roomId) &&
+      Boolean(step.audioFileId) &&
+      audioFiles.some((file) => file.id === step.audioFileId) &&
+      Number.isInteger(step.delay) &&
+      step.delay >= 0,
+  )
 }

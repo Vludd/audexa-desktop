@@ -6,8 +6,8 @@ import { getScenarioDuration } from "@/lib/scenarios"
 
 interface Props {
   scenarios: Scenario[]
-  selected: number | null
-  onSelect: (id: number) => void
+  selected: string | null
+  onSelect: (id: string) => void
 }
 
 export default function ScenarioList({

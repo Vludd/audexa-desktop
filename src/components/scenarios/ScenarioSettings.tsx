@@ -27,7 +27,7 @@ interface Props {
   scenario: Scenario | null
   mode: "create" | "edit"
   onOpenChange: (open: boolean) => void
-  onSave: (patch: ScenarioUpdate) => void
+  onSave: (patch: ScenarioUpdate) => void | Promise<void>
 }
 
 export default function ScenarioSettings({
@@ -49,6 +49,7 @@ export default function ScenarioSettings({
         }
       : {},
   )
+  const [saving, setSaving] = useState(false)
 
   if (!scenario) return null
 
@@ -65,9 +66,14 @@ export default function ScenarioSettings({
     setDraft((current) => ({ ...current, ...patch }))
   }
 
-  const handleSave = () => {
-    onSave(draft)
-    onOpenChange(false)
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      await onSave(draft)
+      onOpenChange(false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -161,6 +167,7 @@ export default function ScenarioSettings({
               onCheckedChange={(checked) =>
                 update({ status: checked ? "active" : "inactive" })
               }
+              disabled={scenario.steps.length === 0 && value.status !== "active"}
             />
             <CheckRow
               label={t("scenarios.settings.stopPrevious")}
@@ -182,8 +189,8 @@ export default function ScenarioSettings({
           </Button>
           <Button
             type="button"
-            disabled={!value.name.trim()}
-            onClick={handleSave}
+            disabled={!value.name.trim() || saving}
+            onClick={() => void handleSave()}
           >
             {t("common.save")}
           </Button>
@@ -214,15 +221,21 @@ function CheckRow({
   label,
   checked,
   onCheckedChange,
+  disabled = false,
 }: {
   label: string
   checked: boolean
   onCheckedChange: (value: boolean) => void
+  disabled?: boolean
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1.5">
       <span className="text-sm">{label}</span>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+      />
     </div>
   )
 }

@@ -18,7 +18,6 @@ export interface Room {
   name: string
   status: RoomStatus
   operation?: RoomOperation
-  audioFileId: EntityId | null
   volume: number
   position: number
   duration: number

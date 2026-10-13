@@ -275,6 +275,8 @@ export default function AudioFiles() {
             onTogglePlay={audio.togglePlay}
             onRename={handleRename}
             onDelete={handleDelete}
+            onGainPreview={audio.previewFileGain}
+            onGainCommit={audio.commitFileGain}
           />
         )}
       </div>
@@ -287,12 +289,12 @@ export default function AudioFiles() {
           playbackError={audio.playbackError}
           currentTime={audio.currentTime}
           duration={audio.duration}
-          volume={audio.volume}
+          previewVolume={audio.previewVolume}
           onPlay={audio.playCurrent}
           onPause={audio.pause}
           onStop={audio.stop}
           onSeek={audio.seek}
-          onVolumeChange={audio.setVolume}
+          onPreviewVolumeChange={audio.changePreviewVolume}
           onSkip={audio.skip}
         />
       </div>

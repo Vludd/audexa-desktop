@@ -19,16 +19,16 @@ interface Props {
   scenario: Scenario
   rooms: Room[]
   audioFiles: AudioFile[]
-  onUpdate: (id: number, patch: ScenarioUpdate) => void
+  onUpdate: (id: string, patch: ScenarioUpdate) => void
   onOpenSettings: () => void
-  onAddStep: (scenarioId: number, step?: Partial<ScenarioStep>) => void
+  onAddStep: (scenarioId: string, step?: Partial<ScenarioStep>) => void
   onUpdateStep: (
-    scenarioId: number,
-    stepId: number,
+    scenarioId: string,
+    stepId: string,
     patch: Partial<ScenarioStep>,
   ) => void
-  onRemoveStep: (scenarioId: number, stepId: number) => void
-  onMoveStep: (scenarioId: number, fromIndex: number, toIndex: number) => void
+  onRemoveStep: (scenarioId: string, stepId: string) => void
+  onMoveStep: (scenarioId: string, fromIndex: number, toIndex: number) => void
   onValidate: (scenario: Scenario) => ScenarioValidation
 }
 
@@ -53,7 +53,6 @@ export default function ScenarioEditor({
       roomName: "",
       audioFileId: null,
       file: "",
-      volume: 100,
       delay: 0,
       duration: 0,
     })

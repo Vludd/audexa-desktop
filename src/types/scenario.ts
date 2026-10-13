@@ -1,12 +1,11 @@
 import type { EntityId } from "./entity"
 
 export interface ScenarioStep {
-  id: number
+  id: string
   roomId: EntityId
   roomName: string
   audioFileId: EntityId | null
   file: string
-  volume: number
   delay: number
   duration: number
 }
@@ -16,7 +15,7 @@ export type ScenarioPlayMode = "sequential" | "parallel"
 export type ScenarioRepeat = "once" | "loop"
 
 export interface Scenario {
-  id: number
+  id: string
   name: string
   description: string
   steps: ScenarioStep[]

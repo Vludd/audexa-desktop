@@ -23,12 +23,12 @@ interface Props {
   playbackError: string | null
   currentTime: number
   duration: number
-  volume: number
+  previewVolume: number
   onPlay: () => void
   onPause: () => void
   onStop: () => void
   onSeek: (value: number) => void
-  onVolumeChange: (value: number) => void
+  onPreviewVolumeChange: (value: number) => void
   onSkip: (seconds: number) => void
 }
 
@@ -39,12 +39,12 @@ export default function AudioPlayer({
   playbackError,
   currentTime,
   duration,
-  volume,
+  previewVolume,
   onPlay,
   onPause,
   onStop,
   onSeek,
-  onVolumeChange,
+  onPreviewVolumeChange,
   onSkip,
 }: Props) {
   const actualDuration =
@@ -190,41 +190,42 @@ export default function AudioPlayer({
           </Button>
         </div>
 
-        <div className="hidden w-28 items-center gap-2 lg:flex">
+        <div className="flex w-32 shrink-0 items-center gap-2">
           <Button
             variant="ghost"
             size="icon-sm"
             title={
-              volume === 0
+              previewVolume === 0
+                ? t("audio.player.unmute")
+                : t("audio.player.mute")
+            }
+            aria-label={
+              previewVolume === 0
                 ? t("audio.player.unmute")
                 : t("audio.player.mute")
             }
             onClick={() =>
-              onVolumeChange(
-                volume === 0 ? 1 : 0,
-              )
+              onPreviewVolumeChange(previewVolume === 0 ? 1 : 0)
             }
           >
-            {volume === 0 ? (
+            {previewVolume === 0 ? (
               <VolumeX className="size-4" />
             ) : (
               <Volume2 className="size-4" />
             )}
           </Button>
-
           <Slider
-            trackClassName="bg-muted-foreground/20"
-            value={[volume]}
+            value={[previewVolume]}
+            min={0}
             max={1}
             step={0.01}
             onValueChange={(value) => {
-              const v = Array.isArray(value)
-                ? value[0]
-                : value
-
-              onVolumeChange(v ?? 0)
+              const next = Array.isArray(value) ? value[0] : value
+              if (typeof next === "number") {
+                onPreviewVolumeChange(next)
+              }
             }}
-            aria-label={t("audio.player.volume")}
+            aria-label={t("audio.player.previewVolume")}
           />
         </div>
       </div>

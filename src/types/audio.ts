@@ -9,5 +9,6 @@ export interface AudioFile {
   channels: number
   duration: number
   size: number
+  volumeDb: number
   createdAt: string
 }

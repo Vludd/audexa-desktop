@@ -1,13 +1,6 @@
-import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
 
-import type {
-  AudioFile,
-  Room,
-  RoomOperation,
-} from "@/types"
-
-import { audioApi } from "@/api/audio"
+import type { Room, RoomOperation } from "@/types"
 import { toast } from "@/lib/toast"
 
 import Header from "@/components/Header"
@@ -64,7 +57,6 @@ interface Props {
 
   onAddRoom: (data: {
     name: string
-    audioFileId: string | null
     volume: number
   }) => void | Promise<void>
 
@@ -72,7 +64,6 @@ interface Props {
     id: string,
     data: {
       name: string
-      audioFileId: string | null
       volume: number
     },
   ) => void | Promise<void>
@@ -126,22 +117,6 @@ export default function Rooms({
     useState<Room | null>(null)
 
   const confirmation = useConfirm()
-
-  const { data: audioFiles = [] } = useQuery({
-    queryKey: ["audio-files"],
-    queryFn: audioApi.getAll,
-  })
-
-  const audioFileNames = useMemo(
-    () =>
-      new Map<string, string>(
-        audioFiles.map((file: AudioFile) => [
-          file.id,
-          file.name,
-        ]),
-      ),
-    [audioFiles],
-  )
 
   const counts: Record<
     RoomFilter,
@@ -442,11 +417,6 @@ export default function Rooms({
                 <RoomCard
                   key={room.id}
                   room={room}
-                  audioFileName={
-                    room.audioFileId
-                      ? audioFileNames.get(room.audioFileId) ?? null
-                      : null
-                  }
                   displayNumber={
                     displayNumber
                   }
@@ -486,7 +456,6 @@ export default function Rooms({
         ) : (
           <RoomTable
             rooms={filtered}
-            audioFileNames={audioFileNames}
             operations={operations}
             onPlay={onPlay}
             onStop={onStop}
@@ -502,8 +471,7 @@ export default function Rooms({
 
       <RoomDialog
         key={
-          editingRoom?.id ??
-          "new"
+          `${editingRoom?.id ?? "new"}-${dialogOpen}`
         }
         open={dialogOpen}
         room={editingRoom}

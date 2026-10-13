@@ -8,7 +8,6 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Slider } from "@/components/ui/slider"
 import ConfirmDialog from "@/components/ui/confirm-dialog"
 import { useConfirm } from "@/hooks/useConfirm"
 import {
@@ -28,8 +27,8 @@ interface Props {
   steps: ScenarioStep[]
   rooms: Room[]
   audioFiles: AudioFile[]
-  onUpdateStep: (stepId: number, patch: Partial<ScenarioStep>) => void
-  onRemoveStep: (stepId: number) => void
+  onUpdateStep: (stepId: string, patch: Partial<ScenarioStep>) => void
+  onRemoveStep: (stepId: string) => void
   onMoveStep: (fromIndex: number, toIndex: number) => void
 }
 
@@ -97,9 +96,6 @@ export default function ScenarioStepsTable({
               <TableHead className="w-10">#</TableHead>
               <TableHead>{t("scenarios.steps.room")}</TableHead>
               <TableHead>{t("scenarios.steps.audioFile")}</TableHead>
-              <TableHead className="w-[180px]">
-                {t("scenarios.steps.volume")}
-              </TableHead>
               <TableHead className="w-[100px]">
                 {t("scenarios.steps.delay")}
               </TableHead>
@@ -112,7 +108,6 @@ export default function ScenarioStepsTable({
 
           <TableBody>
             {steps.map((step, index) => {
-              const roomAssigned = Boolean(step.roomId)
               const selectedAudioId =
                 step.audioFileId ??
                 audioFiles.find((file) => file.filename === step.file)?.id ??
@@ -186,31 +181,6 @@ export default function ScenarioStepsTable({
                         </option>
                       ))}
                     </select>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex min-w-[155px] items-center gap-2">
-                      <Slider
-                        value={[step.volume]}
-                        min={0}
-                        max={100}
-                        step={1}
-                        disabled={!roomAssigned}
-                        className="min-w-0 flex-1"
-                        trackClassName="!h-1.5"
-                        onValueChange={(value) => {
-                          const volume = Array.isArray(value) ? value[0] : value
-                          if (typeof volume !== "number") return
-                          onUpdateStep(step.id, { volume })
-                        }}
-                        aria-label={t("scenarios.steps.volumeFor", {
-                          number: index + 1,
-                        })}
-                      />
-                      <span className="w-9 text-right text-xs font-medium tabular-nums">
-                        {step.volume}%
-                      </span>
-                    </div>
                   </TableCell>
 
                   <TableCell>

@@ -49,9 +49,6 @@ export default function DashboardPlayback({
                   {currentRoom.name}
                 </div>
 
-                <div className="mt-1 truncate text-sm text-muted-foreground">
-                  {currentRoom.audioFileId ?? t("common.fileNotAssigned")}
-                </div>
               </div>
 
               <Badge
