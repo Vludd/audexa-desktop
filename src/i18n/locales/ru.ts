@@ -655,6 +655,10 @@ export const ru = {
       message: "СООБЩЕНИЕ",
     },
     empty: "Нет записей",
+    confirmClear: {
+      title: "Очистить логи?",
+      description: "Все записи журнала будут удалены. Это действие нельзя отменить.",
+    },
     filters: {
       all: "Все",
       info: "Информация",

@@ -1079,6 +1079,12 @@ export const en: Widen<typeof ru> = {
 
     empty: "No entries",
 
+    confirmClear: {
+      title: "Clear logs?",
+
+      description: "All log entries will be deleted. This action cannot be undone.",
+    },
+
     filters: {
       all: "All",
 

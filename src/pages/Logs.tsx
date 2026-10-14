@@ -3,6 +3,8 @@ import { useMemo, useState } from "react"
 import type { LogEntry } from "@/types"
 import Header from "@/components/Header"
 import { t } from "@/i18n"
+import ConfirmDialog from "@/components/ui/confirm-dialog"
+import { useConfirm } from "@/hooks/useConfirm"
 import LogsToolbar, { type LogFilter } from "@/components/logs/LogsToolbar"
 import LogViewer from "@/components/logs/LogViewer"
 
@@ -15,6 +17,21 @@ export default function Logs({ logs, onClear }: Props) {
   const [filter, setFilter] = useState<LogFilter>("all")
   const [query, setQuery] = useState("")
   const [includeDebug, setIncludeDebug] = useState(false)
+  const confirmation = useConfirm()
+
+  const handleClear = () => {
+    if (!onClear) {
+      return
+    }
+
+    confirmation.confirm({
+      title: t("logs.confirmClear.title"),
+      description: t("logs.confirmClear.description"),
+      confirmLabel: t("logs.filters.clear"),
+      variant: "destructive",
+      onConfirm: onClear,
+    })
+  }
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -60,7 +77,7 @@ export default function Logs({ logs, onClear }: Props) {
         onQueryChange={setQuery}
         onFilterChange={setFilter}
         onIncludeDebugChange={setIncludeDebug}
-        onClear={onClear}
+        onClear={handleClear}
       />
 
       <main className="flex min-h-0 flex-1 flex-col gap-2 p-4">
@@ -72,6 +89,19 @@ export default function Logs({ logs, onClear }: Props) {
           {t("pages.logs.records")}: {filtered.length} / {logs.length}
         </div>
       </main>
+
+      <ConfirmDialog
+        open={confirmation.open}
+        onOpenChange={(open) => {
+          if (!open) confirmation.close()
+        }}
+        title={confirmation.options?.title ?? ""}
+        description={confirmation.options?.description}
+        confirmLabel={confirmation.options?.confirmLabel}
+        variant={confirmation.options?.variant}
+        loading={confirmation.loading}
+        onConfirm={confirmation.handleConfirm}
+      />
     </div>
   )
 }

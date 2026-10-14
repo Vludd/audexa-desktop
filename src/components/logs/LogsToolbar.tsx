@@ -1,4 +1,4 @@
-import { Download, RefreshCw, Search, Trash2 } from "lucide-react"
+import { Download, Search, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +16,7 @@ interface Props {
   onQueryChange: (query: string) => void
   onFilterChange: (filter: LogFilter) => void
   onIncludeDebugChange: (include: boolean) => void
-  onRefresh?: () => void
+  // onRefresh?: () => void
   onExport?: () => void
   onClear?: () => void
 }
@@ -55,7 +55,7 @@ export default function LogsToolbar({
   onQueryChange,
   onFilterChange,
   onIncludeDebugChange,
-  onRefresh,
+  // onRefresh,
   onExport,
   onClear,
 }: Props) {
@@ -117,11 +117,11 @@ export default function LogsToolbar({
         </div>
 
         <div className="ml-auto flex-1" />
-
+{/* 
         <Button variant="outline" size="sm" onClick={onRefresh}>
           <RefreshCw className="size-3.5" />
           {t("logs.filters.refresh")}
-        </Button>
+        </Button> */}
 
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="size-3.5" />
