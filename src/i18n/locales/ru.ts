@@ -167,7 +167,10 @@ export const ru = {
       dayAt: "{day} в {time}",
       nextDayAt: "Следующий {day} в {time}",
     },
-    confirmDelete: "Удалить расписание «{scenario}» в {time}?",
+    confirmDelete: {
+      title: "Удалить расписание?",
+      description: "Расписание «{scenario}» в {time} будет удалено. Это действие нельзя отменить.",
+    },
   },
   rooms: {
     duplicateSuffix: "копия",

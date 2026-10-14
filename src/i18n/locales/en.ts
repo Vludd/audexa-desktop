@@ -283,7 +283,11 @@ export const en: Widen<typeof ru> = {
       nextDayAt: "Next {day} at {time}",
     },
 
-    confirmDelete: 'Delete the "{scenario}" schedule at {time}?',
+    confirmDelete: {
+      title: "Delete schedule?",
+
+      description: 'The "{scenario}" schedule at {time} will be deleted. This action cannot be undone.',
+    },
   },
 
   rooms: {

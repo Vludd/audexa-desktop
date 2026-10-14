@@ -6,6 +6,8 @@ import ScheduleDialog from "@/components/schedule/ScheduleDialog"
 import ScheduleTable from "@/components/schedule/ScheduleTable"
 import ScheduleToolbar from "@/components/schedule/ScheduleToolbar"
 import UpcomingEvents from "@/components/schedule/UpcomingEvents"
+import ConfirmDialog from "@/components/ui/confirm-dialog"
+import { useConfirm } from "@/hooks/useConfirm"
 
 import type {
   Scenario,
@@ -64,12 +66,22 @@ export default function Schedule({
       INITIAL_FORM,
     )
 
+  const confirmation = useConfirm()
+
   const selectedItem = useMemo(
     () =>
       schedule.find(
         (item) => item.id === selectedId,
       ) ?? null,
     [schedule, selectedId],
+  )
+
+  const sortedSchedule = useMemo(
+    () =>
+      [...schedule].sort(
+        (a, b) => a.time.localeCompare(b.time) || a.id - b.id,
+      ),
+    [schedule],
   )
 
   const upcoming = useMemo(() => {
@@ -156,20 +168,20 @@ export default function Schedule({
       return
     }
 
-    const confirmed =
-      window.confirm(
-        t("schedule.confirmDelete", {
-          scenario: selectedItem.scenarioName,
-          time: selectedItem.time,
-        }),
-      )
-
-    if (!confirmed) {
-      return
-    }
-
-    onDelete(selectedItem.id)
-    setSelectedId(null)
+    confirmation.confirm({
+      title: t("schedule.confirmDelete.title"),
+      description: t("schedule.confirmDelete.description", {
+        scenario: selectedItem.scenarioName,
+        time: selectedItem.time,
+      }),
+      confirmLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+      variant: "destructive",
+      onConfirm: () => {
+        onDelete(selectedItem.id)
+        setSelectedId(null)
+      },
+    })
   }
 
   const handleDuplicate = () => {
@@ -213,7 +225,7 @@ export default function Schedule({
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <main className="min-w-0 flex-1 overflow-auto p-5">
           <ScheduleTable
-            schedule={schedule}
+            schedule={sortedSchedule}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onToggle={onToggle}
@@ -233,6 +245,20 @@ export default function Schedule({
         onOpenChange={handleDialogChange}
         onChange={handleFormChange}
         onSave={handleSave}
+      />
+
+      <ConfirmDialog
+        open={confirmation.open}
+        onOpenChange={(open) => {
+          if (!open) confirmation.close()
+        }}
+        title={confirmation.options?.title ?? ""}
+        description={confirmation.options?.description}
+        confirmLabel={confirmation.options?.confirmLabel}
+        cancelLabel={confirmation.options?.cancelLabel}
+        variant={confirmation.options?.variant}
+        loading={confirmation.loading}
+        onConfirm={confirmation.handleConfirm}
       />
     </div>
   )
