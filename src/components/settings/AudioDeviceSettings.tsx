@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import {
   AlertCircle,
   CheckCircle2,
+  Loader2,
   RefreshCw,
 } from "lucide-react"
 
@@ -129,13 +130,11 @@ export default function AudioDeviceSettings({
               onClick={onRefresh}
               disabled={isLoading || isRefreshing}
             >
-              <RefreshCw
-                className={[
-                  "size-3.5",
-                  isLoading || isRefreshing ? "animate-spin" : "",
-                ].join(" ")}
-              />
-
+              {isRefreshing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
               {t("settings.audioDevice.refresh")}
             </Button>
           </div>

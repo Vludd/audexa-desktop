@@ -587,6 +587,9 @@ export const ru = {
       description:
         "Настройка соответствия комнат физическим выходам аудиоустройства",
       summary: "Комнаты: {rooms} · выходы: {outputs}",
+      refresh: "Обновить",
+      backendUnavailable: "Нет соединения с backend",
+      reconnecting: "Повторное подключение выполняется автоматически.",
       assigned: "Назначено",
       free: "Свободно",
       conflicts: "Конфликты",

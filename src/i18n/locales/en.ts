@@ -977,6 +977,12 @@ export const en: Widen<typeof ru> = {
 
       summary: "Rooms: {rooms} · outputs: {outputs}",
 
+      refresh: "Refresh",
+
+      backendUnavailable: "Unable to connect to the backend",
+
+      reconnecting: "Retrying automatically every few seconds.",
+
       assigned: "Assigned",
 
       free: "Free",

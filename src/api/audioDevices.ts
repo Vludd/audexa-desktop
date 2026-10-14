@@ -23,7 +23,7 @@ export interface AudioDevice {
   bufferSize: number | null
 }
 
-interface AudioDevicesResponse {
+export interface AudioDevicesResponse {
   supported: boolean
   devices: AudioDevice[]
   error?: string | null

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Check, CircleAlert, Save, X } from "lucide-react"
+import { AlertCircle, Check, CircleAlert, Loader2, RefreshCw, Save, X } from "lucide-react"
 
 import type { AudioDevice } from "@/api/audioDevices"
 import type { AudioOutputMapping, AudioSettingsConfig } from "@/api/audioSettings"
@@ -25,6 +25,9 @@ interface LineMappingSettingsProps {
   selectedDevice: AudioDevice | null
   savedConfig: AudioSettingsConfig | null
   isSaving: boolean
+  backendError: string | null
+  isRefreshing: boolean
+  onRefresh: () => void
   onSave: (config: AudioSettingsConfig) => Promise<void>
 }
 
@@ -70,6 +73,9 @@ export default function LineMappingSettings({
   selectedDevice,
   savedConfig,
   isSaving,
+  backendError,
+  isRefreshing,
+  onRefresh,
   onSave,
 }: LineMappingSettingsProps) {
   const outputs = selectedDevice?.outputs ?? EMPTY_OUTPUTS
@@ -207,13 +213,49 @@ export default function LineMappingSettings({
               {t("settings.lineMapping.description")}
             </CardDescription>
           </div>
-          <Badge variant="outline" className="shrink-0">
-            {t("settings.lineMapping.summary", { rooms: rooms.length, outputs: outputs.length })}
-          </Badge>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge variant="outline">
+              {t("settings.lineMapping.summary", { rooms: rooms.length, outputs: outputs.length })}
+            </Badge>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              {t("settings.lineMapping.refresh")}
+            </Button>
+          </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {backendError && (
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm"
+          >
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <div className="min-w-0">
+              <div className="font-medium">
+                {t("settings.lineMapping.backendUnavailable")}
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {t("settings.lineMapping.reconnecting")}
+              </div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {backendError}
+              </div>
+            </div>
+          </div>
+        )}
+
         {!selectedDevice ? (
           <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
             {t("settings.lineMapping.selectDevice")}
