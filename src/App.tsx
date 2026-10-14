@@ -12,6 +12,7 @@ import { useRooms } from "./hooks/useRooms"
 import { useAudioFiles } from "./hooks/useAudioFiles"
 import { useScenarios } from "./hooks/useScenarios"
 import { useSchedule } from "./hooks/useSchedule"
+import { usePlayback } from "./hooks/usePlayback"
 import { useLogs } from "./hooks/useLogs"
 
 import Sidebar from "./components/Sidebar"
@@ -45,6 +46,7 @@ export default function App() {
     useState<Page>("dashboard")
 
   const { status } = useAudioSystem()
+  usePlayback()
 
   const { files: audioFiles } = useAudioFiles({})
 
@@ -62,7 +64,6 @@ export default function App() {
     updateRoomFromForm,
     stopAllRooms,
 
-    updateRoom,
     addRoom,
     deleteRoom,
     duplicateRoom,
@@ -89,7 +90,6 @@ export default function App() {
     error: scenariosError,
     refetch: refetchScenarios,
   } = useScenarios({
-    updateRoom,
     rooms,
     audioFiles,
   })

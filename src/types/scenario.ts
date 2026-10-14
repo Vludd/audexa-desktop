@@ -11,7 +11,7 @@ export interface ScenarioStep {
 }
 
 export type ScenarioStatus = "active" | "inactive"
-export type ScenarioPlayMode = "sequential" | "parallel"
+export type ScenarioPlayMode = "sequential"
 export type ScenarioRepeat = "once" | "loop"
 
 export interface Scenario {

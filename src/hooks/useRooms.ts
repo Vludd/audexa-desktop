@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback } from "react"
 import {
   useMutation,
   useQuery,
@@ -13,6 +13,7 @@ import type {
 
 import { toast } from "@/lib/toast"
 import { t } from "@/i18n"
+import { playbackApi } from "@/api/playback"
 
 const ROOMS_QUERY_KEY = ["rooms"] as const
 
@@ -34,10 +35,7 @@ interface VolumeUpdateContext {
 export function useRooms() {
   const queryClient = useQueryClient()
 
-  const [
-    operations,
-    setOperations,
-  ] = useState<Record<string, RoomOperation>>({})
+  const operations: Record<string, RoomOperation> = {}
 
   const {
     data: rooms = [],
@@ -402,83 +400,33 @@ export function useRooms() {
     ],
   )
 
-  /*
-   * Playback is not implemented by the backend yet.
-   */
-  const runUnsupportedOperation =
-    useCallback(
-      (
-        id: string,
-        operation: RoomOperation,
-      ) => {
-        setOperations((current) => ({
-          ...current,
-          [id]: operation,
-        }))
+  const playRoom = useCallback(() => {
+    toast.error("Комната не запускается сама по себе", {
+      description: "В Audexa аудио запускается только через сценарий или расписание сценария.",
+    })
+  }, [])
 
-        toast.error(
-          "Операция пока недоступна",
-          {
-            description:
-              "Backend пока не предоставляет playback endpoint.",
-          },
-        )
+  const stopRoom = useCallback((id: string) => {
+    void playbackApi.stopRoom(id).catch((error) => {
+      toast.error("Не удалось остановить комнату", {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    })
+  }, [])
 
-        setOperations((current) => {
-          const next = {
-            ...current,
-          }
+  const pauseRoom = useCallback(() => {
+    toast.error("Пауза пока не реализована", {
+      description: "Остановка сценария доступна уже сейчас; pause/resume добавим поверх общего playback engine.",
+    })
+  }, [])
 
-          delete next[id]
-
-          return next
-        })
-      },
-      [],
-    )
-
-  const playRoom = useCallback(
-    (id: string) => {
-      runUnsupportedOperation(
-        id,
-        "starting",
-      )
-    },
-    [runUnsupportedOperation],
-  )
-
-  const stopRoom = useCallback(
-    (id: string) => {
-      runUnsupportedOperation(
-        id,
-        "stopping",
-      )
-    },
-    [runUnsupportedOperation],
-  )
-
-  const pauseRoom = useCallback(
-    (id: string) => {
-      runUnsupportedOperation(
-        id,
-        "pausing",
-      )
-    },
-    [runUnsupportedOperation],
-  )
-
-  const stopAllRooms = useCallback(
-    () => {
-      toast.error(
-        "Операция пока недоступна",
-        {
-          description:
-            "Backend пока не предоставляет endpoint для остановки всех комнат.",
-        },
-      )
-    },
-    [],
-  )
+  const stopAllRooms = useCallback(() => {
+    void playbackApi.stop().catch((error) => {
+      toast.error("Не удалось остановить воспроизведение", {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    })
+  }, [])
 
   return {
     rooms,

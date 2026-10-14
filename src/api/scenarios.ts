@@ -14,7 +14,7 @@ interface BackendScenario {
   name: string
   description: string
   status: "active" | "inactive"
-  playMode: "sequential" | "parallel"
+  playMode: "sequential"
   repeat: "once" | "loop"
   stopPrevious: boolean
   createdAt: string

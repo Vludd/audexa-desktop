@@ -115,10 +115,10 @@ export default function ScenarioSettings({
             <FieldRow label={t("scenarios.settings.playbackMode")}>
               <Select
                 value={value.playMode}
-                onValueChange={(next) =>
+                onValueChange={() =>
                   update({
                     playMode:
-                      next === "parallel" ? "parallel" : "sequential",
+                      "sequential",
                   })
                 }
               >
@@ -128,9 +128,6 @@ export default function ScenarioSettings({
                 <SelectContent>
                   <SelectItem value="sequential">
                     {t("scenarios.settings.sequential")}
-                  </SelectItem>
-                  <SelectItem value="parallel">
-                    {t("scenarios.settings.parallel")}
                   </SelectItem>
                 </SelectContent>
               </Select>

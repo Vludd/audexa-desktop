@@ -2,15 +2,12 @@ import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { scenariosApi } from "@/api/scenarios"
+import { playbackApi } from "@/api/playback"
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
 import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
 
 const SCENARIOS_QUERY_KEY = ["scenarios"] as const
-
-interface RoomActions {
-  updateRoom: (id: string, patch: Partial<Room>) => void
-}
 
 export interface ScenarioUpdate {
   name?: string
@@ -37,10 +34,9 @@ interface ScenarioData {
 }
 
 export function useScenarios({
-  updateRoom,
   rooms,
   audioFiles,
-}: RoomActions & ScenarioData) {
+}: ScenarioData) {
   const queryClient = useQueryClient()
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const saveChains = useRef<Record<string, Promise<void>>>({})
@@ -343,32 +339,29 @@ export function useScenarios({
   )
 
   const playScenario = useCallback(
-    (id: string) => {
-      const scenario = latestScenarios.current.find((item) => item.id === id)
-      if (!scenario) return
-
-      scenario.steps.forEach((step) => {
-        if (!step.roomId || !step.audioFileId) return
-        updateRoom(step.roomId, {
-          status: "playing",
-          position: 0,
+    async (id: string) => {
+      try {
+        await playbackApi.startScenario(id)
+      } catch (error) {
+        toast.error("Не удалось запустить сценарий", {
+          description: error instanceof Error ? error.message : String(error),
         })
-      })
+      }
     },
-    [updateRoom],
+    [],
   )
 
   const stopScenario = useCallback(
-    (id: string) => {
-      const scenario = latestScenarios.current.find((item) => item.id === id)
-      if (!scenario) return
-
-      const roomIds = new Set(scenario.steps.map((step) => step.roomId))
-      roomIds.forEach((roomId) => {
-        if (roomId) updateRoom(roomId, { status: "stopped", position: 0 })
-      })
+    async () => {
+      try {
+        await playbackApi.stop()
+      } catch (error) {
+        toast.error("Не удалось остановить воспроизведение", {
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
     },
-    [updateRoom],
+    [],
   )
 
   const validateScenario = useCallback(
