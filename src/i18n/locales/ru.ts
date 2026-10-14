@@ -244,6 +244,8 @@ export const ru = {
       add: "Добавить файл",
       opening: "Открытие...",
       deleteSelected: "Удалить выбранные",
+      fileCount: "Файлов: {count}",
+      storageUsed: "Занято: {size} {unit}",
       search: "Поиск файлов...",
     },
     table: {

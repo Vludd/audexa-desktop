@@ -414,6 +414,10 @@ export const en: Widen<typeof ru> = {
 
       deleteSelected: "Delete selected",
 
+      fileCount: "Files: {count}",
+
+      storageUsed: "Storage: {size} {unit}",
+
       search: "Search files...",
     },
 

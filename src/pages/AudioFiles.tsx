@@ -134,6 +134,8 @@ export default function AudioFiles() {
       <AudioToolbar
         query={audio.query}
         onQueryChange={audio.setQuery}
+        fileCount={audio.files.length}
+        storageBytes={audio.files.reduce((total, file) => total + file.size, 0)}
         onAdd={() => void filePicker.open()}
         isAddPending={filePicker.isOpening}
         selectedCount={audio.selectedIds.length}

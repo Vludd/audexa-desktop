@@ -12,6 +12,8 @@ import { t } from "@/i18n"
 interface Props {
   query: string
   onQueryChange: (value: string) => void
+  fileCount: number
+  storageBytes: number
   onAdd: () => void
   isAddPending?: boolean
 
@@ -22,13 +24,15 @@ interface Props {
 export default function AudioToolbar({
   query,
   onQueryChange,
+  fileCount,
+  storageBytes,
   onAdd,
   isAddPending = false,
   selectedCount,
   onDeleteSelected,
 }: Props) {
   return (
-    <div className="flex min-h-11 items-center gap-2 border-b bg-card px-4 py-2">
+    <div className="flex min-h-11 flex-wrap items-center gap-2 border-b bg-card px-4 py-2">
       <Button
         size="sm"
         onClick={onAdd}
@@ -67,6 +71,16 @@ export default function AudioToolbar({
       )}
 
       <div className="flex-1" />
+
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span>{t("audio.toolbar.fileCount", { count: fileCount })}</span>
+        <span>
+          {t("audio.toolbar.storageUsed", {
+            size: (storageBytes / 1024 / 1024).toFixed(1),
+            unit: t("units.megabyte"),
+          })}
+        </span>
+      </div>
 
       <div className="relative w-64">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
