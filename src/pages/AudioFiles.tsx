@@ -269,6 +269,8 @@ export default function AudioFiles() {
             currentFileId={audio.currentFileId}
             isPlaying={audio.isPlaying}
             isPlayPending={audio.isPlayPending}
+            currentTime={audio.currentTime}
+            duration={audio.duration}
             onSelect={audio.selectFile}
             onToggleSelection={audio.toggleSelection}
             onToggleSelectAll={audio.toggleSelectAll}

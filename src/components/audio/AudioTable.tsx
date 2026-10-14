@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
-import { formatTime } from "@/lib/audio"
+import { formatTime, getProgress } from "@/lib/audio"
 
 import AudioFileActions from "./AudioFileActions"
 
@@ -26,6 +26,8 @@ interface Props {
   currentFileId: string | null
   isPlaying: boolean
   isPlayPending: boolean
+  currentTime: number
+  duration: number
 
   onSelect: (id: string) => void
   onToggleSelection: (id: string) => void
@@ -52,6 +54,8 @@ export default function AudioTable({
   currentFileId,
   isPlaying,
   isPlayPending,
+  currentTime,
+  duration,
   onSelect,
   onToggleSelection,
   onToggleSelectAll,
@@ -112,6 +116,9 @@ export default function AudioTable({
           {files.map((file) => {
             const isCurrent =
               currentFileId === file.id
+            const showPlaybackProgress =
+              isCurrent && (isPlaying || isPlayPending || currentTime > 0)
+            const playbackDuration = duration || file.duration || 0
 
             const isChecked =
               selectedIds.includes(file.id)
@@ -206,13 +213,38 @@ export default function AudioTable({
                   </div>
 
                   {isCurrent && (
-                    <div className="mt-0.5 text-[11px] font-medium text-primary">
-                      {isPlaying
-                        ? t("audio.table.playing")
-                        : isPlayPending
-                          ? t("audio.table.starting")
-                          : t("audio.table.selected")}
-                    </div>
+                    <>
+                      <div className="mt-0.5 text-[11px] font-medium text-primary">
+                        {isPlaying
+                          ? t("audio.table.playing")
+                          : isPlayPending
+                            ? t("audio.table.starting")
+                            : t("audio.table.selected")}
+                      </div>
+
+                      {showPlaybackProgress && (
+                        <div className="mt-1 flex items-center gap-2">
+                          <div
+                            role="progressbar"
+                            aria-label={t("audio.player.position")}
+                            aria-valuemin={0}
+                            aria-valuemax={playbackDuration}
+                            aria-valuenow={Math.min(currentTime, playbackDuration)}
+                            className="h-1 min-w-12 flex-1 overflow-hidden rounded-full bg-muted"
+                          >
+                            <div
+                              className="h-full rounded-full bg-primary transition-[width]"
+                              style={{
+                                width: `${getProgress(currentTime, playbackDuration)}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                            {formatTime(currentTime)} / {formatTime(playbackDuration)}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </TableCell>
 
