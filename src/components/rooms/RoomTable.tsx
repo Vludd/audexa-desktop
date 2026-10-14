@@ -1,7 +1,6 @@
 import {
   Copy,
   Edit,
-  Ellipsis,
   Loader2,
   Pause,
   Play,
@@ -11,13 +10,6 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -75,6 +67,8 @@ export default function RoomTable({
 
   const volumeBeforeDrag = useRef<number | null>(null)
 
+  const hideMediaControls = true
+
   return (
     <Card className="overflow-hidden">
       <Table>
@@ -82,10 +76,14 @@ export default function RoomTable({
           <TableRow>
             <TableHead className="w-16 text-center">#</TableHead>
             <TableHead>{t("rooms.table.room")}</TableHead>
+            <TableHead className="w-48">{t("rooms.table.volume")}</TableHead>
             <TableHead className="w-16">{t("rooms.table.status")}</TableHead>
-            <TableHead>{t("rooms.table.volume")}</TableHead>
-            <TableHead className="w-72">{t("rooms.table.actions")}</TableHead>
-            <TableHead className="w-12" />
+            <TableHead className="w-72" hidden={hideMediaControls}>
+              {t("rooms.table.actions")}
+            </TableHead>
+            <TableHead className="w-28">
+              {hideMediaControls ? t("rooms.table.actions") : ""}
+            </TableHead>
           </TableRow>
         </TableHeader>
 
@@ -131,14 +129,9 @@ export default function RoomTable({
                 </TableCell>
 
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={room.status} />
-                  </div>
-                </TableCell>
-
-                <TableCell>
                   <div className="flex min-w-[150px] items-center gap-3">
                     <Slider
+                      trackClassName="bg-muted-foreground/25"
                       value={[room.volume]}
                       onValueChange={(value) => {
                         const volume = Array.isArray(value) ? value[0] : value
@@ -177,7 +170,14 @@ export default function RoomTable({
                     </span>
                   </div>
                 </TableCell>
+
                 <TableCell>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={room.status} />
+                  </div>
+                </TableCell>
+
+                <TableCell hidden={hideMediaControls}>
                   <div className="flex gap-1.5">
                     {operation === "starting" ? (
                       <SmallButton
@@ -253,52 +253,38 @@ export default function RoomTable({
                 </TableCell>
 
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          aria-label={t("rooms.table.roomActions", {
-                            name: room.name,
-                          })}
-                        >
-                          <Ellipsis className="size-4" />
-                        </Button>
-                      }
-                    />
-
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-48"
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      title={t("common.edit")}
+                      aria-label={`${t("common.edit")} ${room.name}`}
+                      onClick={() => onEdit(room)}
                     >
-                      <DropdownMenuItem
-                        onClick={() => onEdit(room)}
-                      >
-                        <Edit className="size-4" />
-                        {t("common.edit")}
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() => onDuplicate(room)}
-                      >
-                        <Copy className="size-4" />
-                        {t("common.duplicate")}
-                      </DropdownMenuItem>
-
-                      <DropdownMenuSeparator />
-
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => onDelete(room)}
-                      >
-                        <Trash2 className="size-4" />
-                        {t("common.delete")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      <Edit />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      title={t("common.duplicate")}
+                      aria-label={`${t("common.duplicate")} ${room.name}`}
+                      onClick={() => onDuplicate(room)}
+                    >
+                      <Copy />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon-xs"
+                      title={t("common.delete")}
+                      aria-label={`${t("common.delete")} ${room.name}`}
+                      onClick={() => onDelete(room)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             )

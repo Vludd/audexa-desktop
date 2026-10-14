@@ -82,7 +82,7 @@ export default function RoomCard({
   const isPending =
     Boolean(operation)
 
-  const hideMediaControls = false
+  const hideMediaControls = true
 
   const progress =
     room.duration > 0
