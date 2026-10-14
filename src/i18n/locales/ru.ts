@@ -401,6 +401,8 @@ export const ru = {
       audioFile: "Аудиофайл",
       volume: "Громкость",
       delay: "Задержка",
+      delayBeforeStartSeconds: "Задержка перед стартом (сек.)",
+      delaySeconds: "Задержка (сек.)",
       duration: "Длительность",
       chooseRoom: "Выбрать комнату",
       chooseAudioFile: "Выбрать аудиофайл",

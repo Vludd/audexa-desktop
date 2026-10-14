@@ -1,4 +1,5 @@
 import type { LogEntry, Room, ScheduleItem, SystemStatus } from "@/types"
+import type { PlaybackState } from "@/api/playback"
 
 import Header from "@/components/Header"
 import { t } from "@/i18n"
@@ -15,9 +16,13 @@ interface Props {
   schedule: ScheduleItem[]
   system: SystemStatus
   logs: LogEntry[]
+  playback?: PlaybackState
   onStopAll: () => void
-  onPauseRoom: (roomId: string) => void
+  onPause: () => void
+  onResume: () => void
   onStopRoom: (roomId: string) => void
+  onVolumeChange: (roomId: string, volume: number) => void
+  onGainChange: (audioFileId: string, gainDb: number) => void
   onNavigate: (page: string) => void
 }
 
@@ -26,9 +31,13 @@ export default function Dashboard({
   schedule,
   system,
   logs,
+  playback,
   onStopAll,
-  onPauseRoom,
+  onPause,
+  onResume,
   onStopRoom,
+  onVolumeChange,
+  onGainChange,
   onNavigate,
 }: Props) {
   return (
@@ -51,9 +60,13 @@ export default function Dashboard({
               <div className="flex min-w-0 flex-col gap-3">
                 <DashboardPlayback
                   rooms={rooms}
+                  playback={playback}
                   onNavigate={onNavigate}
-                  onPauseRoom={onPauseRoom}
+                  onPause={onPause}
+                  onResume={onResume}
                   onStopRoom={onStopRoom}
+                  onVolumeChange={onVolumeChange}
+                  onGainChange={onGainChange}
                 />
 
                 <DashboardRooms

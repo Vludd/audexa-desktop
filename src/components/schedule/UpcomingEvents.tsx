@@ -1,12 +1,4 @@
-import {
-  Clock,
-  Play,
-  Square,
-} from "lucide-react"
-
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-
 import type { ScheduleItem } from "@/types"
 import { t } from "@/i18n"
 
@@ -78,46 +70,6 @@ export default function UpcomingEvents({
         </div>
       )}
 
-      <Separator className="my-4" />
-
-      <div className="mb-3 text-sm font-semibold">
-        {t("schedule.upcoming.quickActions")}
-      </div>
-
-      <div className="space-y-2">
-        <Button
-          type="button"
-          variant="success"
-          className="w-full justify-start"
-        >
-          <Play
-            className="size-4"
-            fill="currentColor"
-          />
-          {t("schedule.upcoming.runNow")}
-        </Button>
-
-        <Button
-          type="button"
-          variant="destructive"
-          className="w-full justify-start"
-        >
-          <Square
-            className="size-4"
-            fill="currentColor"
-          />
-          {t("schedule.upcoming.stopAll")}
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full justify-start"
-        >
-          <Clock className="size-4" />
-          {t("schedule.upcoming.test")}
-        </Button>
-      </div>
     </aside>
   )
 }

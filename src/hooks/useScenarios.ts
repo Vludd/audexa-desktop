@@ -351,6 +351,20 @@ export function useScenarios({
     [],
   )
 
+  const testScenario = useCallback(
+    async (id: string) => {
+      try {
+        await playbackApi.startScenario(id)
+        toast.info("Тестовый запуск начат")
+      } catch (error) {
+        toast.error("Не удалось выполнить тестовый запуск", {
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [],
+  )
+
   const stopScenario = useCallback(
     async () => {
       try {
@@ -401,6 +415,7 @@ export function useScenarios({
     error,
     refetch,
     playScenario,
+    testScenario,
     stopScenario,
     createScenario,
     updateScenario,
@@ -428,7 +443,7 @@ function canPersistScenario(
       rooms.some((room) => room.id === step.roomId) &&
       Boolean(step.audioFileId) &&
       audioFiles.some((file) => file.id === step.audioFileId) &&
-      Number.isInteger(step.delay) &&
+      Number.isFinite(step.delay) &&
       step.delay >= 0,
   )
 }

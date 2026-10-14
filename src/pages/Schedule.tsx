@@ -9,6 +9,9 @@ import UpcomingEvents from "@/components/schedule/UpcomingEvents"
 import ConfirmDialog from "@/components/ui/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/hooks/useConfirm"
+import { playbackApi } from "@/api/playback"
+import { scenariosApi } from "@/api/scenarios"
+import { toast } from "@/lib/toast"
 
 import type {
   Scenario,
@@ -192,11 +195,49 @@ export default function Schedule({
   }
 
   const handleDuplicate = () => {
-    if (!selectedItem) {
+    if (!selectedItem) return
+    onDuplicate(selectedItem.id)
+  }
+
+  const handleRunNow = async () => {
+    if (!selectedItem) return
+    try {
+      await playbackApi.startScenario(selectedItem.scenarioId)
+      toast.success(`Сценарий «${selectedItem.scenarioName}» запущен`)
+    } catch (error) {
+      toast.error("Не удалось запустить сценарий", {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  const handleValidate = async () => {
+    if (!selectedItem) return
+    const scenario = scenarios.find((item) => item.id === selectedItem.scenarioId)
+
+    if (!scenario) {
+      toast.error("Расписание некорректно", {
+        description: "Сценарий, привязанный к расписанию, не найден.",
+      })
       return
     }
 
-    onDuplicate(selectedItem.id)
+    try {
+      const result = await scenariosApi.validate(scenario.id)
+      if (result.valid) {
+        toast.success("Расписание готово к запуску", {
+          description: `Сценарий «${scenario.name}» прошёл проверку.`,
+        })
+      } else {
+        toast.error("Расписание не готово", {
+          description: result.errors.join(" "),
+        })
+      }
+    } catch (error) {
+      toast.error("Не удалось проверить расписание", {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   const handleDialogChange = (
@@ -227,6 +268,8 @@ export default function Schedule({
         onEdit={openEdit}
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
+        onRunNow={() => void handleRunNow()}
+        onValidate={() => void handleValidate()}
       />
 
       {error != null && (

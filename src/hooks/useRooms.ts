@@ -330,6 +330,9 @@ export function useRooms() {
             previousVolume,
           },
         )
+
+        // Keep the active playback stream in sync without restarting it.
+        await playbackApi.setRoomVolume(id, normalizedVolume)
       },
       [updateVolumeMutation],
     )
@@ -415,8 +418,10 @@ export function useRooms() {
   }, [])
 
   const pauseRoom = useCallback(() => {
-    toast.error("Пауза пока не реализована", {
-      description: "Остановка сценария доступна уже сейчас; pause/resume добавим поверх общего playback engine.",
+    void playbackApi.pause().catch((error) => {
+      toast.error("Не удалось поставить воспроизведение на паузу", {
+        description: error instanceof Error ? error.message : String(error),
+      })
     })
   }, [])
 

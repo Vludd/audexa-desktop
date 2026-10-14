@@ -97,7 +97,7 @@ export default function ScenarioStepsTable({
               <TableHead>{t("scenarios.steps.room")}</TableHead>
               <TableHead>{t("scenarios.steps.audioFile")}</TableHead>
               <TableHead className="w-[100px]">
-                {t("scenarios.steps.delay")}
+                {t("scenarios.steps.delayBeforeStartSeconds")}
               </TableHead>
               <TableHead className="w-[100px]">
                 {t("scenarios.steps.duration")}
@@ -187,6 +187,7 @@ export default function ScenarioStepsTable({
                     <Input
                       type="number"
                       min={0}
+                      step={0.1}
                       value={step.delay}
                       onChange={(event) =>
                         onUpdateStep(step.id, {

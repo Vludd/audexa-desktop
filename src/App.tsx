@@ -13,6 +13,7 @@ import { useAudioFiles } from "./hooks/useAudioFiles"
 import { useScenarios } from "./hooks/useScenarios"
 import { useSchedule } from "./hooks/useSchedule"
 import { usePlayback } from "./hooks/usePlayback"
+import { playbackApi } from "./api/playback"
 import { useLogs } from "./hooks/useLogs"
 
 import Sidebar from "./components/Sidebar"
@@ -46,7 +47,7 @@ export default function App() {
     useState<Page>("dashboard")
 
   const { status } = useAudioSystem()
-  usePlayback()
+  const { data: playback } = usePlayback()
 
   const { files: audioFiles } = useAudioFiles({})
 
@@ -86,6 +87,7 @@ export default function App() {
     removeStep,
     moveStep,
     validateScenario,
+    testScenario,
     isLoading: scenariosLoading,
     error: scenariosError,
     refetch: refetchScenarios,
@@ -126,9 +128,32 @@ export default function App() {
               schedule={schedule}
               system={status}
               logs={logs}
-              onPauseRoom={pauseRoom}
+              playback={playback}
+              onPause={pauseRoom}
+              onResume={() => {
+                void playbackApi.resume().catch((error) =>
+                  toast.error("Не удалось продолжить воспроизведение", {
+                    description: error instanceof Error ? error.message : String(error),
+                  }),
+                )
+              }}
               onStopRoom={stopRoom}
               onStopAll={stopAllRooms}
+              onVolumeChange={(roomId, volume) => {
+                void playbackApi.setRoomVolume(roomId, volume).catch((error) =>
+                  toast.error("Не удалось изменить громкость", {
+                    description: error instanceof Error ? error.message : String(error),
+                  }),
+                )
+              }}
+              onGainChange={(audioFileId, gainDb) => {
+                if (!audioFileId) return
+                void playbackApi.setAudioGain(audioFileId, gainDb).catch((error) =>
+                  toast.error("Не удалось изменить усиление", {
+                    description: error instanceof Error ? error.message : String(error),
+                  }),
+                )
+              }}
               onNavigate={(nextPage) =>
                 setPage(nextPage as Page)
               }
@@ -174,7 +199,17 @@ export default function App() {
               rooms={rooms}
               audioFiles={audioFiles}
               onPlay={playScenario}
+              onTest={testScenario}
               onStop={stopScenario}
+              onPause={pauseRoom}
+              onResume={() => {
+                void playbackApi.resume().catch((error) =>
+                  toast.error("Не удалось продолжить воспроизведение", {
+                    description: error instanceof Error ? error.message : String(error),
+                  }),
+                )
+              }}
+              playback={playback}
               onCreate={createScenario}
               onUpdate={updateScenario}
               onDelete={deleteScenario}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
+import type { PlaybackState } from "@/api/playback"
 import Header from "@/components/Header"
 import { t } from "@/i18n"
 import ScenarioEditor from "@/components/scenarios/ScenarioEditor"
@@ -17,7 +18,11 @@ interface Props {
   rooms: Room[]
   audioFiles: AudioFile[]
   onPlay: (id: string) => void
-  onStop: (id: string) => void
+  onTest: (id: string) => void
+  onStop: () => void
+  onPause: () => void
+  onResume: () => void
+  playback?: PlaybackState
   onCreate: (patch?: ScenarioUpdate) => Promise<string>
   onUpdate: (id: string, patch: ScenarioUpdate) => void
   onDelete: (id: string) => void
@@ -56,7 +61,11 @@ export default function Scenarios({
   rooms,
   audioFiles,
   onPlay,
+  onTest,
   onStop,
+  onPause,
+  onResume,
+  playback,
   onCreate,
   onUpdate,
   onDelete,
@@ -211,8 +220,16 @@ export default function Scenarios({
 
         <ScenarioQuickActions
           scenario={scenario}
+          playbackStatus={
+            playback?.scenarioId === scenario?.id
+              ? playback.status
+              : undefined
+          }
           onPlay={onPlay}
+          onTest={onTest}
           onStop={onStop}
+          onPause={onPause}
+          onResume={onResume}
           onValidate={onValidate}
         />
           </>

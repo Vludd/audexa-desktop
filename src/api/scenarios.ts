@@ -72,7 +72,7 @@ function mapScenario(
           roomName: room?.name ?? "",
           audioFileId: step.audioFileId,
           file: audio?.filename ?? "",
-                delay: step.delayMs,
+                delay: step.delayMs / 1000,
           duration: audio?.duration ?? 0,
         }
       }),
@@ -90,7 +90,7 @@ function toPayload(scenario: Scenario): ScenarioPayload {
     steps: scenario.steps.map((step) => ({
       roomId: step.roomId,
       audioFileId: step.audioFileId ?? "",
-        delayMs: step.delay,
+        delayMs: Math.round(step.delay * 1000),
     })),
   }
 }

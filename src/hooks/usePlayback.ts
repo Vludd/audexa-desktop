@@ -24,23 +24,15 @@ export function usePlayback() {
       rooms.map((room) => {
         const runtime = state.rooms.find((item) => item.roomId === room.id)
         if (!runtime) {
-          return state.status === "idle" || state.status === "stopped"
-            ? { ...room, status: "stopped", position: 0, duration: 0 }
-            : room
+          return { ...room, status: "stopped", position: 0, duration: 0 }
         }
 
         return {
           ...room,
-          status:
-            runtime.status === "playing"
-              ? "playing"
-              : runtime.status === "waiting"
-                ? "waiting"
-                : runtime.status === "error"
-                  ? "error"
-                  : "stopped",
+          status: runtime.status,
           position: runtime.positionSeconds,
           duration: runtime.durationSeconds,
+          volume: runtime.volume,
         }
       }),
     )

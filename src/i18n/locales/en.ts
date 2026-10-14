@@ -678,6 +678,8 @@ export const en: Widen<typeof ru> = {
       volume: "Volume",
 
       delay: "Delay",
+      delayBeforeStartSeconds: "Delay before start (sec.)",
+      delaySeconds: "Delay (sec.)",
 
       duration: "Duration",
 
