@@ -8,10 +8,6 @@ import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
 import type { Page } from "./types"
 
-import {
-  mockAudioFiles,
-} from "./data/mock"
-
 import { useRooms } from "./hooks/useRooms"
 import { useAudioFiles } from "./hooks/useAudioFiles"
 import { useScenarios } from "./hooks/useScenarios"
@@ -50,9 +46,7 @@ export default function App() {
 
   const { status } = useAudioSystem()
 
-  const { files: audioFiles } = useAudioFiles({
-    initialFiles: mockAudioFiles,
-  })
+  const { files: audioFiles } = useAudioFiles({})
 
   const {
     rooms,
@@ -107,6 +101,9 @@ export default function App() {
     deleteSchedule,
     duplicateSchedule,
     toggleSchedule,
+    isLoading: scheduleLoading,
+    error: scheduleError,
+    refetch: refetchSchedule,
   } = useSchedule()
 
   const {
@@ -210,6 +207,11 @@ export default function App() {
                 duplicateSchedule
               }
               onToggle={toggleSchedule}
+              isLoading={scheduleLoading}
+              error={scheduleError}
+              onRetry={() => {
+                void refetchSchedule()
+              }}
             />
           )}
 

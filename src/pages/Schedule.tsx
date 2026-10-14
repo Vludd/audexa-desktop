@@ -7,6 +7,7 @@ import ScheduleTable from "@/components/schedule/ScheduleTable"
 import ScheduleToolbar from "@/components/schedule/ScheduleToolbar"
 import UpcomingEvents from "@/components/schedule/UpcomingEvents"
 import ConfirmDialog from "@/components/ui/confirm-dialog"
+import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/hooks/useConfirm"
 
 import type {
@@ -26,6 +27,9 @@ interface Props {
   onDelete: (id: number) => void
   onDuplicate: (id: number) => void
   onToggle: (id: number) => void
+  isLoading?: boolean
+  error?: unknown
+  onRetry?: () => void
 }
 
 const INITIAL_FORM: ScheduleFormData = {
@@ -51,6 +55,9 @@ export default function Schedule({
   onDelete,
   onDuplicate,
   onToggle,
+  isLoading = false,
+  error = null,
+  onRetry,
 }: Props) {
   const [selectedId, setSelectedId] =
     useState<number | null>(null)
@@ -101,7 +108,7 @@ export default function Schedule({
     setForm({
       ...INITIAL_FORM,
       scenarioId:
-        firstScenario?.id ?? 0,
+        firstScenario?.id ?? "",
       scenarioName:
         firstScenario?.name ?? "",
     })
@@ -222,6 +229,19 @@ export default function Schedule({
         onDuplicate={handleDuplicate}
       />
 
+      {error != null && (
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b bg-destructive/5 px-5 py-3 text-sm">
+          <span className="text-destructive">
+            Не удалось загрузить расписание: {error instanceof Error ? error.message : String(error)}
+          </span>
+          {onRetry && (
+            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+              Повторить
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <main className="min-w-0 flex-1 overflow-auto p-5">
           <ScheduleTable
@@ -229,6 +249,7 @@ export default function Schedule({
             selectedId={selectedId}
             onSelect={setSelectedId}
             onToggle={onToggle}
+            isLoading={isLoading}
           />
         </main>
 

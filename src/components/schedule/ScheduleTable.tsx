@@ -16,6 +16,7 @@ interface Props {
   selectedId: number | null
   onSelect: (id: number) => void
   onToggle: (id: number) => void
+  isLoading?: boolean
 }
 
 export default function ScheduleTable({
@@ -23,6 +24,7 @@ export default function ScheduleTable({
   selectedId,
   onSelect,
   onToggle,
+  isLoading = false,
 }: Props) {
   return (
     <div className="overflow-hidden rounded-lg border bg-card">
@@ -43,7 +45,16 @@ export default function ScheduleTable({
         </TableHeader>
 
         <TableBody>
-          {schedule.length === 0 ? (
+          {isLoading ? (
+            <TableRow>
+              <TableCell
+                colSpan={7}
+                className="h-32 text-center text-muted-foreground"
+              >
+                Загрузка расписания…
+              </TableCell>
+            </TableRow>
+          ) : schedule.length === 0 ? (
             <TableRow>
               <TableCell
                 colSpan={7}
