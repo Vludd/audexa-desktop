@@ -30,6 +30,7 @@ interface AudioDeviceSettingsProps {
   selectedDeviceId: string
   onDeviceChange: (deviceId: string) => void
   isLoading: boolean
+  isRefreshing?: boolean
   supported: boolean
   error: string | null
   onRefresh: () => void
@@ -40,6 +41,7 @@ export default function AudioDeviceSettings({
   selectedDeviceId,
   onDeviceChange,
   isLoading,
+  isRefreshing = false,
   supported,
   error,
   onRefresh,
@@ -125,12 +127,12 @@ export default function AudioDeviceSettings({
               variant="outline"
               size="sm"
               onClick={onRefresh}
-              disabled={isLoading}
+              disabled={isLoading || isRefreshing}
             >
               <RefreshCw
                 className={[
                   "size-3.5",
-                  isLoading ? "animate-spin" : "",
+                  isLoading || isRefreshing ? "animate-spin" : "",
                 ].join(" ")}
               />
 

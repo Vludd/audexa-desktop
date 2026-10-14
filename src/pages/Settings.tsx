@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import Header from "@/components/Header"
 import { t } from "@/i18n"
@@ -10,28 +11,33 @@ import LoggingSettings from "@/components/settings/LoggingSettings"
 import ThemeSettings from "@/components/settings/ThemeSettings"
 import LanguageSwitcher from "@/components/LanguageSwitcher"
 
-import { audioDevicesApi, type AudioDevice } from "@/api/audioDevices"
+import { audioDevicesApi } from "@/api/audioDevices"
 import { audioSettingsApi, type AudioSettingsConfig } from "@/api/audioSettings"
 import type { Room } from "@/types"
 import { toast } from "@/lib/toast"
+
+const AUDIO_DEVICES_QUERY_KEY = ["audio-devices"] as const
+const AUDIO_SETTINGS_QUERY_KEY = ["audio-settings"] as const
 
 interface SettingsProps {
   rooms: Room[]
 }
 
 function SettingsSection({
+  id,
   title,
   description,
   children,
   className = "",
 }: {
+  id?: string
   title: string
   description?: string
   children: React.ReactNode
   className?: string
 }) {
   return (
-    <section className={`space-y-2 ${className}`}>
+    <section id={id} className={`space-y-2 ${className}`}>
       <div>
         <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
         {description && (
@@ -44,131 +50,81 @@ function SettingsSection({
 }
 
 export default function Settings({ rooms }: SettingsProps) {
-  const [devices, setDevices] = useState<AudioDevice[]>([])
+  const queryClient = useQueryClient()
   const [selectedDeviceId, setSelectedDeviceId] = useState("")
-  const [savedAudioConfig, setSavedAudioConfig] = useState<AudioSettingsConfig | null>(null)
   const [isSavingAudioConfig, setIsSavingAudioConfig] = useState(false)
-  const [isLoadingDevices, setIsLoadingDevices] = useState(true)
-  const [devicesError, setDevicesError] = useState<string | null>(null)
-  const [devicesSupported, setDevicesSupported] = useState(true)
-  const [isLoadingConfig, setIsLoadingConfig] = useState(true)
 
-  const selectedDevice = useMemo(
-    () => devices.find((device) => device.id === selectedDeviceId) ?? null,
-    [devices, selectedDeviceId],
-  )
+  const devicesQuery = useQuery({
+    queryKey: AUDIO_DEVICES_QUERY_KEY,
+    queryFn: audioDevicesApi.getAll,
+  })
+  const audioConfigQuery = useQuery({
+    queryKey: AUDIO_SETTINGS_QUERY_KEY,
+    queryFn: audioSettingsApi.get,
+  })
+  const savedAudioConfig = audioConfigQuery.data ?? null
 
-  const applyDevicesResponse = useCallback(
-    (
-      response: Awaited<ReturnType<typeof audioDevicesApi.getAll>>,
-      preferredDeviceId?: string | null,
-    ) => {
-      // Backend intentionally returns the complete Windows audio inventory.
-      // Settings only exposes render-capable devices because capture-only
-      // endpoints (microphones / microphone arrays) are not useful here.
-      const outputDevices = response.devices.filter(
-        (device) => device.outputCount > 0 && device.outputs.length > 0,
-      )
+  const devices = useMemo(() => {
+    const response = devicesQuery.data
+    const outputDevices = response?.devices.filter(
+      (device) => device.outputCount > 0 && device.outputs.length > 0,
+    ) ?? []
+    const configuredDevice = savedAudioConfig?.deviceId
+      ? response?.devices.find((device) => device.id === savedAudioConfig.deviceId)
+      : undefined
 
-      // Keep the currently configured device visible even when it is
-      // temporarily disconnected. This is important: configuration is
-      // persistent, connection state is not.
-      const configuredDevice = preferredDeviceId
-        ? response.devices.find((device) => device.id === preferredDeviceId)
-        : undefined
+    return configuredDevice &&
+      !outputDevices.some((device) => device.id === configuredDevice.id)
+      ? [configuredDevice, ...outputDevices]
+      : outputDevices
+  }, [devicesQuery.data, savedAudioConfig])
 
-      const visibleDevices = configuredDevice &&
-        !outputDevices.some((device) => device.id === configuredDevice.id)
-        ? [configuredDevice, ...outputDevices]
-        : outputDevices
-
-      setDevices(visibleDevices)
-      setDevicesSupported(response.supported)
-
-      setSelectedDeviceId((current) => {
-        if (current && visibleDevices.some((device) => device.id === current)) {
-          return current
-        }
-
-        if (preferredDeviceId && visibleDevices.some((device) => device.id === preferredDeviceId)) {
-          return preferredDeviceId
-        }
-
-        return visibleDevices.find((device) => device.status === "online")?.id ?? visibleDevices[0]?.id ?? ""
-      })
-
-      setDevicesError(
-        response.error && response.devices.length === 0 ? response.error : null,
-      )
-    },
-    [],
-  )
-
-  const fetchDevices = async () => {
-    setIsLoadingDevices(true)
-    setDevicesError(null)
-
-    try {
-      const response = await audioDevicesApi.getAll()
-      applyDevicesResponse(response, savedAudioConfig?.deviceId)
-    } catch (error) {
-      setDevices([])
-      setSelectedDeviceId("")
-      setDevicesError(
-        error instanceof Error ? error.message : "Не удалось получить аудиоустройства",
-      )
-    } finally {
-      setIsLoadingDevices(false)
-    }
-  }
+  const devicesSupported = devicesQuery.data?.supported ?? true
+  const devicesError =
+    devicesQuery.error instanceof Error
+      ? devicesQuery.error.message
+      : devicesQuery.data?.error && devicesQuery.data.devices.length === 0
+        ? devicesQuery.data.error
+        : null
+  const selectedDeviceIdForView =
+    (selectedDeviceId && devices.some((device) => device.id === selectedDeviceId)
+      ? selectedDeviceId
+      : null) ??
+    (savedAudioConfig?.deviceId &&
+    devices.some((device) => device.id === savedAudioConfig.deviceId)
+      ? savedAudioConfig.deviceId
+      : null) ??
+    devices.find((device) => device.status === "online")?.id ??
+    devices[0]?.id ??
+    ""
 
   useEffect(() => {
-    let cancelled = false
+    if (window.location.hash !== "#audio-device-settings") return
 
-    Promise.allSettled([audioSettingsApi.get(), audioDevicesApi.getAll()]).then(
-      ([configResult, devicesResult]) => {
-        if (cancelled) return
+    document
+      .getElementById("audio-device-settings")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" })
 
-        const config =
-          configResult.status === "fulfilled"
-            ? configResult.value
-            : null
+    const url = new URL(window.location.href)
+    url.hash = ""
+    window.history.replaceState(window.history.state, "", url)
+  }, [])
 
-        setSavedAudioConfig(config)
-        setIsLoadingConfig(false)
-
-        if (configResult.status === "rejected") {
-          toast.error(t("settings.lineMapping.saveFailed"), {
-            description:
-              configResult.reason instanceof Error
-                ? configResult.reason.message
-                : t("settings.lineMapping.saveFailedDescription"),
-          })
-        }
-
-        if (devicesResult.status === "fulfilled") {
-          applyDevicesResponse(
-            devicesResult.value,
-            config?.deviceId ?? null,
-          )
-        } else {
-          setDevices([])
-          setSelectedDeviceId(config?.deviceId ?? "")
-          setDevicesError(
-            devicesResult.reason instanceof Error
-              ? devicesResult.reason.message
-              : "Не удалось получить аудиоустройства",
-          )
-        }
-
-        setIsLoadingDevices(false)
-      },
-    )
-
-    return () => {
-      cancelled = true
+  useEffect(() => {
+    if (audioConfigQuery.error) {
+      toast.error(t("settings.lineMapping.saveFailed"), {
+        description:
+          audioConfigQuery.error instanceof Error
+            ? audioConfigQuery.error.message
+            : t("settings.lineMapping.saveFailedDescription"),
+      })
     }
-  }, [applyDevicesResponse])
+  }, [audioConfigQuery.error])
+
+  const selectedDevice = useMemo(
+    () => devices.find((device) => device.id === selectedDeviceIdForView) ?? null,
+    [devices, selectedDeviceIdForView],
+  )
 
   const handleDeviceChange = (deviceId: string) => {
     setSelectedDeviceId(deviceId)
@@ -179,7 +135,7 @@ export default function Settings({ rooms }: SettingsProps) {
 
     try {
       const saved = await audioSettingsApi.save(config)
-      setSavedAudioConfig(saved)
+      queryClient.setQueryData(AUDIO_SETTINGS_QUERY_KEY, saved)
       setSelectedDeviceId(saved.deviceId ?? "")
       toast.success(t("settings.lineMapping.saveSuccess"))
     } catch (error) {
@@ -225,17 +181,19 @@ export default function Settings({ rooms }: SettingsProps) {
           </SettingsSection>
 
           <SettingsSection
+            id="audio-device-settings"
             title={t("settings.sections.audio.title")}
             description={t("settings.sections.audio.description")}
           >
             <AudioDeviceSettings
               devices={devices}
-              selectedDeviceId={selectedDeviceId}
+              selectedDeviceId={selectedDeviceIdForView}
               onDeviceChange={handleDeviceChange}
-              isLoading={isLoadingDevices || isLoadingConfig}
+              isLoading={devicesQuery.isLoading || audioConfigQuery.isLoading}
+              isRefreshing={devicesQuery.isFetching && !devicesQuery.isLoading}
               supported={devicesSupported}
               error={devicesError}
-              onRefresh={() => void fetchDevices()}
+              onRefresh={() => void devicesQuery.refetch()}
             />
           </SettingsSection>
 

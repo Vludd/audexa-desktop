@@ -33,6 +33,10 @@ export default function DashboardQuickActions({
           type="button"
           variant="outline"
           className="w-full justify-start gap-2.5"
+          onClick={() => {
+            window.location.hash = "audio-device-settings"
+            onNavigate("settings")
+          }}
         >
           <Radio className="size-4" />
           {t("dashboard.quickActions.testOutputs")}
