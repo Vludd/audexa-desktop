@@ -18,7 +18,7 @@ function mapRoom(
   return {
     id: room.id,
     name: room.name,
-    status: "stopped",
+    status: "idle",
     volume: room.volume,
     position: 0,
     duration: 0,

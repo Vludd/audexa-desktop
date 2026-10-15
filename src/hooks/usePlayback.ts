@@ -24,7 +24,7 @@ export function usePlayback() {
       rooms.map((room) => {
         const runtime = state.rooms.find((item) => item.roomId === room.id)
         if (!runtime) {
-          return { ...room, status: "stopped", position: 0, duration: 0 }
+          return { ...room, status: "idle", position: 0, duration: 0 }
         }
 
         return {

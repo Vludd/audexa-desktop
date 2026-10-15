@@ -17,6 +17,7 @@ export interface SystemStatus {
   mappings: number
   sampleRate: number | null
   bufferSize: number | null
-  engine: "stopped" | "starting" | "running" | "error"
+  engine: "unknown" | "stopped" | "starting" | "running" | "error"
   error: string | null
+  lastUpdated: string | null
 }

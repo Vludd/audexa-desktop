@@ -7,7 +7,9 @@ import {
   type ReactNode,
 } from "react"
 
+import { useQuery } from "@tanstack/react-query"
 import { audioDevicesApi, type AudioDevice } from "@/api/audioDevices"
+import { playbackApi } from "@/api/playback"
 import {
   audioSettingsApi,
   type AudioSettingsConfig,
@@ -29,20 +31,37 @@ const EMPTY_STATUS: SystemStatus = {
   mappings: 0,
   sampleRate: null,
   bufferSize: null,
-  engine: "stopped",
+  engine: "unknown",
   error: null,
+  lastUpdated: null,
 }
 
 function calculateStatus(
   config: AudioSettingsConfig | null,
   devices: AudioDevice[],
   requestError: string | null,
+  playbackStatus: string | undefined,
+  playbackError: boolean,
+  lastUpdated: string | null,
 ): SystemStatus {
+  const engine: SystemStatus["engine"] = playbackError
+    ? "error"
+    : playbackStatus === undefined
+      ? "unknown"
+      : playbackStatus === "starting"
+      ? "starting"
+      : playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "waiting"
+        ? "running"
+        : playbackStatus === "error"
+          ? "error"
+          : "stopped"
   if (requestError) {
     return {
       ...EMPTY_STATUS,
       state: "error",
+      engine,
       error: requestError,
+      lastUpdated,
     }
   }
 
@@ -50,7 +69,8 @@ function calculateStatus(
     return {
       ...EMPTY_STATUS,
       state: "unconfigured",
-      engine: "stopped",
+      engine,
+      lastUpdated,
     }
   }
 
@@ -66,7 +86,8 @@ function calculateStatus(
       availableOutputs: 0,
       mappings: config.mappings.length,
       mappedOutputs: 0,
-      engine: "stopped",
+      engine,
+      lastUpdated,
     }
   }
 
@@ -87,11 +108,15 @@ function calculateStatus(
   }
 
   const mappingHealthy =
+    config.mappings.length > 0 &&
     validMappings.length === config.mappings.length &&
     duplicateOutputs.size === 0
 
+  const systemHealthy =
+    mappingHealthy && engine !== "error" && engine !== "unknown"
+
   return {
-    state: mappingHealthy ? "ready" : "degraded",
+    state: systemHealthy ? "ready" : "degraded",
     device: device.name,
     deviceId: device.id,
     online: true,
@@ -101,10 +126,15 @@ function calculateStatus(
     mappings: config.mappings.length,
     sampleRate: device.sampleRate,
     bufferSize: device.bufferSize,
-    engine: mappingHealthy ? "running" : "error",
-    error: mappingHealthy
-      ? null
-      : "Часть сопоставлений выходов требует проверки",
+    engine,
+    error: !mappingHealthy
+      ? "Сопоставления выходов отсутствуют или требуют проверки"
+      : engine === "error"
+        ? "Не удалось получить достоверное состояние движка воспроизведения"
+        : engine === "unknown"
+          ? "Состояние движка воспроизведения ещё не подтверждено"
+          : null,
+    lastUpdated,
   }
 }
 
@@ -115,6 +145,13 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const playbackQuery = useQuery({
+    queryKey: ["playback"],
+    queryFn: playbackApi.getState,
+    refetchInterval: 1000,
+    staleTime: 0,
+  })
   const refreshInFlight = useRef(false)
 
   const refresh = useCallback(async () => {
@@ -130,6 +167,7 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
       setConfig(nextConfig)
       setDevices(nextDevices.devices)
       setSupported(nextDevices.supported)
+      setLastUpdated(new Date().toISOString())
       setError(
         nextDevices.error && nextDevices.devices.length === 0
           ? nextDevices.error
@@ -158,6 +196,7 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
         setConfig(nextConfig)
         setDevices(nextDevices.devices)
         setSupported(nextDevices.supported)
+        setLastUpdated(new Date().toISOString())
         setError(
           nextDevices.error && nextDevices.devices.length === 0
             ? nextDevices.error
@@ -233,8 +272,15 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     () =>
       isLoading
         ? EMPTY_STATUS
-        : calculateStatus(config, devices, error),
-    [config, devices, error, isLoading],
+        : calculateStatus(
+            config,
+            devices,
+            error,
+            playbackQuery.data?.status,
+            Boolean(playbackQuery.error),
+            lastUpdated,
+          ),
+    [config, devices, error, isLoading, playbackQuery.data?.status, playbackQuery.error, lastUpdated],
   )
 
   const value = useMemo<AudioSystemContextValue>(

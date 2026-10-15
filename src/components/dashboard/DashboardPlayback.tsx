@@ -30,10 +30,18 @@ export default function DashboardPlayback({
   onVolumeChange,
   onGainChange,
 }: DashboardPlaybackProps) {
-  const current = playback?.steps.find((step) =>
-    step.status === "playing" || step.status === "paused" || step.status === "waiting",
+  // A step can retain its last status in the execution history after the
+  // scenario has stopped. Only show it as current playback while the parent
+  // playback state confirms that execution is active.
+  const isPlaybackActive = Boolean(
+    playback && ["starting", "playing", "paused", "waiting"].includes(playback.status),
   )
-  const next = playback?.nextStep
+  const current = isPlaybackActive
+    ? playback?.steps.find((step) =>
+        step.status === "playing" || step.status === "paused" || step.status === "waiting",
+      )
+    : undefined
+  const next = isPlaybackActive && playback?.nextStep
     ? playback.steps.find((step) => step.step === playback.nextStep)
     : undefined
   const room = current ? rooms.find((item) => item.id === current.roomId) : undefined
@@ -44,7 +52,7 @@ export default function DashboardPlayback({
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div>
           <h3 className="text-sm font-semibold">{t("dashboard.playback.title")}</h3>
-          {playback?.scenarioName && (
+          {isPlaybackActive && playback?.scenarioName && (
             <p className="mt-0.5 text-xs text-muted-foreground">
               {playback.scenarioName} · шаг {playback.currentStep}/{playback.totalSteps}
             </p>

@@ -1,9 +1,27 @@
 import { apiRequest } from "@/api/client"
 import type { RoomStatus } from "@/types"
 
+export type PlaybackStatus =
+  | "idle"
+  | "starting"
+  | "playing"
+  | "paused"
+  | "waiting"
+  | "stopped"
+  | "error"
+
+export type PlaybackStepStatus =
+  | "pending"
+  | "playing"
+  | "paused"
+  | "waiting"
+  | "finished"
+  | "stopped"
+  | "error"
+
 export interface PlaybackRoomState {
   roomId: string
-  status: Exclude<RoomStatus, "idle" | "paused">
+  status: RoomStatus
   scenarioId: string | null
   scenarioName: string | null
   audioFileId: string | null
@@ -24,7 +42,7 @@ export interface PlaybackStepState {
   roomName: string
   audioFileId: string
   audioFileName: string
-  status: "pending" | "playing" | "paused" | "waiting" | "finished" | "stopped" | "error"
+  status: PlaybackStepStatus
   delayMs: number
   delayRemainingSeconds: number
   positionSeconds: number
@@ -34,7 +52,7 @@ export interface PlaybackStepState {
 }
 
 export interface PlaybackState {
-  status: "idle" | "starting" | "playing" | "paused" | "waiting" | "stopped" | "error"
+  status: PlaybackStatus
   scenarioId: string | null
   scenarioName: string | null
   currentStep: number
@@ -47,46 +65,81 @@ export interface PlaybackState {
   error: string | null
 }
 
+const PLAYBACK_STATUSES = new Set<PlaybackStatus>([
+  "idle", "starting", "playing", "paused", "waiting", "stopped", "error",
+])
+const ROOM_STATUSES = new Set<RoomStatus>([
+  "idle", "playing", "paused", "stopped", "waiting", "error",
+])
+const STEP_STATUSES = new Set<PlaybackStepStatus>([
+  "pending", "playing", "paused", "waiting", "finished", "stopped", "error",
+])
+
+function assertPlaybackState(value: PlaybackState): PlaybackState {
+  if (!value || !PLAYBACK_STATUSES.has(value.status)) {
+    throw new Error(`Неизвестный статус воспроизведения: ${String(value?.status)}`)
+  }
+
+  for (const room of value.rooms ?? []) {
+    if (!ROOM_STATUSES.has(room.status)) {
+      throw new Error(`Неизвестный статус комнаты ${room.roomId}: ${String(room.status)}`)
+    }
+  }
+
+  for (const step of value.steps ?? []) {
+    if (!STEP_STATUSES.has(step.status)) {
+      throw new Error(`Неизвестный статус шага ${step.step}: ${String(step.status)}`)
+    }
+  }
+
+  return value
+}
+
+async function requestPlaybackState(
+  path: string,
+  init?: RequestInit,
+): Promise<PlaybackState> {
+  return assertPlaybackState(await apiRequest<PlaybackState>(path, init))
+}
+
 export const playbackApi = {
   getState() {
-    return apiRequest<PlaybackState>("/api/playback")
+    return requestPlaybackState("/api/playback")
   },
 
   startScenario(id: string) {
-    return apiRequest<PlaybackState>(`/api/playback/scenarios/${id}/start`, {
+    return requestPlaybackState(`/api/playback/scenarios/${id}/start`, {
       method: "POST",
     })
   },
 
   pause() {
-    return apiRequest<PlaybackState>("/api/playback/pause", { method: "POST" })
+    return requestPlaybackState("/api/playback/pause", { method: "POST" })
   },
 
   resume() {
-    return apiRequest<PlaybackState>("/api/playback/resume", { method: "POST" })
+    return requestPlaybackState("/api/playback/resume", { method: "POST" })
   },
 
   stop() {
-    return apiRequest<PlaybackState>("/api/playback/stop", {
-      method: "POST",
-    })
+    return requestPlaybackState("/api/playback/stop", { method: "POST" })
   },
 
   stopRoom(id: string) {
-    return apiRequest<PlaybackState>(`/api/playback/rooms/${id}/stop`, {
+    return requestPlaybackState(`/api/playback/rooms/${id}/stop`, {
       method: "POST",
     })
   },
 
   setRoomVolume(id: string, value: number) {
-    return apiRequest<PlaybackState>(`/api/playback/rooms/${id}/volume`, {
+    return requestPlaybackState(`/api/playback/rooms/${id}/volume`, {
       method: "PATCH",
       body: JSON.stringify({ value }),
     })
   },
 
   setAudioGain(id: string, value: number) {
-    return apiRequest<PlaybackState>(`/api/playback/audio/${id}/gain`, {
+    return requestPlaybackState(`/api/playback/audio/${id}/gain`, {
       method: "PATCH",
       body: JSON.stringify({ value }),
     })

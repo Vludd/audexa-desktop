@@ -38,6 +38,11 @@ export default function DashboardAudioSystem({ system }: DashboardAudioSystemPro
         />
 
         <InfoRow
+          label="Audio Engine"
+          value={system.engine.toUpperCase()}
+        />
+
+        <InfoRow
           label={t("dashboard.audioSystem.outputs")}
           value={`${system.availableOutputs} / ${system.outputs}`}
         />
@@ -62,9 +67,14 @@ export default function DashboardAudioSystem({ system }: DashboardAudioSystemPro
         />
       </div>
 
-      {system.error && (
+      {(system.error || system.lastUpdated) && (
         <div className="border-t px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
           {system.error}
+          {system.lastUpdated && (
+            <div className="mt-1 text-muted-foreground">
+              Обновлено: {new Date(system.lastUpdated).toLocaleTimeString()}
+            </div>
+          )}
         </div>
       )}
     </div>
