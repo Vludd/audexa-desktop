@@ -268,23 +268,29 @@ export default function Rooms({
       variant: "destructive",
 
       onConfirm: async () => {
-        await onDeleteRoom(
-          room.id,
-        )
+        try {
+          await onDeleteRoom(room.id)
 
-        toast.success(
-          t(
-            "rooms.notifications.deleted",
-          ),
-          {
-            description: t(
-              "rooms.notifications.deletedDescription",
-              {
+          toast.success(
+            t("rooms.notifications.deleted"),
+            {
+              description: t("rooms.notifications.deletedDescription", {
                 name: room.name,
-              },
-            ),
-          },
-        )
+              }),
+            },
+          )
+        } catch (error) {
+          const message = error instanceof Error ? error.message : ""
+          const isUsedByScenario = message.toLowerCase().includes("used by one or more scenarios")
+            || message.toLowerCase().includes("used by scenario")
+            || message.includes("SCENARIO_IN_USE")
+
+          toast.error(t("rooms.notifications.deleteFailed"), {
+            description: isUsedByScenario
+              ? t("rooms.notifications.deleteUsedByScenario")
+              : message || "Неизвестная ошибка.",
+          })
+        }
       },
     })
   }

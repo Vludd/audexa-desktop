@@ -10,32 +10,42 @@ interface Props {
 
 export default function StatusBar({ status, onOpenSettings }: Props) {
   const stateText =
-    status.state === "ready"
-      ? t("common.online")
-      : status.state === "degraded"
-        ? "DEGRADED"
-        : status.state === "initializing"
-          ? "INIT"
-          : t("common.offline")
+    status.backend === "offline"
+      ? "BACKEND OFFLINE"
+      : status.state === "ready"
+        ? t("common.online")
+        : status.state === "degraded"
+          ? "DEGRADED"
+          : status.state === "initializing"
+            ? "INIT"
+            : status.state === "unconfigured"
+              ? "UNCONFIGURED"
+              : status.state === "disconnected"
+                ? "DEVICE OFFLINE"
+                : "ERROR"
 
   const stateClass =
-    status.state === "ready"
-      ? "text-emerald-400"
-      : status.state === "degraded"
-        ? "text-amber-400"
-        : "text-red-400"
+    status.backend === "offline" || status.state === "error" || status.state === "disconnected"
+      ? "text-red-400"
+      : status.state === "ready"
+        ? "text-emerald-400"
+        : "text-amber-400"
 
   const dotClass =
-    status.state === "ready"
-      ? "bg-emerald-400"
-      : status.state === "degraded"
-        ? "bg-amber-400"
-        : "bg-red-400"
+    status.backend === "offline" || status.state === "error" || status.state === "disconnected"
+      ? "bg-red-400"
+      : status.state === "ready"
+        ? "bg-emerald-400"
+        : "bg-amber-400"
 
   return (
     <footer className="flex h-8 shrink-0 items-center border-t bg-[#1d2b3d] px-4 text-[11px] text-[#9db0c8]">
       <span>
         {t("statusBar.audioDevice")}: <strong className="text-[#d7e2ef]">{status.device ?? "—"}</strong>
+      </span>
+      <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
+      <span>
+        Backend: <strong className={status.backend === "online" ? "text-emerald-400" : status.backend === "offline" ? "text-red-400" : "text-[#d7e2ef]"}>{status.backend.toUpperCase()}</strong>
       </span>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
 

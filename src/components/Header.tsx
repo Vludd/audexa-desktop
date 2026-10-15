@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { CheckCircle, XCircle } from "lucide-react"
+import { AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { useAudioSystem } from "@/context/useAudioSystem"
@@ -15,7 +15,42 @@ interface Props {
 export default function Header({ title, subtitle }: Props) {
   const [now, setNow] = useState(new Date())
   const { status } = useAudioSystem()
-  const systemOk = status.state === "ready"
+  const backendOffline = status.backend === "offline"
+  const systemOk = status.state === "ready" && !backendOffline
+  const systemDegraded = status.state === "degraded" && !backendOffline
+  const statusVariant = systemOk
+    ? "success"
+    : systemDegraded || status.state === "unconfigured" || status.state === "initializing"
+      ? "warning"
+      : "destructive"
+  const statusTitle = backendOffline
+    ? t("header.backendOffline")
+    : status.state === "ready"
+      ? t("header.systemOk")
+      : status.state === "degraded"
+        ? t("header.systemDegraded")
+        : status.state === "unconfigured"
+          ? t("header.systemUnconfigured")
+          : status.state === "initializing"
+            ? t("header.systemChecking")
+            : status.state === "disconnected"
+              ? t("header.deviceDisconnected")
+              : t("header.systemError")
+  const statusDescription = backendOffline
+    ? t("header.backendOfflineDescription")
+    : status.state === "ready"
+      ? status.mappings === 0
+        ? t("header.noRoomsConfigured")
+        : t("header.allLinesOk")
+      : status.state === "degraded"
+        ? t("header.someRoomsNotConfigured", { mapped: status.mappedOutputs, total: status.mappings })
+        : status.state === "unconfigured"
+          ? t("header.systemUnconfiguredDescription")
+          : status.state === "initializing"
+            ? t("header.systemCheckingDescription")
+            : status.state === "disconnected"
+              ? t("header.deviceDisconnectedDescription")
+              : t("header.checkConnection")
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -44,16 +79,20 @@ export default function Header({ title, subtitle }: Props) {
         </div>
 
         <Badge
-          variant={systemOk ? "success" : "destructive"}
+          variant={statusVariant}
           className="h-auto rounded-md px-2.5 py-1.5"
         >
-          {systemOk ? <CheckCircle className="size-3.5 shrink-0" /> : <XCircle className="size-3.5 shrink-0" />}
+          {systemOk
+            ? <CheckCircle className="size-3.5 shrink-0" />
+            : systemDegraded || status.state === "unconfigured" || status.state === "initializing"
+              ? <AlertTriangle className="size-3.5 shrink-0" />
+              : <XCircle className="size-3.5 shrink-0" />}
           <div className="text-left">
             <div className="text-[11px] font-semibold leading-3.5">
-              {t(systemOk ? "header.systemOk" : "header.systemError")}
+              {statusTitle}
             </div>
             <div className="text-[10px] font-normal leading-3 opacity-75">
-              {t(systemOk ? "header.allLinesOk" : "header.checkConnection")}
+              {statusDescription}
             </div>
           </div>
         </Badge>

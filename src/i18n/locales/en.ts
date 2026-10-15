@@ -99,11 +99,33 @@ export const en: Widen<typeof ru> = {
   },
 
   header: {
-    systemOk: "System operational",
+    systemOk: "System ready",
+
+    systemDegraded: "Partially operational",
+
+    systemUnconfigured: "Setup required",
+
+    systemChecking: "Checking system",
 
     systemError: "System error",
 
-    allLinesOk: "All lines are operational",
+    backendOffline: "Backend unavailable",
+
+    deviceDisconnected: "Audio device unavailable",
+
+    allLinesOk: "All rooms are configured",
+
+    noRoomsConfigured: "No rooms created yet",
+
+    someRoomsNotConfigured: "Rooms configured: {mapped} of {total}",
+
+    systemUnconfiguredDescription: "Select an audio device",
+
+    systemCheckingDescription: "Retrieving system status",
+
+    deviceDisconnectedDescription: "Check the selected device",
+
+    backendOfflineDescription: "No connection to the server",
 
     checkConnection: "Check the connection",
   },
@@ -389,6 +411,10 @@ export const en: Widen<typeof ru> = {
       deleted: "Room deleted",
 
       deletedDescription: 'Room "{name}" has been deleted.',
+
+      deleteFailed: "Could not delete room",
+
+      deleteUsedByScenario: "This room is used by one or more scenarios. Remove it from those scenario steps, then try again.",
 
       duplicated: "Room duplicated",
 

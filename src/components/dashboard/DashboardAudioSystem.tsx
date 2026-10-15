@@ -26,6 +26,8 @@ export default function DashboardAudioSystem({ system }: DashboardAudioSystemPro
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-3.5">
+        <InfoRow label="Backend" value={system.backend.toUpperCase()} />
+
         <InfoRow label={t("dashboard.audioSystem.device")} value={system.device ?? "—"} />
 
         <InfoRow

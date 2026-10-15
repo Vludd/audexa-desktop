@@ -7,9 +7,9 @@ import {
   type ReactNode,
 } from "react"
 
-import { useQuery } from "@tanstack/react-query"
 import { audioDevicesApi, type AudioDevice } from "@/api/audioDevices"
-import { playbackApi } from "@/api/playback"
+import { isBackendOnline } from "@/api/client"
+import { audioSystemApi } from "@/api/audioSystem"
 import {
   audioSettingsApi,
   type AudioSettingsConfig,
@@ -22,6 +22,7 @@ import {
 
 const EMPTY_STATUS: SystemStatus = {
   state: "initializing",
+  backend: "unknown",
   device: null,
   deviceId: null,
   online: false,
@@ -36,108 +37,6 @@ const EMPTY_STATUS: SystemStatus = {
   lastUpdated: null,
 }
 
-function calculateStatus(
-  config: AudioSettingsConfig | null,
-  devices: AudioDevice[],
-  requestError: string | null,
-  playbackStatus: string | undefined,
-  playbackError: boolean,
-  lastUpdated: string | null,
-): SystemStatus {
-  const engine: SystemStatus["engine"] = playbackError
-    ? "error"
-    : playbackStatus === undefined
-      ? "unknown"
-      : playbackStatus === "starting"
-      ? "starting"
-      : playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "waiting"
-        ? "running"
-        : playbackStatus === "error"
-          ? "error"
-          : "stopped"
-  if (requestError) {
-    return {
-      ...EMPTY_STATUS,
-      state: "error",
-      engine,
-      error: requestError,
-      lastUpdated,
-    }
-  }
-
-  if (!config?.deviceId) {
-    return {
-      ...EMPTY_STATUS,
-      state: "unconfigured",
-      engine,
-      lastUpdated,
-    }
-  }
-
-  const device = devices.find((item) => item.id === config.deviceId) ?? null
-
-  if (!device || device.status === "offline") {
-    return {
-      ...EMPTY_STATUS,
-      state: "disconnected",
-      device: device?.name ?? "Неизвестное аудиоустройство",
-      deviceId: config.deviceId,
-      outputs: device?.outputCount ?? 0,
-      availableOutputs: 0,
-      mappings: config.mappings.length,
-      mappedOutputs: 0,
-      engine,
-      lastUpdated,
-    }
-  }
-
-  const outputIds = new Set(device.outputs.map((output) => output.id))
-  const validMappings = config.mappings.filter(
-    (mapping) => mapping.outputId && outputIds.has(mapping.outputId),
-  )
-
-  const duplicateOutputs = new Set<string>()
-  const seenOutputs = new Set<string>()
-
-  for (const mapping of config.mappings) {
-    if (!mapping.outputId || !outputIds.has(mapping.outputId)) continue
-    if (seenOutputs.has(mapping.outputId)) {
-      duplicateOutputs.add(mapping.outputId)
-    }
-    seenOutputs.add(mapping.outputId)
-  }
-
-  const mappingHealthy =
-    config.mappings.length > 0 &&
-    validMappings.length === config.mappings.length &&
-    duplicateOutputs.size === 0
-
-  const systemHealthy =
-    mappingHealthy && engine !== "error" && engine !== "unknown"
-
-  return {
-    state: systemHealthy ? "ready" : "degraded",
-    device: device.name,
-    deviceId: device.id,
-    online: true,
-    outputs: device.outputCount,
-    availableOutputs: device.outputs.length,
-    mappedOutputs: validMappings.length,
-    mappings: config.mappings.length,
-    sampleRate: device.sampleRate,
-    bufferSize: device.bufferSize,
-    engine,
-    error: !mappingHealthy
-      ? "Сопоставления выходов отсутствуют или требуют проверки"
-      : engine === "error"
-        ? "Не удалось получить достоверное состояние движка воспроизведения"
-        : engine === "unknown"
-          ? "Состояние движка воспроизведения ещё не подтверждено"
-          : null,
-    lastUpdated,
-  }
-}
-
 export function AudioSystemProvider({ children }: { children: ReactNode }) {
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [supported, setSupported] = useState(true)
@@ -145,13 +44,7 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const playbackQuery = useQuery({
-    queryKey: ["playback"],
-    queryFn: playbackApi.getState,
-    refetchInterval: 1000,
-    staleTime: 0,
-  })
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>(EMPTY_STATUS)
   const refreshInFlight = useRef(false)
 
   const refresh = useCallback(async () => {
@@ -159,26 +52,27 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     refreshInFlight.current = true
 
     try {
-      const [nextConfig, nextDevices] = await Promise.all([
+      const [nextConfig, nextDevices, nextStatus] = await Promise.all([
         audioSettingsApi.get(),
         audioDevicesApi.getAll(),
+        audioSystemApi.getStatus(),
       ])
 
       setConfig(nextConfig)
       setDevices(nextDevices.devices)
       setSupported(nextDevices.supported)
-      setLastUpdated(new Date().toISOString())
+      setSystemStatus(nextStatus)
       setError(
         nextDevices.error && nextDevices.devices.length === 0
           ? nextDevices.error
           : null,
       )
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Не удалось загрузить аудиосистему",
-      )
+      const message = requestError instanceof Error
+        ? requestError.message
+        : "Не удалось загрузить аудиосистему"
+      setError(message)
+      setSystemStatus({ ...EMPTY_STATUS, state: "error", backend: isBackendOnline() ? "online" : "offline", error: message, lastUpdated: null })
     } finally {
       refreshInFlight.current = false
     }
@@ -190,14 +84,15 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     Promise.all([
       audioSettingsApi.get(),
       audioDevicesApi.getAll(),
+      audioSystemApi.getStatus(),
     ])
-      .then(([nextConfig, nextDevices]) => {
+      .then(([nextConfig, nextDevices, nextStatus]) => {
         if (cancelled) return
         setConfig(nextConfig)
         setDevices(nextDevices.devices)
         setSupported(nextDevices.supported)
-        setLastUpdated(new Date().toISOString())
-        setError(
+        setSystemStatus(nextStatus)
+          setError(
           nextDevices.error && nextDevices.devices.length === 0
             ? nextDevices.error
             : null,
@@ -205,11 +100,11 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
       })
       .catch((requestError) => {
         if (cancelled) return
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Не удалось загрузить аудиосистему",
-        )
+        const message = requestError instanceof Error
+          ? requestError.message
+          : "Не удалось загрузить аудиосистему"
+        setError(message)
+        setSystemStatus({ ...EMPTY_STATUS, state: "error", backend: isBackendOnline() ? "online" : "offline", error: message, lastUpdated: null })
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -237,6 +132,12 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     try {
       const saved = await audioSettingsApi.save(nextConfig)
       setConfig(saved)
+      try {
+        const nextStatus = await audioSystemApi.getStatus()
+        setSystemStatus(nextStatus)
+      } catch {
+        // Keep the save result, but do not fabricate a refreshed system status.
+      }
       return saved
     } catch (requestError) {
       const message =
@@ -252,11 +153,14 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
 
   const selectDevice = useCallback(
     async (deviceId: string) => {
+      const sameDevice = Boolean(deviceId) && deviceId === config?.deviceId
       const nextConfig: AudioSettingsConfig = {
         version: 1,
         deviceId: deviceId || null,
-        mappings: config?.mappings ?? [],
-        translationOutputId: config?.translationOutputId ?? null,
+        // Output IDs are device-specific. Never carry mappings from a previous
+        // device into a newly selected device.
+        mappings: sameDevice ? (config?.mappings ?? []) : [],
+        translationOutputId: sameDevice ? (config?.translationOutputId ?? null) : null,
       }
 
       return saveConfig(nextConfig)
@@ -269,18 +173,8 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     : null
 
   const status = useMemo(
-    () =>
-      isLoading
-        ? EMPTY_STATUS
-        : calculateStatus(
-            config,
-            devices,
-            error,
-            playbackQuery.data?.status,
-            Boolean(playbackQuery.error),
-            lastUpdated,
-          ),
-    [config, devices, error, isLoading, playbackQuery.data?.status, playbackQuery.error, lastUpdated],
+    () => isLoading ? EMPTY_STATUS : systemStatus,
+    [isLoading, systemStatus],
   )
 
   const value = useMemo<AudioSystemContextValue>(

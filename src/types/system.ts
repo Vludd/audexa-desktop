@@ -8,6 +8,7 @@ export type AudioSystemState =
 
 export interface SystemStatus {
   state: AudioSystemState
+  backend: "unknown" | "online" | "offline"
   device: string | null
   deviceId: string | null
   online: boolean
