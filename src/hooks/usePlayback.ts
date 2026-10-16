@@ -13,6 +13,8 @@ const PLAYBACK_SESSIONS_QUERY_KEY = ["playback-sessions"] as const
 export function usePlayback() {
   const queryClient = useQueryClient()
   const notifiedSessionErrors = useRef(new Map<string, string>())
+  const mountedAt = useRef<number | null>(null)
+  const hasProcessedInitialSessions = useRef(false)
   const query = useQuery({
     queryKey: PLAYBACK_QUERY_KEY,
     queryFn: playbackApi.getState,
@@ -40,6 +42,12 @@ export function usePlayback() {
   })
 
   useEffect(() => {
+    mountedAt.current = Date.now()
+  }, [])
+
+  useEffect(() => {
+    if (!sessionsQuery.data) return
+
     const sessions = sessionsQuery.data ?? []
     const activeSessionIds = new Set(sessions.map((session) => session.sessionId))
 
@@ -52,6 +60,11 @@ export function usePlayback() {
       if (previousError === errorMessage) continue
 
       notifiedSessionErrors.current.set(session.sessionId, errorMessage)
+      const occurredDuringThisRun = state.finishedAt
+        ? mountedAt.current !== null && Date.parse(state.finishedAt) >= mountedAt.current
+        : false
+      if (!hasProcessedInitialSessions.current && !occurredDuringThisRun) continue
+
       toast.error(
         state.scenarioName
           ? `Ошибка воспроизведения: ${state.scenarioName}`
@@ -70,6 +83,8 @@ export function usePlayback() {
         notifiedSessionErrors.current.delete(sessionId)
       }
     }
+
+    hasProcessedInitialSessions.current = true
   }, [sessionsQuery.data])
 
   useEffect(() => {

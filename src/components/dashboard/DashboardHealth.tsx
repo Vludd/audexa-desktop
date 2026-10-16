@@ -25,9 +25,20 @@ export default function DashboardHealth({
     (room) => room.status === "playing",
   )
 
-  const issues = logs.filter(
-    (log) => log.level === "ERROR" || log.level === "WARNING",
-  )
+  const issues = logs.filter((log) => {
+    if (log.level !== "ERROR" && log.level !== "WARNING") return false
+    if (system.state === "disconnected") return true
+
+    const searchableText = [log.event, log.message, log.context?.exceptionMessage]
+      .filter((value): value is string => typeof value === "string")
+      .join(" ")
+      .toLowerCase()
+
+    return !(
+      searchableText.includes("device_unavailable") ||
+      searchableText.includes("аудиоустройство отключено")
+    )
+  })
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">

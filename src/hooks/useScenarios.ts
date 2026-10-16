@@ -399,31 +399,61 @@ export function useScenarios({
     [scheduleSave, updateCache],
   )
 
-  const playScenario = useCallback(
-    async (id: string) => {
+  const runScenario = useCallback(
+    async (id: string, isTestRun: boolean) => {
       try {
+        const pendingTimer = saveTimers.current[id]
+        if (pendingTimer) {
+          clearTimeout(pendingTimer)
+          delete saveTimers.current[id]
+        }
+
+        await saveChains.current[id]?.catch(() => undefined)
+
+        const latest = latestScenarios.current.find((item) => item.id === id)
+        if (!latest) throw new Error("Сценарий не найден в текущем состоянии приложения")
+        if (!canPersistScenario(latest, rooms, audioFiles)) {
+          throw new Error("Сначала заполните все шаги сценария и исправьте ошибки конфигурации")
+        }
+
+        // Persist the exact version the operator is about to run. This prevents
+        // a debounced autosave from leaving the backend with an older scenario.
+        setSaveStatuses((current) => ({ ...current, [id]: "saving" }))
+        try {
+          await saveMutation.mutateAsync(latest)
+        } catch {
+          // The mutation already reports and records the save failure.
+          return
+        }
+
+        const validation = await scenariosApi.validate(id)
+        if (!validation.valid) {
+          throw new Error(validation.errors.join("\n") || "Сценарий не прошёл проверку")
+        }
+
         await playbackApi.startScenario(id)
+        if (isTestRun) {
+          toast.info("Тестовый запуск начат: звук будет воспроизводиться через выбранные аудиовыходы.")
+        }
       } catch (error) {
-        toast.error("Не удалось запустить сценарий", {
-          description: error instanceof Error ? error.message : String(error),
-        })
+        const message = error instanceof Error ? error.message : String(error)
+        toast.error(
+          isTestRun ? "Не удалось выполнить тестовый запуск" : "Не удалось запустить сценарий",
+          { description: message },
+        )
       }
     },
-    [],
+    [audioFiles, rooms, saveMutation],
+  )
+
+  const playScenario = useCallback(
+    (id: string) => runScenario(id, false),
+    [runScenario],
   )
 
   const testScenario = useCallback(
-    async (id: string) => {
-      try {
-        await playbackApi.startScenario(id)
-        toast.info("Тестовый запуск начат")
-      } catch (error) {
-        toast.error("Не удалось выполнить тестовый запуск", {
-          description: error instanceof Error ? error.message : String(error),
-        })
-      }
-    },
-    [],
+    (id: string) => runScenario(id, true),
+    [runScenario],
   )
 
   const stopScenario = useCallback(

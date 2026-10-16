@@ -76,6 +76,7 @@ export default function Dashboard({
                 />
                 <DashboardPlayback
                   rooms={rooms}
+                  system={system}
                   playback={playback}
                   playbackSessions={playbackSessions}
                   onNavigate={onNavigate}
@@ -111,6 +112,7 @@ export default function Dashboard({
             <DashboardIssues
               logs={logs}
               rooms={rooms}
+              system={system}
               onNavigate={onNavigate}
               onStopAll={onStopAll}
             />

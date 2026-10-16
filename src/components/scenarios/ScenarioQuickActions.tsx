@@ -107,6 +107,9 @@ export default function ScenarioQuickActions({
           <Headphones className="size-3.5" />
           Тестовый запуск
         </Button>
+        <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">
+          Тестовый запуск воспроизводит звук через выбранные аудиовыходы.
+        </p>
       </div>
 
       {scenario && !validation?.valid && (

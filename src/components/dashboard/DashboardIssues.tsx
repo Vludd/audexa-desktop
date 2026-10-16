@@ -2,12 +2,13 @@ import { AlertTriangle, ExternalLink, Square, XCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import type { LogEntry, Room } from "@/types"
+import type { LogEntry, Room, SystemStatus } from "@/types"
 import { t } from "@/i18n"
 
 interface DashboardIssuesProps {
   logs: LogEntry[]
   rooms: Room[]
+  system: SystemStatus
   onNavigate: (page: string) => void
   onStopAll: () => void
 }
@@ -15,14 +16,36 @@ interface DashboardIssuesProps {
 export default function DashboardIssues({
   logs,
   rooms,
+  system,
   onNavigate,
   onStopAll,
 }: DashboardIssuesProps) {
+  const isResolvedDeviceInterruption = (log: LogEntry) => {
+    if (system.state === "disconnected") return false
+
+    const searchableText = [
+      log.event,
+      log.message,
+      log.context?.exceptionMessage,
+    ]
+      .filter((value): value is string => typeof value === "string")
+      .join(" ")
+      .toLowerCase()
+
+    return (
+      searchableText.includes("device_unavailable") ||
+      searchableText.includes("аудиоустройство отключено") ||
+      searchableText.includes("аудиоустройство отключено во время воспроизведения")
+    )
+  }
+
+  // Keep the incident in the Logs page for audit purposes, but do not present a
+  // recovered device interruption as an ongoing Dashboard issue.
   const issues = logs
     .filter(
       (log) =>
-        log.level === "ERROR" ||
-        log.level === "WARNING",
+        (log.level === "ERROR" || log.level === "WARNING") &&
+        !isResolvedDeviceInterruption(log),
     )
     .slice(0, 3)
 

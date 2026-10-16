@@ -132,8 +132,13 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     const intervalMs =
       connectionState === "offline"
         ? 15_000
-        : connectionState === "reconnecting"
-          ? 2_000
+        : connectionState === "reconnecting" ||
+            systemStatus.state === "disconnected" ||
+            systemStatus.state === "error" ||
+            systemStatus.backend === "offline"
+          // Recovery must be checked quickly after a device or status request
+          // fails. A failed Promise.all must not drop polling back to 10 seconds.
+          ? 1_500
           : engineActive
             ? 5_000
             : 10_000
@@ -142,7 +147,14 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
     }, intervalMs)
 
     return () => window.clearInterval(timer)
-  }, [isLoading, refresh, connectionState, systemStatus.engine])
+  }, [
+    isLoading,
+    refresh,
+    connectionState,
+    systemStatus.engine,
+    systemStatus.state,
+    systemStatus.backend,
+  ])
 
   const saveConfig = useCallback(async (nextConfig: AudioSettingsConfig) => {
     setIsSaving(true)

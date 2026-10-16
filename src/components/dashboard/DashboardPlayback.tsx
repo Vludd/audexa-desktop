@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Slider } from "@/components/ui/slider"
-import type { Room } from "@/types"
+import type { Room, SystemStatus } from "@/types"
 import type { PlaybackSession, PlaybackState } from "@/api/playback"
 import { t } from "@/i18n"
 import { formatTime } from "@/lib/audio"
 
 interface DashboardPlaybackProps {
   rooms: Room[]
+  system: SystemStatus
   playback?: PlaybackState
   playbackSessions: PlaybackSession[]
   onNavigate: (page: string) => void
@@ -24,6 +25,7 @@ interface DashboardPlaybackProps {
 
 export default function DashboardPlayback({
   rooms,
+  system,
   playback,
   playbackSessions,
   onNavigate,
@@ -39,6 +41,19 @@ export default function DashboardPlayback({
   const isPlaybackActive = Boolean(
     playback && ["starting", "playing", "paused", "waiting"].includes(playback.status),
   )
+  // Playback keeps its terminal error for history. Do not present a stale
+  // device-disconnect error as a current incident after the device is healthy.
+  const playbackErrorText = playback?.error?.toLowerCase() ?? ""
+  const isStaleDeviceError = Boolean(
+    playback?.status === "error" &&
+    (playbackErrorText.includes("device") || playbackErrorText.includes("аудиоустрой")) &&
+    (playbackErrorText.includes("disconnect") ||
+      playbackErrorText.includes("unavailable") ||
+      playbackErrorText.includes("отключ") ||
+      playbackErrorText.includes("недоступ")),
+  )
+  const showPlaybackError = playback?.status === "error" &&
+    (!isStaleDeviceError || system.state === "disconnected" || system.state === "error" || system.backend === "offline")
   const current = isPlaybackActive
     ? playback?.steps.find((step) =>
         step.status === "playing" || step.status === "paused" || step.status === "waiting" || step.status === "delaying",
@@ -257,7 +272,7 @@ export default function DashboardPlayback({
               <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onNavigate("scenarios")}>Открыть сценарий</Button>
             </div>
           </div>
-        ) : playback?.status === "error" ? (
+        ) : showPlaybackError ? (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
             <div className="text-sm font-semibold text-destructive">Воспроизведение остановлено из-за ошибки</div>
             <p className="mt-1 break-words text-xs text-muted-foreground">
