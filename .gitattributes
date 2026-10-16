@@ -1,3 +1,24 @@
+# Text files: normalize to LF in the repository
+* text=auto
+
+# Source code and configuration: always LF
+*.ts      text eol=lf
+*.tsx     text eol=lf
+*.js      text eol=lf
+*.jsx     text eol=lf
+*.css     text eol=lf
+*.scss    text eol=lf
+*.html    text eol=lf
+*.json    text eol=lf
+*.md      text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+
+# Windows scripts
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+
 # Git LFS Tracking Rules
 # Generated for binary, large, and non-diffable file types
 
