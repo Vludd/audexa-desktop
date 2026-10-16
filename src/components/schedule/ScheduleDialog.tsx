@@ -35,6 +35,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onChange: (form: ScheduleFormData) => void
   onSave: () => void
+  isSaving?: boolean
 }
 
 const DAYS: Weekday[] = [
@@ -55,6 +56,7 @@ export default function ScheduleDialog({
   onOpenChange,
   onChange,
   onSave,
+  isSaving = false,
 }: Props) {
   const toggleDay = (day: Weekday) => {
     onChange({
@@ -70,7 +72,11 @@ export default function ScheduleDialog({
   const canSave =
     Boolean(form.time) &&
     Boolean(form.scenarioId) &&
-    form.days.length > 0
+    (form.repeat === "once"
+      ? Boolean(form.executionDate)
+      : form.repeat === "weekly"
+        ? form.days.length > 0
+        : true)
 
   return (
     <Dialog
@@ -134,50 +140,56 @@ export default function ScheduleDialog({
             </Select>
           </FormRow>
 
-          <FormRow label={t("schedule.dialog.weekdays")}>
-            <div className="flex flex-wrap gap-2">
-              {DAYS.map((dayKey) => {
-                const active =
-                  form.days.includes(dayKey)
+          {form.repeat === "weekly" && (
+            <FormRow label={t("schedule.dialog.weekdays")}>
+              <div className="flex flex-wrap gap-2">
+                {DAYS.map((dayKey) => {
+                  const active =
+                    form.days.includes(dayKey)
 
-                return (
-                  <Button
-                    key={dayKey}
-                    type="button"
-                    size="sm"
-                    variant={
-                      active
-                        ? "default"
-                        : "outline"
-                    }
-                    onClick={() =>
-                      toggleDay(dayKey)
-                    }
-                    className="min-w-10"
-                  >
-                    {t(`schedule.weekdays.${dayKey}`)}
-                  </Button>
-                )
-              })}
-            </div>
+                  return (
+                    <Button
+                      key={dayKey}
+                      type="button"
+                      size="sm"
+                      variant={
+                        active
+                          ? "default"
+                          : "outline"
+                      }
+                      onClick={() =>
+                        toggleDay(dayKey)
+                      }
+                      className="min-w-10"
+                    >
+                      {t(`schedule.weekdays.${dayKey}`)}
+                    </Button>
+                  )
+                })}
+              </div>
 
-            {form.days.length === 0 && (
-              <p className="text-xs text-destructive">
-                {t("schedule.dialog.chooseDay")}
-              </p>
-            )}
-          </FormRow>
+              {form.days.length === 0 && (
+                <p className="text-xs text-destructive">
+                  {t("schedule.dialog.chooseDay")}
+                </p>
+              )}
+            </FormRow>
+          )}
 
           <FormRow label={t("schedule.dialog.repeat")}>
             <Select
               value={form.repeat}
-              onValueChange={(value) =>
+              onValueChange={(value) => {
+                const repeat = value as ScheduleFormData["repeat"]
                 onChange({
                   ...form,
-                  repeat:
-                    value as ScheduleFormData["repeat"],
+                  repeat,
+                  executionDate:
+                    repeat === "once"
+                      ? form.executionDate ?? getLocalDateString()
+                      : null,
                 })
-              }
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -198,6 +210,22 @@ export default function ScheduleDialog({
               </SelectContent>
             </Select>
           </FormRow>
+
+          {form.repeat === "once" && (
+            <FormRow label={t("schedule.dialog.executionDate")}>
+              <Input
+                type="date"
+                value={form.executionDate ?? ""}
+                min={getLocalDateString()}
+                onChange={(event) =>
+                  onChange({
+                    ...form,
+                    executionDate: event.target.value || null,
+                  })
+                }
+              />
+            </FormRow>
+          )}
 
           <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-3">
             <div>
@@ -235,7 +263,7 @@ export default function ScheduleDialog({
 
           <Button
             type="button"
-            disabled={!canSave}
+            disabled={!canSave || isSaving}
             onClick={onSave}
           >
             {editing
@@ -261,4 +289,12 @@ function FormRow({
       {children}
     </div>
   )
+}
+
+function getLocalDateString() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }

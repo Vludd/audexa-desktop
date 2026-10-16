@@ -10,6 +10,9 @@ interface BackendSchedule {
   repeat: ScheduleItem["repeat"]
   enabled: boolean
   status: ScheduleItem["status"]
+  executionDate: string | null
+  lastTriggeredAt: string | null
+  lastExecutionStatus: string | null
   createdAt: string
   updatedAt: string
 }
@@ -20,6 +23,7 @@ interface SchedulePayload {
   days: ScheduleItem["days"]
   repeat: ScheduleItem["repeat"]
   enabled: boolean
+  executionDate: string | null
 }
 
 function toItem(schedule: BackendSchedule): ScheduleItem {
@@ -31,6 +35,9 @@ function toItem(schedule: BackendSchedule): ScheduleItem {
     scenarioName: schedule.scenarioName,
     days: schedule.days,
     repeat: schedule.repeat,
+    executionDate: schedule.executionDate,
+    lastTriggeredAt: schedule.lastTriggeredAt,
+    lastExecutionStatus: schedule.lastExecutionStatus,
     nextRun: "—",
     status: schedule.status,
   }
@@ -43,6 +50,7 @@ function toPayload(data: ScheduleFormData): SchedulePayload {
     days: data.days,
     repeat: data.repeat,
     enabled: data.enabled,
+    executionDate: data.repeat === "once" ? data.executionDate : null,
   }
 }
 

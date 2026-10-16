@@ -22,15 +22,16 @@ import type {
 interface Props {
   schedule: ScheduleItem[]
   scenarios: Scenario[]
-  onAdd: (data: ScheduleFormData) => void
+  onAdd: (data: ScheduleFormData) => void | Promise<void>
   onUpdate: (
     id: number,
     data: ScheduleFormData,
-  ) => void
+  ) => void | Promise<void>
   onDelete: (id: number) => void
   onDuplicate: (id: number) => void
   onToggle: (id: number) => void
   isLoading?: boolean
+  isSaving?: boolean
   error?: unknown
   onRetry?: () => void
 }
@@ -48,6 +49,7 @@ const INITIAL_FORM: ScheduleFormData = {
   ],
   repeat: "daily",
   enabled: true,
+  executionDate: null,
 }
 
 export default function Schedule({
@@ -59,6 +61,7 @@ export default function Schedule({
   onDuplicate,
   onToggle,
   isLoading = false,
+  isSaving = false,
   error = null,
   onRetry,
 }: Props) {
@@ -133,6 +136,7 @@ export default function Schedule({
       days: [...selectedItem.days],
       repeat: selectedItem.repeat,
       enabled: selectedItem.enabled,
+      executionDate: selectedItem.executionDate,
     })
 
     setShowModal(true)
@@ -154,23 +158,29 @@ export default function Schedule({
     })
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (
       !form.scenarioId ||
       !form.time ||
-      form.days.length === 0
+      (form.repeat === "weekly" && form.days.length === 0) ||
+      (form.repeat === "once" && !form.executionDate)
     ) {
       return
     }
 
-    if (editingId !== null) {
-      onUpdate(editingId, form)
-    } else {
-      onAdd(form)
-    }
+    try {
+      if (editingId !== null) {
+        await onUpdate(editingId, form)
+      } else {
+        await onAdd(form)
+      }
 
-    setShowModal(false)
-    setEditingId(null)
+      setShowModal(false)
+      setEditingId(null)
+    } catch {
+      // Mutation hooks already display the backend error. Keep the dialog
+      // open so the operator can correct the schedule and retry.
+    }
   }
 
   const handleDelete = () => {
@@ -308,7 +318,8 @@ export default function Schedule({
         scenarios={scenarios}
         onOpenChange={handleDialogChange}
         onChange={handleFormChange}
-        onSave={handleSave}
+        onSave={() => void handleSave()}
+        isSaving={isSaving}
       />
 
       <ConfirmDialog

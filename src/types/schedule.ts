@@ -17,6 +17,9 @@ export interface ScheduleItem {
   scenarioName: string
   days: Weekday[]
   repeat: ScheduleRepeat
+  executionDate: string | null
+  lastTriggeredAt: string | null
+  lastExecutionStatus: string | null
   nextRun: string
   status: ScheduleStatus
 }
@@ -28,4 +31,5 @@ export interface ScheduleFormData {
   days: Weekday[]
   repeat: ScheduleRepeat
   enabled: boolean
+  executionDate: string | null
 }

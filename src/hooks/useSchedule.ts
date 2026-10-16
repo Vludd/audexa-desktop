@@ -7,7 +7,7 @@ import type {
   ScheduleItem,
   Weekday,
 } from "@/types"
-import { t } from "@/i18n"
+import { formatDate, t } from "@/i18n"
 import { toast } from "@/lib/toast"
 
 const SCHEDULE_QUERY_KEY = ["schedule"] as const
@@ -33,14 +33,24 @@ export function useSchedule() {
   } = useQuery({
     queryKey: SCHEDULE_QUERY_KEY,
     queryFn: scheduleApi.getAll,
+    // Refresh execution results while at least one schedule is enabled.
+    refetchInterval: (query) =>
+      query.state.data?.some((item) => item.enabled) ? 15_000 : false,
+    refetchIntervalInBackground: false,
   })
 
   const withNextRun = useCallback((items: ScheduleItem[]) => {
     return items.map((item) => ({
       ...item,
-      nextRun: item.enabled
-        ? calculateNextRun(item.time, item.days, item.repeat)
-        : "—",
+      nextRun:
+        item.repeat === "once" &&
+        (item.lastTriggeredAt !== null ||
+          item.lastExecutionStatus !== null ||
+          isOneTimePast(item.executionDate, item.time))
+          ? calculateNextRun(item.time, item.days, item.repeat, item.executionDate, item.lastTriggeredAt, item.lastExecutionStatus)
+          : item.enabled
+            ? calculateNextRun(item.time, item.days, item.repeat, item.executionDate, item.lastTriggeredAt, item.lastExecutionStatus)
+            : "—",
     }))
   }, [])
 
@@ -156,6 +166,7 @@ export function useSchedule() {
         days: [...source.days],
         repeat: source.repeat,
         enabled: source.enabled,
+        executionDate: source.repeat === "once" ? getTomorrowDateString() : null,
       })
     },
     [addSchedule, schedule],
@@ -174,6 +185,7 @@ export function useSchedule() {
     duplicateSchedule,
     toggleSchedule,
     isLoading,
+    isSaving: saveMutation.isPending,
     error,
     refetch,
   }
@@ -183,13 +195,62 @@ function calculateNextRun(
   time: string,
   days: Weekday[],
   repeat: ScheduleItem["repeat"],
+  executionDate: string | null,
+  lastTriggeredAt: string | null,
+  lastExecutionStatus: string | null,
 ) {
-  if (days.length === 0) {
-    return "—"
+  if (repeat === "once") {
+    if (lastExecutionStatus === "missed") {
+      return t("schedule.nextRun.missed")
+    }
+
+    if (lastExecutionStatus === "invalid") {
+      return t("schedule.nextRun.invalid")
+    }
+
+    if (lastTriggeredAt) {
+      switch (lastExecutionStatus) {
+        case "started":
+          return t("schedule.nextRun.completed")
+        case "skipped_conflict":
+          return t("schedule.nextRun.skipped")
+        case "failed":
+          return t("schedule.nextRun.failed")
+        case "invalid":
+          return t("schedule.nextRun.invalid")
+        default:
+          return t("schedule.nextRun.pending")
+      }
+    }
+
+    if (!executionDate) {
+      return t("schedule.nextRun.dateRequired")
+    }
+
+    const [year, month, day] = executionDate.split("-").map(Number)
+    const scheduledDate = new Date(year, month - 1, day)
+    const now = new Date()
+    const [hours, minutes] = time.split(":").map(Number)
+    const scheduledAt = new Date(year, month - 1, day, hours, minutes)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+    const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes())
+    if (scheduledDate < todayStart || scheduledAt < currentMinute) {
+      return t("schedule.nextRun.missed")
+    }
+
+    return t("schedule.nextRun.dateAt", {
+      date: formatDate(scheduledDate, { weekday: undefined, year: "numeric", month: "short", day: "numeric" }),
+      time,
+    })
   }
 
-  if (repeat === "once") {
-    return t("schedule.nextRun.todayAt", { time })
+  if (repeat === "daily") {
+    days = DAY_ORDER
+  }
+
+  if (days.length === 0) {
+    return "—"
   }
 
   const now = new Date()
@@ -231,4 +292,24 @@ function getNextTime(time: string) {
     2,
     "0",
   )}`
+}
+
+
+function getTomorrowDateString() {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function isOneTimePast(executionDate: string | null, time: string) {
+  if (!executionDate) return false
+  const [year, month, day] = executionDate.split("-").map(Number)
+  const [hours, minutes] = time.split(":").map(Number)
+  const scheduledAt = new Date(year, month - 1, day, hours, minutes)
+  const now = new Date()
+  const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes())
+  return scheduledAt < currentMinute
 }

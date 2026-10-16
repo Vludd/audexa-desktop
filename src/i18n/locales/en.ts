@@ -241,6 +241,7 @@ export const en: Widen<typeof ru> = {
       days: "Days",
 
       repeat: "Repeat",
+      executionDate: "Execution date",
 
       nextRun: "Next run",
 
@@ -271,6 +272,8 @@ export const en: Widen<typeof ru> = {
       chooseDay: "Select at least one day.",
 
       repeat: "Repeat",
+
+      executionDate: "Execution date",
 
       enabled: "Enabled",
 
@@ -305,6 +308,14 @@ export const en: Widen<typeof ru> = {
       dayAt: "{day} at {time}",
 
       nextDayAt: "Next {day} at {time}",
+      completed: "Executed",
+      dateRequired: "Choose a date",
+      missed: "Missed",
+      dateAt: "{date} at {time}",
+      skipped: "Skipped due to conflict",
+      failed: "Start failed",
+      pending: "Start not confirmed",
+      invalid: "Execution date missing",
     },
 
     confirmDelete: {

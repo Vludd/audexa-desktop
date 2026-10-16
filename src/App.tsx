@@ -113,6 +113,7 @@ export default function App() {
     duplicateSchedule,
     toggleSchedule,
     isLoading: scheduleLoading,
+    isSaving: scheduleSaving,
     error: scheduleError,
     refetch: refetchSchedule,
   } = useSchedule()
@@ -298,6 +299,7 @@ export default function App() {
               }
               onToggle={toggleSchedule}
               isLoading={scheduleLoading}
+              isSaving={scheduleSaving}
               error={scheduleError}
               onRetry={() => {
                 void refetchSchedule()
