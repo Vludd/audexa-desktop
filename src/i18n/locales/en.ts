@@ -139,6 +139,8 @@ export const en: Widen<typeof ru> = {
   statusBar: {
     audioDevice: "Audio device",
 
+    backend: "Backend",
+
     outputs: "Outputs",
 
     available: "available",
@@ -859,6 +861,8 @@ export const en: Widen<typeof ru> = {
     audioSystem: {
       title: "Audio system",
 
+      backend: "Backend",
+
       device: "Device",
 
       status: "Status",
@@ -1143,6 +1147,18 @@ export const en: Widen<typeof ru> = {
       appStarted: "Audexa frontend started",
 
       contextSerializationError: "Failed to serialize log context",
+
+      backendReconnected: "Connection to the server was restored",
+
+      backendConnectionLost: "Connection to the server was lost; reconnecting",
+
+      backendOffline: "The server is not responding after repeated connection attempts",
+
+      requestTimedOut: "Request timed out: {method} {path}",
+
+      connectionFailed: "Could not connect to the server",
+
+      requestFailed: "Request {method} {path} failed with status {status}: {message}",
     },
 
     columns: {

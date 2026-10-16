@@ -57,7 +57,7 @@ export default function StatusBar({ status, connectionState, onOpenSettings }: P
       </span>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
       <span>
-        Backend: <strong className={connectionState === "online" ? "text-emerald-400" : connectionState === "offline" ? "text-red-400" : "text-amber-400"}>{connectionState.toUpperCase()}</strong>
+        {t("statusBar.backend")}: <strong className={connectionState === "online" ? "text-emerald-400" : connectionState === "offline" ? "text-red-400" : "text-amber-400"}>{connectionState.toUpperCase()}</strong>
       </span>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
 

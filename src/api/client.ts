@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger"
+import { t } from "@/i18n"
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:5081"
@@ -44,19 +45,19 @@ function setConnectionState(nextState: BackendConnectionState): boolean {
     logger.info(
       "NETWORK",
       "backend.reconnected",
-      "Соединение с backend восстановлено",
+      t("logs.messages.backendReconnected"),
     )
   } else if (nextState === "reconnecting" && previousState === "online") {
     logger.warn(
       "NETWORK",
       "backend.connection_lost",
-      "Соединение с backend потеряно, выполняется переподключение",
+      t("logs.messages.backendConnectionLost"),
     )
   } else if (nextState === "offline") {
     logger.error(
       "NETWORK",
       "backend.offline",
-      "Backend не отвечает после повторных попыток подключения",
+      t("logs.messages.backendOffline"),
     )
   }
 
@@ -144,8 +145,8 @@ export async function apiRequest<T>(
         "NETWORK",
         isTimeout ? "backend.timeout" : "backend.connection_failed",
         isTimeout
-          ? `Таймаут запроса ${method} ${path}`
-          : "Не удалось установить соединение с backend",
+          ? t("logs.messages.requestTimedOut", { method, path })
+          : t("logs.messages.connectionFailed"),
         {
           method,
           path,
@@ -185,7 +186,12 @@ export async function apiRequest<T>(
     logger[response.status >= 500 ? "error" : "warn"](
       "API",
       "request.failed",
-      `${method} ${path} → ${response.status}: ${message}`,
+      t("logs.messages.requestFailed", {
+        method,
+        path,
+        status: response.status,
+        message,
+      }),
       {
         method,
         path,
