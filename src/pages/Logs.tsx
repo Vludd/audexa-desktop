@@ -15,8 +15,9 @@ interface Props {
 
 export default function Logs({ logs, onClear }: Props) {
   const [filter, setFilter] = useState<LogFilter>("all")
+  const [sourceFilter, setSourceFilter] = useState("all")
   const [query, setQuery] = useState("")
-  const [includeDebug, setIncludeDebug] = useState(false)
+  const [includeDebug, setIncludeDebug] = useState(true)
   const confirmation = useConfirm()
 
   const handleClear = () => {
@@ -48,6 +49,10 @@ export default function Logs({ logs, onClear }: Props) {
           return false
         }
 
+        if (sourceFilter !== "all" && log.source !== sourceFilter) {
+          return false
+        }
+
         if (!normalizedQuery) {
           return true
         }
@@ -59,8 +64,20 @@ export default function Logs({ logs, onClear }: Props) {
           JSON.stringify(log.context ?? {}),
         ].some((value) => value.toLowerCase().includes(normalizedQuery))
       })
-      .reverse()
-  }, [filter, includeDebug, logs, query])
+  }, [filter, includeDebug, logs, query, sourceFilter])
+
+  const handleExport = () => {
+    const stamp = new Date().toISOString().replace(/:/g, "-")
+    const blob = new Blob([JSON.stringify(filtered, null, 2)], {
+      type: "application/json;charset=utf-8",
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `audexa-logs-${stamp}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -71,6 +88,8 @@ export default function Logs({ logs, onClear }: Props) {
 
       <LogsToolbar
         filter={filter}
+        sourceFilter={sourceFilter}
+        onSourceFilterChange={setSourceFilter}
         logs={logs}
         query={query}
         includeDebug={includeDebug}
@@ -78,6 +97,7 @@ export default function Logs({ logs, onClear }: Props) {
         onFilterChange={setFilter}
         onIncludeDebugChange={setIncludeDebug}
         onClear={handleClear}
+        onExport={handleExport}
       />
 
       <main className="flex min-h-0 flex-1 flex-col gap-2 p-4">

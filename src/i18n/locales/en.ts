@@ -1201,6 +1201,24 @@ export const en: Widen<typeof ru> = {
       additional: "Additional filters",
 
       includeDebug: "Include DEBUG",
+
+      source: "Log source",
+
+      allSources: "All sources",
+
+      sourceSystem: "System",
+
+      sourceAudio: "Audio",
+
+      sourceSchedule: "Schedule",
+
+      sourceApi: "API",
+
+      sourceNetwork: "Network",
+
+      sourceApp: "App",
+
+      sourceUi: "UI",
     },
   },
 } satisfies Widen<typeof ru> & TranslationTree

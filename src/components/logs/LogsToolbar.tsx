@@ -1,7 +1,15 @@
 import { Download, Search, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { LogEntry } from "@/types"
 import { exportLogs } from "@/lib/logger"
 import { t, type TranslationKey } from "@/i18n"
@@ -10,6 +18,8 @@ export type LogFilter = "all" | "INFO" | "WARNING" | "ERROR"
 
 interface Props {
   filter: LogFilter
+  sourceFilter: string
+  onSourceFilterChange: (source: string) => void
   logs: LogEntry[]
   query: string
   includeDebug: boolean
@@ -28,11 +38,34 @@ const FILTERS: { value: LogFilter; labelKey: TranslationKey }[] = [
   { value: "ERROR", labelKey: "logs.filters.error" },
 ]
 
-const ACTIVE_CLASS: Record<LogFilter, string> = {
-  all: "bg-primary text-primary-foreground",
-  INFO: "bg-blue-600 text-white hover:bg-blue-700",
-  WARNING: "bg-amber-500 text-white hover:bg-amber-600",
-  ERROR: "bg-red-600 text-white hover:bg-red-700",
+const SOURCE_FILTERS: { value: string; labelKey: TranslationKey }[] = [
+  { value: "all", labelKey: "logs.filters.allSources" },
+  { value: "SYSTEM", labelKey: "logs.filters.sourceSystem" },
+  { value: "AUDIO", labelKey: "logs.filters.sourceAudio" },
+  { value: "SCHEDULE", labelKey: "logs.filters.sourceSchedule" },
+  { value: "API", labelKey: "logs.filters.sourceApi" },
+  { value: "NETWORK", labelKey: "logs.filters.sourceNetwork" },
+  { value: "APP", labelKey: "logs.filters.sourceApp" },
+  { value: "UI", labelKey: "logs.filters.sourceUi" },
+]
+
+const FILTER_STYLES: Record<LogFilter, { dot: string; active: string }> = {
+  all: {
+    dot: "bg-blue-500",
+    active: "border-blue-500/60 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  },
+  INFO: {
+    dot: "bg-emerald-500",
+    active: "border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  },
+  WARNING: {
+    dot: "bg-amber-500",
+    active: "border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  },
+  ERROR: {
+    dot: "bg-red-500",
+    active: "border-red-500/60 bg-red-500/10 text-red-700 dark:text-red-300",
+  },
 }
 
 function download(content: string, filename: string, type: string) {
@@ -49,6 +82,8 @@ function download(content: string, filename: string, type: string) {
 
 export default function LogsToolbar({
   filter,
+  sourceFilter,
+  onSourceFilterChange,
   logs,
   query,
   includeDebug,
@@ -105,16 +140,45 @@ export default function LogsToolbar({
             return (
               <Button
                 key={item.value}
-                variant={active ? "default" : "outline"}
+                variant="outline"
                 size="sm"
-                className={active ? ACTIVE_CLASS[item.value] : ""}
+                className={`h-7 rounded-full border-border bg-muted/30 px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground ${
+                  active ? FILTER_STYLES[item.value].active : ""
+                }`}
                 onClick={() => onFilterChange(item.value)}
               >
+                <span
+                  aria-hidden="true"
+                  className={`size-1.5 shrink-0 rounded-full ${FILTER_STYLES[item.value].dot}`}
+                />
                 {t(item.labelKey)} ({count(item.value)})
               </Button>
             )
           })}
         </div>
+
+        <Select
+          value={sourceFilter}
+          onValueChange={(value) => {
+            if (value !== null) onSourceFilterChange(value)
+          }}
+        >
+          <SelectTrigger
+            aria-label={t("logs.filters.source")}
+            className="h-8 w-40 text-xs"
+          >
+            <SelectValue>
+              {t(SOURCE_FILTERS.find((item) => item.value === sourceFilter)?.labelKey ?? "logs.filters.allSources")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {SOURCE_FILTERS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {t(item.labelKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <div className="ml-auto flex-1" />
 {/* 
@@ -145,13 +209,11 @@ export default function LogsToolbar({
         </span>
 
         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={includeDebug}
-            onChange={(event) =>
-              onIncludeDebugChange(event.target.checked)
+            onCheckedChange={(checked) =>
+              onIncludeDebugChange(checked === true)
             }
-            className="size-3.5 accent-primary"
           />
 
           <span>{t("logs.filters.includeDebug")}</span>
