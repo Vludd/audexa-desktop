@@ -2,17 +2,21 @@ import { Settings } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { t } from "@/i18n"
 import type { SystemStatus } from "../types"
+import type { BackendConnectionState } from "@/api/client"
 
 interface Props {
   status: SystemStatus
+  connectionState: BackendConnectionState
   onOpenSettings?: () => void
 }
 
-export default function StatusBar({ status, onOpenSettings }: Props) {
+export default function StatusBar({ status, connectionState, onOpenSettings }: Props) {
   const stateText =
-    status.backend === "offline"
+    connectionState === "offline"
       ? "BACKEND OFFLINE"
-      : status.state === "ready"
+      : connectionState === "reconnecting"
+        ? "BACKEND RECONNECTING"
+        : status.state === "ready"
         ? t("common.online")
         : status.state === "degraded"
           ? "DEGRADED"
@@ -25,18 +29,26 @@ export default function StatusBar({ status, onOpenSettings }: Props) {
                 : "ERROR"
 
   const stateClass =
-    status.backend === "offline" || status.state === "error" || status.state === "disconnected"
+    connectionState === "offline" ||
+    (connectionState === "online" &&
+      (status.state === "error" || status.state === "disconnected"))
       ? "text-red-400"
-      : status.state === "ready"
-        ? "text-emerald-400"
-        : "text-amber-400"
+      : connectionState === "reconnecting"
+        ? "text-amber-400"
+        : status.state === "ready"
+          ? "text-emerald-400"
+          : "text-amber-400"
 
   const dotClass =
-    status.backend === "offline" || status.state === "error" || status.state === "disconnected"
+    connectionState === "offline" ||
+    (connectionState === "online" &&
+      (status.state === "error" || status.state === "disconnected"))
       ? "bg-red-400"
-      : status.state === "ready"
-        ? "bg-emerald-400"
-        : "bg-amber-400"
+      : connectionState === "reconnecting"
+        ? "bg-amber-400"
+        : status.state === "ready"
+          ? "bg-emerald-400"
+          : "bg-amber-400"
 
   return (
     <footer className="flex h-8 shrink-0 items-center border-t bg-[#1d2b3d] px-4 text-[11px] text-[#9db0c8]">
@@ -45,7 +57,7 @@ export default function StatusBar({ status, onOpenSettings }: Props) {
       </span>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
       <span>
-        Backend: <strong className={status.backend === "online" ? "text-emerald-400" : status.backend === "offline" ? "text-red-400" : "text-[#d7e2ef]"}>{status.backend.toUpperCase()}</strong>
+        Backend: <strong className={connectionState === "online" ? "text-emerald-400" : connectionState === "offline" ? "text-red-400" : "text-amber-400"}>{connectionState.toUpperCase()}</strong>
       </span>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
 

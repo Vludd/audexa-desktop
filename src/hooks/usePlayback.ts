@@ -2,6 +2,7 @@ import { useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { playbackApi, type PlaybackSession, type PlaybackState } from "@/api/playback"
+import { getBackendConnectionState } from "@/api/client"
 import type { Room } from "@/types"
 
 const PLAYBACK_QUERY_KEY = ["playback"] as const
@@ -13,13 +14,26 @@ export function usePlayback() {
   const query = useQuery({
     queryKey: PLAYBACK_QUERY_KEY,
     queryFn: playbackApi.getState,
-    refetchInterval: 500,
+    refetchInterval: (currentQuery) => {
+      const connection = getBackendConnectionState()
+      if (connection === "offline") return 15_000
+      if (connection === "reconnecting") return 2_000
+      return isActivePlayback(currentQuery.state.data) ? 500 : 3_000
+    },
     staleTime: 0,
   })
   const sessionsQuery = useQuery({
     queryKey: PLAYBACK_SESSIONS_QUERY_KEY,
     queryFn: playbackApi.getSessions,
-    refetchInterval: 500,
+    refetchInterval: (currentQuery) => {
+      const connection = getBackendConnectionState()
+      if (connection === "offline") return 15_000
+      if (connection === "reconnecting") return 2_000
+      const sessions = currentQuery.state.data ?? []
+      return sessions.some((session) => isActivePlayback(session.state))
+        ? 500
+        : 3_000
+    },
     staleTime: 0,
   })
 
@@ -53,4 +67,12 @@ export function usePlayback() {
     data: query.data as PlaybackState | undefined,
     sessions: (sessionsQuery.data ?? []) as PlaybackSession[],
   }
+}
+
+
+function isActivePlayback(state: PlaybackState | undefined): boolean {
+  return Boolean(
+    state &&
+      ["starting", "playing", "paused", "waiting"].includes(state.status),
+  )
 }

@@ -32,23 +32,26 @@ import Logs from "./pages/Logs"
 export default function App() {
   useLocale()
 
+  const queryClient = useQueryClient()
+  const [page, setPage] =
+    useState<Page>("dashboard")
+
   useEffect(() => {
     const unsubscribe = subscribeBackendStatus((online) => {
       if (online) {
         toast.success(t("network.backendConnected"))
+        // Invalidate active query caches after reconnection so stale data is
+        // replaced by a fresh snapshot without restarting the desktop app.
+        void queryClient.invalidateQueries()
       } else {
         toast.error(t("network.backendDisconnected"))
       }
     })
 
     return unsubscribe
-  }, [])
+  }, [queryClient])
 
-  const [page, setPage] =
-    useState<Page>("dashboard")
-  const queryClient = useQueryClient()
-
-  const { status } = useAudioSystem()
+  const { status, connectionState } = useAudioSystem()
   const { data: playback, sessions: playbackSessions } = usePlayback()
 
   const { files: audioFiles } = useAudioFiles({})
@@ -320,6 +323,7 @@ export default function App() {
 
       <StatusBar
         status={status}
+        connectionState={connectionState}
         onOpenSettings={() => setPage("settings")}
       />
 

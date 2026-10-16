@@ -8,7 +8,7 @@ import {
 } from "react"
 
 import { audioDevicesApi, type AudioDevice } from "@/api/audioDevices"
-import { isBackendOnline } from "@/api/client"
+import { getBackendConnectionState, isBackendOnline, subscribeBackendConnectionState } from "@/api/client"
 import { audioSystemApi } from "@/api/audioSystem"
 import {
   audioSettingsApi,
@@ -45,6 +45,7 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [systemStatus, setSystemStatus] = useState<SystemStatus>(EMPTY_STATUS)
+  const [connectionState, setConnectionState] = useState(getBackendConnectionState())
   const refreshInFlight = useRef(false)
 
   const refresh = useCallback(async () => {
@@ -116,14 +117,32 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    return subscribeBackendConnectionState((nextState) => {
+      setConnectionState(nextState)
+      // A successful response after an outage is the signal to refresh the
+      // full system snapshot immediately rather than waiting for the next poll.
+      if (nextState === "online") void refresh()
+    })
+  }, [refresh])
+
+  useEffect(() => {
     if (isLoading) return
 
+    const engineActive = ["starting", "running"].includes(systemStatus.engine)
+    const intervalMs =
+      connectionState === "offline"
+        ? 15_000
+        : connectionState === "reconnecting"
+          ? 2_000
+          : engineActive
+            ? 5_000
+            : 10_000
     const timer = window.setInterval(() => {
       void refresh()
-    }, 5000)
+    }, intervalMs)
 
     return () => window.clearInterval(timer)
-  }, [isLoading, refresh])
+  }, [isLoading, refresh, connectionState, systemStatus.engine])
 
   const saveConfig = useCallback(async (nextConfig: AudioSettingsConfig) => {
     setIsSaving(true)
@@ -184,6 +203,7 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
       config,
       selectedDevice,
       status,
+      connectionState,
       isLoading,
       isSaving,
       error,
@@ -197,6 +217,7 @@ export function AudioSystemProvider({ children }: { children: ReactNode }) {
       config,
       selectedDevice,
       status,
+      connectionState,
       isLoading,
       isSaving,
       error,

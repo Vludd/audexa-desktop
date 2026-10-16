@@ -3,6 +3,7 @@ import { createContext } from "react"
 import type { AudioDevice } from "@/api/audioDevices"
 import type { AudioSettingsConfig } from "@/api/audioSettings"
 import type { SystemStatus } from "@/types/system"
+import type { BackendConnectionState } from "@/api/client"
 
 export interface AudioSystemContextValue {
   devices: AudioDevice[]
@@ -10,6 +11,7 @@ export interface AudioSystemContextValue {
   config: AudioSettingsConfig | null
   selectedDevice: AudioDevice | null
   status: SystemStatus
+  connectionState: BackendConnectionState
   isLoading: boolean
   isSaving: boolean
   error: string | null
