@@ -20,8 +20,12 @@ const listeners = new Set<() => void>()
 function getStoredLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE
 
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  return stored === "en" || stored === "ru" ? stored : DEFAULT_LOCALE
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    return stored === "en" || stored === "ru" ? stored : DEFAULT_LOCALE
+  } catch {
+    return DEFAULT_LOCALE
+  }
 }
 
 if (typeof window !== "undefined") {
@@ -45,7 +49,11 @@ export function setLocale(locale: Locale) {
   currentLocale = locale
 
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORAGE_KEY, locale)
+    try {
+      window.localStorage.setItem(STORAGE_KEY, locale)
+    } catch {
+      // The selected locale remains active for the current session.
+    }
   }
 
   listeners.forEach((listener) => listener())

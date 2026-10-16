@@ -663,6 +663,14 @@ export const en: Widen<typeof ru> = {
       addStep: "Add step",
 
       totalDuration: "Total duration:",
+      saveStatus: {
+        scheduled: "Saving…",
+        saving: "Saving…",
+        saved: "Saved",
+        error: "Save failed",
+        unsaved: "Changes not saved: check required fields",
+      },
+      retrySave: "Retry save",
     },
 
     settings: {
@@ -693,15 +701,9 @@ export const en: Widen<typeof ru> = {
 
       additional: "Additional options",
 
-      autoStart: "Start automatically on schedule",
 
       stopPrevious: "Stop the previous scenario",
-
-      syncTranslation: "Simultaneous interpretation (line 31)",
-
-      crossfade: "Crossfade between tracks",
-
-      notifications: "Show notifications",
+      stopPreviousDescription: "When disabled, the scenario can run alongside active sessions. If a required room is occupied, that step waits until the room is released.",
     },
 
     steps: {
@@ -979,6 +981,14 @@ export const en: Widen<typeof ru> = {
       outputDiagnosticsUnavailable: "Output diagnostics are unavailable while the selected device is disconnected.",
     },
 
+    startup: {
+      title: "Startup and recovery",
+      description: "Available after Audexa is packaged as a standalone desktop application. These options are currently disabled and do not affect system behavior.",
+      autoStart: "Start Audexa with Windows",
+      recovery: "Recover operation after a failure",
+      restoreProfile: "Restore the last configuration",
+      errorNotifications: "Notify about startup errors",
+    },
     logging: {
       title: "Logging",
 
@@ -1018,20 +1028,6 @@ export const en: Widen<typeof ru> = {
         description:
           "Entries older than 7 days and entries above the configured limit are removed automatically.",
       },
-    },
-
-    startup: {
-      title: "Startup and recovery",
-
-      description: "Configure app startup and recovery (IN DEVELOPMENT)",
-
-      autoStart: "Start with Windows",
-
-      recovery: "Recover after a failure",
-
-      restoreProfile: "Apply the last profile on startup",
-
-      errorNotifications: "Send notifications about errors",
     },
 
     lineMapping: {

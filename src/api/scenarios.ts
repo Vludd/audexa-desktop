@@ -52,11 +52,7 @@ function mapScenario(
     status: scenario.status,
     playMode: scenario.playMode,
     repeat: scenario.repeat,
-    autoStart: false,
     stopPrevious: scenario.stopPrevious,
-    syncTranslation: false,
-    crossfade: false,
-    notifications: true,
     steps: scenario.steps
       .slice()
       .sort((a, b) => a.order - b.order)
@@ -90,7 +86,7 @@ function toPayload(scenario: Scenario): ScenarioPayload {
     steps: scenario.steps.map((step) => ({
       roomId: step.roomId,
       audioFileId: step.audioFileId ?? "",
-        delayMs: Math.round(step.delay * 1000),
+      delayMs: Math.round(step.delay * 1000),
     })),
   }
 }

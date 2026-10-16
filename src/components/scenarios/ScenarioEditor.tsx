@@ -1,6 +1,9 @@
 import {
+  AlertCircle,
   CheckCircle2,
+  Loader2,
   Plus,
+  RefreshCw,
   Settings2,
   TriangleAlert,
 } from "lucide-react"
@@ -9,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
-import type { ScenarioUpdate, ScenarioValidation } from "@/hooks/useScenarios"
+import type { ScenarioSaveStatus, ScenarioUpdate, ScenarioValidation } from "@/hooks/useScenarios"
 import ScenarioStepsTable from "./ScenarioStepsTable"
 import { t } from "@/i18n"
 import { formatTime } from "@/lib/audio"
@@ -17,6 +20,8 @@ import { getScenarioDuration } from "@/lib/scenarios"
 
 interface Props {
   scenario: Scenario
+  saveStatus?: ScenarioSaveStatus
+  onRetrySave: () => void
   rooms: Room[]
   audioFiles: AudioFile[]
   onUpdate: (id: string, patch: ScenarioUpdate) => void
@@ -35,6 +40,8 @@ interface Props {
 
 export default function ScenarioEditor({
   scenario,
+  saveStatus,
+  onRetrySave,
   rooms,
   audioFiles,
   onUpdate,
@@ -77,6 +84,41 @@ export default function ScenarioEditor({
           <p className="mt-1 text-xs text-muted-foreground">
             {scenario.description || t("scenarios.editor.descriptionEmpty")}
           </p>
+          {saveStatus && (
+            <div
+              className={[
+                "mt-2 flex flex-wrap items-center gap-1.5 text-xs",
+                saveStatus === "error" ? "text-destructive" :
+                saveStatus === "saved" ? "text-emerald-600 dark:text-emerald-400" :
+                "text-muted-foreground",
+              ].join(" ")}
+              role={saveStatus === "error" ? "alert" : "status"}
+              aria-live="polite"
+            >
+              {saveStatus === "scheduled" || saveStatus === "saving" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : saveStatus === "saved" ? (
+                <CheckCircle2 className="size-3.5" />
+              ) : saveStatus === "error" ? (
+                <AlertCircle className="size-3.5" />
+              ) : (
+                <AlertCircle className="size-3.5" />
+              )}
+              <span>{t(`scenarios.editor.saveStatus.${saveStatus}`)}</span>
+              {saveStatus === "error" && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="h-6 px-1.5 text-xs"
+                  onClick={onRetrySave}
+                >
+                  <RefreshCw className="size-3" />
+                  {t("scenarios.editor.retrySave")}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">

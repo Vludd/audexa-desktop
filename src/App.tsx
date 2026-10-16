@@ -78,6 +78,8 @@ export default function App() {
 
   const {
     scenarios,
+    saveStatuses,
+    retrySaveScenario,
     playScenario,
     stopScenario,
     createScenario,
@@ -231,6 +233,8 @@ export default function App() {
           {page === "scenarios" && (
             <Scenarios
               scenarios={scenarios}
+              saveStatuses={saveStatuses}
+              onRetrySave={retrySaveScenario}
               rooms={rooms}
               audioFiles={audioFiles}
               onPlay={playScenario}

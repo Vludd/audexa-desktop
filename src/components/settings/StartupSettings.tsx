@@ -10,6 +10,11 @@ const OPTIONS = [
   "settings.startup.errorNotifications",
 ] as const
 
+/**
+ * These are planned settings for the future standalone desktop package.
+ * They remain visible for planning, but are intentionally disabled until
+ * the desktop shell and startup/recovery behavior are implemented.
+ */
 export default function StartupSettings() {
   return (
     <Card>
@@ -23,16 +28,16 @@ export default function StartupSettings() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {OPTIONS.map((label) => (
+        {OPTIONS.map((key) => (
           <div
-            key={label}
+            key={key}
             className="flex items-center justify-between gap-4"
           >
-            <Label className="cursor-pointer font-normal">
-              {t(label)}
+            <Label className="cursor-not-allowed font-normal text-muted-foreground">
+              {t(key)}
             </Label>
 
-            <Switch defaultChecked disabled/>
+            <Switch checked={false} disabled aria-label={t(key)} />
           </div>
         ))}
       </CardContent>

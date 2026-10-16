@@ -11,10 +11,12 @@ import ScenarioSettings from "@/components/scenarios/ScenarioSettings"
 import ScenarioToolbar from "@/components/scenarios/ScenarioToolbar"
 import ConfirmDialog from "@/components/ui/confirm-dialog"
 import { useConfirm } from "@/hooks/useConfirm"
-import type { ScenarioUpdate, ScenarioValidation } from "@/hooks/useScenarios"
+import type { ScenarioSaveStatus, ScenarioUpdate, ScenarioValidation } from "@/hooks/useScenarios"
 
 interface Props {
   scenarios: Scenario[]
+  saveStatuses: Record<string, ScenarioSaveStatus>
+  onRetrySave: (id: string) => void
   rooms: Room[]
   audioFiles: AudioFile[]
   onPlay: (id: string) => void
@@ -53,15 +55,13 @@ const createDraft: Scenario = {
   status: "inactive",
   playMode: "sequential",
   repeat: "once",
-  autoStart: false,
   stopPrevious: true,
-  syncTranslation: false,
-  crossfade: false,
-  notifications: true,
 }
 
 export default function Scenarios({
   scenarios,
+  saveStatuses,
+  onRetrySave,
   rooms,
   audioFiles,
   onPlay,
@@ -197,11 +197,13 @@ export default function Scenarios({
           </div>
         ) : (
           <>
-        <ScenarioList scenarios={filtered} selected={selectedId} onSelect={setSelected} />
+        <ScenarioList scenarios={filtered} selected={selectedId} onSelect={setSelected} saveStatuses={saveStatuses} />
 
         {scenario ? (
           <ScenarioEditor
             scenario={scenario}
+            saveStatus={saveStatuses[scenario.id]}
+            onRetrySave={() => onRetrySave(scenario.id)}
             rooms={rooms}
             audioFiles={audioFiles}
             onUpdate={onUpdate}

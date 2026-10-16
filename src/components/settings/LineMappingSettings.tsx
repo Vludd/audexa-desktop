@@ -81,6 +81,7 @@ export default function LineMappingSettings({
 
   const [mappings, setMappings] = useState<Mapping[]>(initialMappings)
   const [translationOutput, setTranslationOutput] = useState<string | null>(initialTranslationOutput)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const savedSnapshot = initialMappings
   const savedTranslationOutput = initialTranslationOutput
 
@@ -143,6 +144,7 @@ export default function LineMappingSettings({
     translationOutput !== savedTranslationOutput
 
   const updateMapping = (roomId: string, outputId: string, checked: boolean) => {
+    setSaveError(null)
     setMappings((current) => {
       const withoutOutput = current.filter((mapping) => !(mapping.roomId === roomId && mapping.outputId === outputId))
       if (!checked) return withoutOutput
@@ -151,10 +153,12 @@ export default function LineMappingSettings({
   }
 
   const clearRoomMappings = (roomId: string) => {
+    setSaveError(null)
     setMappings((current) => current.filter((mapping) => mapping.roomId !== roomId))
   }
 
   const handleReset = () => {
+    setSaveError(null)
     setMappings(savedSnapshot)
     setTranslationOutput(savedTranslationOutput)
   }
@@ -169,7 +173,16 @@ export default function LineMappingSettings({
       translationOutputId: translationOutput,
     }
 
-    await onSave(config)
+    setSaveError(null)
+    try {
+      await onSave(config)
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : t("settings.lineMapping.saveFailedDescription"),
+      )
+    }
   }
 
 
@@ -366,7 +379,13 @@ export default function LineMappingSettings({
                     <div className="truncate text-xs text-muted-foreground">{t("settings.lineMapping.dedicatedOutput")}</div>
                   </div>
                   <div className="min-w-0 rounded-md border bg-background">
-                    <Select value={translationOutput ?? ""} onValueChange={setTranslationOutput}>
+                    <Select
+                      value={translationOutput ?? ""}
+                      onValueChange={(value) => {
+                        setSaveError(null)
+                        setTranslationOutput(value)
+                      }}
+                    >
                       <SelectTrigger className="h-8 w-full border-0 bg-transparent px-2 shadow-none focus:ring-0">
                         <SelectValue placeholder={t("common.notAssigned")}>
                           {translationOutput ? outputById.get(translationOutput)?.name ?? t("common.notAssigned") : t("common.notAssigned")}
@@ -405,6 +424,15 @@ export default function LineMappingSettings({
               device={selectedDevice}
               outputIds={mappings.map((mapping) => mapping.outputId).filter((value): value is string => Boolean(value))}
             /> */}
+
+            {saveError && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                {t("settings.lineMapping.saveFailed")}: {saveError}
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-3 border-t pt-4">
               <div className="text-xs text-muted-foreground">

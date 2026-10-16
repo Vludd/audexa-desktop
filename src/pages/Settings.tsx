@@ -6,8 +6,8 @@ import { t } from "@/i18n"
 
 import AudioDeviceSettings from "@/components/settings/AudioDeviceSettings"
 import LineMappingSettings from "@/components/settings/LineMappingSettings"
-import StartupSettings from "@/components/settings/StartupSettings"
 import LoggingSettings from "@/components/settings/LoggingSettings"
+import StartupSettings from "@/components/settings/StartupSettings"
 import ThemeSettings from "@/components/settings/ThemeSettings"
 import LanguageSwitcher from "@/components/LanguageSwitcher"
 

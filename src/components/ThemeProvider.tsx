@@ -10,8 +10,12 @@ function getSystemTheme(): ResolvedTheme {
 }
 
 function getInitialTheme(): Theme {
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (stored === "light" || stored === "dark" || stored === "system") return stored
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    if (stored === "light" || stored === "dark" || stored === "system") return stored
+  } catch {
+    // Use the system preference when browser storage is unavailable.
+  }
 
   return "system"
 }
@@ -39,7 +43,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     applyTheme(resolvedTheme)
-    window.localStorage.setItem(STORAGE_KEY, theme)
+    try {
+      window.localStorage.setItem(STORAGE_KEY, theme)
+    } catch {
+      // Theme selection still applies for the current session.
+    }
   }, [theme, resolvedTheme])
 
   const value = useMemo(

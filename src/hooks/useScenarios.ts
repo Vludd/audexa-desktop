@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { scenariosApi } from "@/api/scenarios"
@@ -17,12 +17,10 @@ export interface ScenarioUpdate {
   status?: Scenario["status"]
   playMode?: Scenario["playMode"]
   repeat?: Scenario["repeat"]
-  autoStart?: boolean
   stopPrevious?: boolean
-  syncTranslation?: boolean
-  crossfade?: boolean
-  notifications?: boolean
 }
+
+export type ScenarioSaveStatus = "scheduled" | "saving" | "saved" | "error" | "unsaved"
 
 export interface ScenarioValidation {
   valid: boolean
@@ -43,6 +41,7 @@ export function useScenarios({
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const saveChains = useRef<Record<string, Promise<void>>>({})
   const latestScenarios = useRef<Scenario[]>([])
+  const [saveStatuses, setSaveStatuses] = useState<Record<string, ScenarioSaveStatus>>({})
 
   const audioSettingsQuery = useQuery({
     queryKey: AUDIO_SETTINGS_QUERY_KEY,
@@ -115,17 +114,43 @@ export function useScenarios({
       return scenariosApi.update(scenario, context)
     },
     onSuccess: (updated, submitted) => {
+      const latestBeforeUpdate = latestScenarios.current.find(
+        (item) => item.id === submitted.id,
+      )
+      const submittedIsCurrent = latestBeforeUpdate === submitted
+
       updateCache((current) =>
         current.map((item) =>
           item.id === updated.id && item === submitted ? updated : item,
         ),
       )
+
+      if (saveTimers.current[submitted.id]) {
+        setSaveStatuses((current) => ({ ...current, [submitted.id]: "scheduled" }))
+      } else if (submittedIsCurrent) {
+        setSaveStatuses((current) => ({ ...current, [submitted.id]: "saved" }))
+      } else if (latestBeforeUpdate) {
+        setSaveStatuses((current) => ({ ...current, [submitted.id]: "unsaved" }))
+      }
     },
-    onError: (error) => {
+    onError: (error, submitted) => {
+      const latest = latestScenarios.current.find((item) => item.id === submitted.id)
+      if (saveTimers.current[submitted.id]) {
+        setSaveStatuses((current) => ({ ...current, [submitted.id]: "scheduled" }))
+        return
+      }
+
+      if (latest !== submitted) {
+        if (latest) {
+          setSaveStatuses((current) => ({ ...current, [submitted.id]: "unsaved" }))
+        }
+        return
+      }
+
+      setSaveStatuses((current) => ({ ...current, [submitted.id]: "error" }))
       toast.error("Не удалось сохранить сценарий", {
         description: error instanceof Error ? error.message : String(error),
       })
-      void refetch()
     },
   })
 
@@ -136,9 +161,11 @@ export function useScenarios({
         const existing = saveTimers.current[id]
         if (existing) clearTimeout(existing)
         delete saveTimers.current[id]
+        setSaveStatuses((current) => ({ ...current, [id]: "unsaved" }))
         return
       }
 
+      setSaveStatuses((current) => ({ ...current, [id]: "scheduled" }))
       const existing = saveTimers.current[id]
       if (existing) clearTimeout(existing)
 
@@ -151,7 +178,11 @@ export function useScenarios({
             const latest = latestScenarios.current.find(
               (item) => item.id === id,
             )
-            if (!latest || !canPersistScenario(latest, rooms, audioFiles)) return
+            if (!latest || !canPersistScenario(latest, rooms, audioFiles)) {
+              setSaveStatuses((current) => ({ ...current, [id]: "unsaved" }))
+              return
+            }
+            setSaveStatuses((current) => ({ ...current, [id]: "saving" }))
             await saveMutation.mutateAsync(latest)
           })
 
@@ -187,6 +218,7 @@ export function useScenarios({
     },
     onSuccess: (created) => {
       updateCache((current) => [...current, created])
+      setSaveStatuses((current) => ({ ...current, [created.id]: "saved" }))
     },
     onError: (error) => {
       toast.error("Не удалось создать сценарий", {
@@ -205,11 +237,7 @@ export function useScenarios({
         status: "inactive",
         playMode: "sequential",
         repeat: "once",
-        autoStart: false,
         stopPrevious: true,
-        syncTranslation: false,
-        crossfade: false,
-        notifications: true,
         ...patch,
       }
 
@@ -226,12 +254,26 @@ export function useScenarios({
     [updateLocalScenario],
   )
 
+  const retrySaveScenario = useCallback(
+    (id: string) => {
+      const latest = latestScenarios.current.find((item) => item.id === id)
+      if (!latest) return
+      scheduleSave(latest)
+    },
+    [scheduleSave],
+  )
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => scenariosApi.delete(id),
     onSuccess: (_, id) => {
       const timer = saveTimers.current[id]
       if (timer) clearTimeout(timer)
       delete saveTimers.current[id]
+      setSaveStatuses((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
       updateCache((current) => current.filter((scenario) => scenario.id !== id))
     },
     onError: (error) => {
@@ -443,6 +485,8 @@ export function useScenarios({
     isLoading,
     error,
     refetch,
+    saveStatuses,
+    retrySaveScenario,
     playScenario,
     testScenario,
     stopScenario,

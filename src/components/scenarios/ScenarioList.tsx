@@ -1,4 +1,5 @@
 import type { Scenario } from "@/types"
+import type { ScenarioSaveStatus } from "@/hooks/useScenarios"
 import { cn } from "cn"
 import { t } from "@/i18n"
 import { formatTime } from "@/lib/audio"
@@ -8,12 +9,14 @@ interface Props {
   scenarios: Scenario[]
   selected: string | null
   onSelect: (id: string) => void
+  saveStatuses: Record<string, ScenarioSaveStatus>
 }
 
 export default function ScenarioList({
   scenarios,
   selected,
   onSelect,
+  saveStatuses,
 }: Props) {
   return (
     <aside className="max-h-36 w-full shrink-0 overflow-auto border-b bg-card xl:max-h-none xl:w-[240px] xl:border-b-0 xl:border-r">
@@ -73,7 +76,7 @@ export default function ScenarioList({
                 </div>
               )}
 
-              <div className="ml-8 mt-1.5 flex gap-2 text-[11px] text-muted-foreground">
+              <div className="ml-8 mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
                 <span>
                   {scenario.steps.length}{" "}
                   {scenario.steps.length === 1
@@ -86,6 +89,23 @@ export default function ScenarioList({
                 <span>
                   {formatTime(getScenarioDuration(scenario))}
                 </span>
+
+                {saveStatuses[scenario.id] && (
+                  <>
+                    <span>·</span>
+                    <span
+                      className={cn(
+                        saveStatuses[scenario.id] === "error"
+                          ? "text-destructive"
+                          : saveStatuses[scenario.id] === "saved"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {t(`scenarios.editor.saveStatus.${saveStatuses[scenario.id]}`)}
+                    </span>
+                  </>
+                )}
               </div>
             </button>
           )

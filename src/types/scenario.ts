@@ -22,9 +22,5 @@ export interface Scenario {
   status: ScenarioStatus
   playMode: ScenarioPlayMode
   repeat: ScenarioRepeat
-  autoStart: boolean
   stopPrevious: boolean
-  syncTranslation: boolean
-  crossfade: boolean
-  notifications: boolean
 }

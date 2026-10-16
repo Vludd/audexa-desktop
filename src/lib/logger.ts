@@ -30,22 +30,6 @@ export type LogStorageInfo = {
   type: "localStorage"
   label: string
   description: string
-} | {
-  type: "file"
-  label: string
-  description: string
-  path: string
-}
-
-interface AudexaLogStorageInfo {
-  type: "file"
-  path: string
-}
-
-declare global {
-  interface Window {
-    __AUDEXA_LOG_STORAGE__?: AudexaLogStorageInfo
-  }
 }
 
 const DEFAULT_LOGGING_SETTINGS: LoggingSettings = {
@@ -168,40 +152,10 @@ export function subscribeLoggingSettings(listener: () => void) {
 }
 
 /**
- * Returns information about the actual log storage.
- *
- * Current implementation:
- *   localStorage
- *
- * Future native implementation:
- *   C# WebView2 shell can expose:
- *
- *   window.__AUDEXA_LOG_STORAGE__ = {
- *     type: "file",
- *     path: "C:\\Users\\...\\AppData\\Roaming\\Audexa\\logs"
- *   }
- *
- * The Settings UI will automatically display the file path
- * without knowing anything about the native implementation.
+ * Logs are currently persisted in browser localStorage.
+ * Do not report a file path until a real file-backed logging adapter exists.
  */
 export function getLogStorageInfo(): LogStorageInfo {
-  if (typeof window !== "undefined") {
-    const nativeStorage = window.__AUDEXA_LOG_STORAGE__
-
-    if (
-      nativeStorage?.type === "file" &&
-      typeof nativeStorage.path === "string" &&
-      nativeStorage.path.trim()
-    ) {
-      return {
-        type: "file",
-        label: t("settings.logging.storage.file"),
-        description: t("settings.logging.storage.fileDescription"),
-        path: nativeStorage.path,
-      }
-    }
-  }
-
   return {
     type: "localStorage",
     label: t("settings.logging.storage.localStorage"),
