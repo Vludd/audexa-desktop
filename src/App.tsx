@@ -156,12 +156,14 @@ export default function App() {
                   }),
                 )
               }}
-              onSkipStep={(roomId) => {
-                void playbackApi.skipStep(roomId).catch((error) =>
-                  toast.error("Не удалось пропустить шаг", {
-                    description: error instanceof Error ? error.message : String(error),
-                  }),
-                )
+              onSkipStep={(sessionId, stepNumber) => {
+                void playbackApi.skipStep(sessionId, stepNumber)
+                  .then(() => queryClient.invalidateQueries({ queryKey: ["playback-sessions"] }))
+                  .catch((error) =>
+                    toast.error("Не удалось пропустить шаг", {
+                      description: error instanceof Error ? error.message : String(error),
+                    }),
+                  )
               }}
               onStopAll={stopAllRooms}
               onVolumeChange={async (roomId, volume) => {

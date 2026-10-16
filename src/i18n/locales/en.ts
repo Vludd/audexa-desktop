@@ -815,7 +815,11 @@ export const en: Widen<typeof ru> = {
       scenarioFallback: "Scenario",
       stepProgress: "Step {current}/{total}",
       delayCountdown: "Step starts in {seconds} s.",
-      waitingForRoom: "The room is occupied by another scenario or a delay is running. This step will restart from the beginning when the room is free.",
+      waitingForRoom: "The room is occupied by another scenario. This step will restart from the beginning when the room is free.",
+      allSteps: "All scenario steps",
+      stepDelay: "Delay before start: {seconds} s",
+      skipStep: "Skip step",
+      stepStatus: { pending: "Queued", playing: "Playing", paused: "Paused", waiting: "Waiting for room", delaying: "Delay", finished: "Finished", stopped: "Skipped/stopped", error: "Error" },
       preparingFirstStep: "Preparing the first step…",
       sessionStatus: { starting: "Starting", playing: "Playing", paused: "Paused", waiting: "Waiting for room" },
 

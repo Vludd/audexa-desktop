@@ -1,4 +1,4 @@
-import { Pause, PlayCircle, Square, AudioLines } from "lucide-react"
+import { Pause, PlayCircle, SkipForward, Square, AudioLines } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,12 +8,14 @@ import { t } from "@/i18n"
 
 interface Props {
   sessions: PlaybackSession[]
+  onSkipStep: (sessionId: string, stepNumber: number) => void
   onPause: (sessionId: string) => void
   onResume: (sessionId: string) => void
   onStop: (sessionId: string) => void
 }
 
 const ACTIVE_STATUSES = new Set(["starting", "playing", "paused", "waiting"])
+const ACTIVE_STEP_STATUSES = new Set(["playing", "paused", "waiting", "delaying"])
 
 function statusLabel(status: string) {
   switch (status) {
@@ -25,7 +27,7 @@ function statusLabel(status: string) {
   }
 }
 
-export default function DashboardPlaybackSessions({ sessions, onPause, onResume, onStop }: Props) {
+export default function DashboardPlaybackSessions({ sessions, onSkipStep, onPause, onResume, onStop }: Props) {
   const activeSessions = sessions.filter((session) => ACTIVE_STATUSES.has(session.state.status))
   if (activeSessions.length < 2) return null
 
@@ -40,7 +42,7 @@ export default function DashboardPlaybackSessions({ sessions, onPause, onResume,
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2">
         {activeSessions.map(({ sessionId, state }) => {
-          const current = state.steps.find((step) => ["playing", "paused", "waiting"].includes(step.status))
+          const current = state.steps.find((step) => ACTIVE_STEP_STATUSES.has(step.status))
           const progress = current && current.durationSeconds > 0
             ? Math.min(100, current.positionSeconds / current.durationSeconds * 100)
             : 0
@@ -60,7 +62,11 @@ export default function DashboardPlaybackSessions({ sessions, onPause, onResume,
               {current ? (
                 <div className="mt-3 min-w-0">
                   <div className="truncate text-sm">{current.roomName} · {current.audioFileName}</div>
-                  {state.status === "waiting" ? (
+                  {current.status === "delaying" || current.delayRemainingSeconds > 0 ? (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      {t("dashboard.playback.delayCountdown", { seconds: current.delayRemainingSeconds.toFixed(1) })}
+                    </p>
+                  ) : current.status === "waiting" ? (
                     <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                       {t("dashboard.playback.waitingForRoom")}
                     </p>
@@ -79,7 +85,27 @@ export default function DashboardPlaybackSessions({ sessions, onPause, onResume,
               ) : (
                 <p className="mt-3 text-xs text-muted-foreground">{t("dashboard.playback.preparingFirstStep")}</p>
               )}
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 rounded border p-2">
+                <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("dashboard.playback.allSteps")}</div>
+                <div className="max-h-36 space-y-1.5 overflow-auto pr-1">
+                  {state.steps.map((step) => (
+                    <div key={`${step.step}-${step.roomId}`} className="flex items-start gap-2 text-[11px]">
+                      <span className="w-4 shrink-0 font-mono text-muted-foreground">{step.step}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">{step.roomName} · {step.audioFileName}</div>
+                        {step.delayMs > 0 && <div className="text-muted-foreground">{t("dashboard.playback.stepDelay", { seconds: (step.delayMs / 1000).toFixed(1) })}</div>}
+                      </div>
+                      <span className="shrink-0 text-muted-foreground">{t(`dashboard.playback.stepStatus.${step.status}` as never)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {current && (
+                  <Button size="sm" variant="outline" onClick={() => onSkipStep(sessionId, current.step)}>
+                    <SkipForward className="size-3.5" /> {t("dashboard.playback.skipStep")}
+                  </Button>
+                )}
                 {state.status === "paused" ? (
                   <Button size="sm" variant="secondary" onClick={() => onResume(sessionId)}>
                     <PlayCircle className="size-3.5" /> Продолжить

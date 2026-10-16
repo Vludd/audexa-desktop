@@ -25,7 +25,7 @@ interface Props {
   onStopAll: () => void
   onPause: () => void
   onResume: () => void
-  onSkipStep: (roomId: string) => void
+  onSkipStep: (sessionId: string, stepNumber: number) => void
   onVolumeChange: (roomId: string, volume: number) => Promise<void>
   onGainChange: (audioFileId: string, gainDb: number) => Promise<void>
   onNavigate: (page: string) => void
@@ -69,6 +69,7 @@ export default function Dashboard({
               <div className="flex min-w-0 flex-col gap-3">
                 <DashboardPlaybackSessions
                   sessions={playbackSessions}
+                  onSkipStep={onSkipStep}
                   onPause={onPauseSession}
                   onResume={onResumeSession}
                   onStop={onStopSession}
@@ -76,6 +77,7 @@ export default function Dashboard({
                 <DashboardPlayback
                   rooms={rooms}
                   playback={playback}
+                  playbackSessions={playbackSessions}
                   onNavigate={onNavigate}
                   onPause={onPause}
                   onResume={onResume}

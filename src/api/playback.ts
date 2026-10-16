@@ -15,6 +15,7 @@ export type PlaybackStepStatus =
   | "playing"
   | "paused"
   | "waiting"
+  | "delaying"
   | "finished"
   | "stopped"
   | "error"
@@ -77,7 +78,7 @@ const ROOM_STATUSES = new Set<RoomStatus>([
   "idle", "playing", "paused", "stopped", "waiting", "error",
 ])
 const STEP_STATUSES = new Set<PlaybackStepStatus>([
-  "pending", "playing", "paused", "waiting", "finished", "stopped", "error",
+  "pending", "playing", "paused", "waiting", "delaying", "finished", "stopped", "error",
 ])
 
 function assertPlaybackState(value: PlaybackState): PlaybackState {
@@ -147,8 +148,8 @@ export const playbackApi = {
     return apiRequest<PlaybackSession[]>(`/api/playback/sessions/${sessionId}/stop`, { method: "POST" })
   },
 
-  skipStep(roomId: string) {
-    return requestPlaybackState(`/api/playback/steps/${roomId}/skip`, {
+  skipStep(sessionId: string, stepNumber: number) {
+    return apiRequest<PlaybackSession[]>(`/api/playback/sessions/${sessionId}/steps/${stepNumber}/skip`, {
       method: "POST",
     })
   },

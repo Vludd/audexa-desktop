@@ -6,17 +6,18 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Slider } from "@/components/ui/slider"
 import type { Room } from "@/types"
-import type { PlaybackState } from "@/api/playback"
+import type { PlaybackSession, PlaybackState } from "@/api/playback"
 import { t } from "@/i18n"
 import { formatTime } from "@/lib/audio"
 
 interface DashboardPlaybackProps {
   rooms: Room[]
   playback?: PlaybackState
+  playbackSessions: PlaybackSession[]
   onNavigate: (page: string) => void
   onPause: () => void
   onResume: () => void
-  onSkipStep: (roomId: string) => void
+  onSkipStep: (sessionId: string, stepNumber: number) => void
   onVolumeChange: (roomId: string, volume: number) => Promise<void>
   onGainChange: (audioFileId: string, gainDb: number) => Promise<void>
 }
@@ -24,6 +25,7 @@ interface DashboardPlaybackProps {
 export default function DashboardPlayback({
   rooms,
   playback,
+  playbackSessions,
   onNavigate,
   onPause,
   onResume,
@@ -39,14 +41,23 @@ export default function DashboardPlayback({
   )
   const current = isPlaybackActive
     ? playback?.steps.find((step) =>
-        step.status === "playing" || step.status === "paused" || step.status === "waiting",
+        step.status === "playing" || step.status === "paused" || step.status === "waiting" || step.status === "delaying",
       )
     : undefined
   const next = isPlaybackActive && playback?.nextStep
     ? playback.steps.find((step) => step.step === playback.nextStep)
     : undefined
   const room = current ? rooms.find((item) => item.id === current.roomId) : undefined
+  const currentSession = playbackSessions.find((session) =>
+    session.state.scenarioId === playback?.scenarioId &&
+    session.state.currentStep === playback?.currentStep &&
+    ["starting", "playing", "paused", "waiting"].includes(session.state.status),
+  )
   const activeRoomState = playback?.rooms.find((item) => item.roomId === current?.roomId)
+  const activeRoomId = activeRoomState?.roomId
+  const activeRoomAudioFileId = activeRoomState?.audioFileId
+  const activeRoomVolume = activeRoomState?.volume
+  const activeRoomAudioGainDb = activeRoomState?.audioGainDb
   const [roomVolume, setRoomVolume] = useState(activeRoomState?.volume ?? 100)
   const [audioGainDb, setAudioGainDb] = useState(activeRoomState?.audioGainDb ?? 0)
   const roomVolumeRef = useRef(roomVolume)
@@ -57,18 +68,22 @@ export default function DashboardPlayback({
   const audioGainDraggingRef = useRef(false)
 
   useEffect(() => {
-    if (!activeRoomState) return
+    if (
+      activeRoomId === undefined ||
+      activeRoomVolume === undefined ||
+      activeRoomAudioGainDb === undefined
+    ) return
     if (!roomVolumeDraggingRef.current) {
-      setRoomVolume(activeRoomState.volume)
-      roomVolumeRef.current = activeRoomState.volume
-      roomVolumeCommittedRef.current = activeRoomState.volume
+      setRoomVolume(activeRoomVolume)
+      roomVolumeRef.current = activeRoomVolume
+      roomVolumeCommittedRef.current = activeRoomVolume
     }
     if (!audioGainDraggingRef.current) {
-      setAudioGainDb(activeRoomState.audioGainDb)
-      audioGainRef.current = activeRoomState.audioGainDb
-      audioGainCommittedRef.current = activeRoomState.audioGainDb
+      setAudioGainDb(activeRoomAudioGainDb)
+      audioGainRef.current = activeRoomAudioGainDb
+      audioGainCommittedRef.current = activeRoomAudioGainDb
     }
-  }, [activeRoomState?.roomId, activeRoomState?.audioFileId, activeRoomState?.volume, activeRoomState?.audioGainDb])
+  }, [activeRoomId, activeRoomAudioFileId, activeRoomVolume, activeRoomAudioGainDb])
 
   const commitRoomVolume = async () => {
     const value = roomVolumeRef.current
@@ -143,11 +158,14 @@ export default function DashboardPlayback({
                 </div>
               </div>
 
-              {playback.status === "waiting" && (
+              {(current.status === "delaying" || current.delayRemainingSeconds > 0) && (
                 <div className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                  {current.delayRemainingSeconds > 0
-                    ? t("dashboard.playback.delayCountdown", { seconds: current.delayRemainingSeconds.toFixed(1) })
-                    : t("dashboard.playback.waitingForRoom")}
+                  {t("dashboard.playback.delayCountdown", { seconds: current.delayRemainingSeconds.toFixed(1) })}
+                </div>
+              )}
+              {current.status === "waiting" && current.delayRemainingSeconds <= 0 && (
+                <div className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                  {t("dashboard.playback.waitingForRoom")}
                 </div>
               )}
 
@@ -206,13 +224,36 @@ export default function DashboardPlayback({
               </div>
             )}
 
+            <div className="rounded-md border p-3">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("dashboard.playback.allSteps")}</div>
+              <div className="max-h-48 space-y-2 overflow-auto pr-1">
+                {playback.steps.map((step) => (
+                  <div key={`${step.step}-${step.roomId}`} className="flex items-start gap-2 text-xs">
+                    <span className="w-5 shrink-0 font-mono text-muted-foreground">{String(step.step).padStart(2, "0")}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{step.roomName} · {step.audioFileName}</div>
+                      {step.delayMs > 0 && <div className="text-muted-foreground">{t("dashboard.playback.stepDelay", { seconds: (step.delayMs / 1000).toFixed(1) })}</div>}
+                    </div>
+                    <span className={step.status === "playing" ? "shrink-0 text-primary" : step.status === "waiting" || step.status === "delaying" ? "shrink-0 text-amber-600 dark:text-amber-400" : "shrink-0 text-muted-foreground"}>
+                      {t(`dashboard.playback.stepStatus.${step.status}` as never)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               {playback.status === "paused" ? (
                 <Button size="sm" onClick={onResume}><PlayCircle className="size-3.5" /> Продолжить</Button>
               ) : (
                 <Button size="sm" onClick={onPause} disabled={playback.status !== "playing"}><Pause className="size-3.5" /> Пауза</Button>
               )}
-              <Button size="sm" variant="secondary" onClick={() => onSkipStep(current.roomId)}><Square className="size-3.5" /> Пропустить шаг</Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => currentSession && onSkipStep(currentSession.sessionId, current.step)}
+                disabled={!currentSession}
+              ><Square className="size-3.5" /> Пропустить шаг</Button>
               <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onNavigate("scenarios")}>Открыть сценарий</Button>
             </div>
           </div>
