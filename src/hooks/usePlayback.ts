@@ -1,8 +1,9 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { playbackApi, type PlaybackSession, type PlaybackState } from "@/api/playback"
 import { getBackendConnectionState } from "@/api/client"
+import { toast } from "@/lib/toast"
 import type { Room } from "@/types"
 
 const PLAYBACK_QUERY_KEY = ["playback"] as const
@@ -11,6 +12,7 @@ const PLAYBACK_SESSIONS_QUERY_KEY = ["playback-sessions"] as const
 
 export function usePlayback() {
   const queryClient = useQueryClient()
+  const notifiedSessionErrors = useRef(new Map<string, string>())
   const query = useQuery({
     queryKey: PLAYBACK_QUERY_KEY,
     queryFn: playbackApi.getState,
@@ -36,6 +38,39 @@ export function usePlayback() {
     },
     staleTime: 0,
   })
+
+  useEffect(() => {
+    const sessions = sessionsQuery.data ?? []
+    const activeSessionIds = new Set(sessions.map((session) => session.sessionId))
+
+    for (const session of sessions) {
+      const state = session.state
+      if (state.status !== "error") continue
+
+      const errorMessage = state.error?.trim() || "Неизвестная ошибка воспроизведения"
+      const previousError = notifiedSessionErrors.current.get(session.sessionId)
+      if (previousError === errorMessage) continue
+
+      notifiedSessionErrors.current.set(session.sessionId, errorMessage)
+      toast.error(
+        state.scenarioName
+          ? `Ошибка воспроизведения: ${state.scenarioName}`
+          : "Ошибка воспроизведения сценария",
+        {
+          description: errorMessage,
+          dedupeKey: `playback-session:${session.sessionId}:${errorMessage}`,
+        },
+      )
+    }
+
+    // Prevent stale session IDs from accumulating indefinitely. Keep an error
+    // marker only while the corresponding session remains in the API snapshot.
+    for (const sessionId of notifiedSessionErrors.current.keys()) {
+      if (!activeSessionIds.has(sessionId)) {
+        notifiedSessionErrors.current.delete(sessionId)
+      }
+    }
+  }, [sessionsQuery.data])
 
   useEffect(() => {
     const state = query.data

@@ -44,7 +44,8 @@ export default function App() {
         // replaced by a fresh snapshot without restarting the desktop app.
         void queryClient.invalidateQueries()
       } else {
-        toast.error(t("network.backendDisconnected"))
+        // api/client.ts already records the connection transition in the log.
+        toast.error(t("network.backendDisconnected"), { logError: false })
       }
     })
 

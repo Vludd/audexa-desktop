@@ -1,10 +1,16 @@
 import type { ReactNode } from "react"
 
+import { logger } from "@/lib/logger"
+
 export type ToastVariant = "success" | "info" | "warning" | "error"
 
 export interface ToastOptions {
   description?: ReactNode
   duration?: number
+  /** Collapse identical notifications while one is still visible. */
+  dedupeKey?: string
+  /** Disable automatic UI-log recording when the originating subsystem already logs the event. */
+  logError?: boolean
 }
 
 export interface ToastItem {
@@ -21,6 +27,8 @@ let nextId = 1
 let items: ToastItem[] = []
 const listeners = new Set<Listener>()
 const timers = new Map<number, ReturnType<typeof setTimeout>>()
+const activeDedupeKeys = new Map<string, number>()
+const MAX_VISIBLE_TOASTS = 5
 
 function emit() {
   listeners.forEach((listener) => listener())
@@ -34,6 +42,9 @@ function remove(id: number) {
   }
 
   items = items.filter((item) => item.id !== id)
+  for (const [key, activeId] of activeDedupeKeys) {
+    if (activeId === id) activeDedupeKeys.delete(key)
+  }
   emit()
 }
 
@@ -42,22 +53,45 @@ function show(
   title: string,
   options: ToastOptions = {},
 ) {
+  const dedupeKey = options.dedupeKey ?? `${variant}:${title}`
+  const existingId = activeDedupeKeys.get(dedupeKey)
+  if (existingId !== undefined && items.some((item) => item.id === existingId)) {
+    return existingId
+  }
+
   const id = nextId++
   const duration = options.duration ?? (variant === "error" ? 7000 : 4000)
+  const item: ToastItem = {
+    id,
+    variant,
+    title,
+    description: options.description,
+    duration,
+  }
 
-  items = [
-    ...items,
-    {
-      id,
-      variant,
-      title,
-      description: options.description,
-      duration,
-    },
-  ]
+  items = [...items, item]
+  activeDedupeKeys.set(dedupeKey, id)
+
+  while (items.length > MAX_VISIBLE_TOASTS) {
+    const evicted = items.shift()
+    if (evicted) {
+      const timer = timers.get(evicted.id)
+      if (timer) clearTimeout(timer)
+      timers.delete(evicted.id)
+      for (const [key, activeId] of activeDedupeKeys) {
+        if (activeId === evicted.id) activeDedupeKeys.delete(key)
+      }
+    }
+  }
+
+  if (variant === "error" && options.logError !== false) {
+    logger.error("UI", "notification.error", title, {
+      dedupeKey,
+      description: typeof options.description === "string" ? options.description : undefined,
+    })
+  }
 
   emit()
-
   timers.set(id, setTimeout(() => remove(id), duration))
   return id
 }
