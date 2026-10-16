@@ -20,9 +20,9 @@ interface Props {
   onStopAll: () => void
   onPause: () => void
   onResume: () => void
-  onStopRoom: (roomId: string) => void
-  onVolumeChange: (roomId: string, volume: number) => void
-  onGainChange: (audioFileId: string, gainDb: number) => void
+  onSkipStep: (roomId: string) => void
+  onVolumeChange: (roomId: string, volume: number) => Promise<void>
+  onGainChange: (audioFileId: string, gainDb: number) => Promise<void>
   onNavigate: (page: string) => void
 }
 
@@ -35,7 +35,7 @@ export default function Dashboard({
   onStopAll,
   onPause,
   onResume,
-  onStopRoom,
+  onSkipStep,
   onVolumeChange,
   onGainChange,
   onNavigate,
@@ -64,7 +64,7 @@ export default function Dashboard({
                   onNavigate={onNavigate}
                   onPause={onPause}
                   onResume={onResume}
-                  onStopRoom={onStopRoom}
+                  onSkipStep={onSkipStep}
                   onVolumeChange={onVolumeChange}
                   onGainChange={onGainChange}
                 />

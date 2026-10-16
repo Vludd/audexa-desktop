@@ -96,39 +96,16 @@ export function useRooms() {
    * Volume:
    *
    * - previewRoomVolume() updates only the cache;
-   * - saveRoomVolume() sends one PUT request;
-   * - the backend response is used after the PUT;
-   * - no GET request is made after the PUT.
+   * - saveRoomVolume() sends one request to the playback endpoint;
+   * - the backend persists the value and updates the active stream;
+   * - the room cache is updated only after the request succeeds.
    */
   const updateVolumeMutation =
     useMutation({
       mutationFn: ({
         id,
         volume,
-      }: VolumeUpdateVariables) => {
-        const currentRooms =
-          queryClient.getQueryData<Room[]>(
-            ROOMS_QUERY_KEY,
-          ) ?? []
-
-        const room = currentRooms.find(
-          (item) => item.id === id,
-        )
-
-        if (!room) {
-          throw new Error(
-            "Room not found.",
-          )
-        }
-
-        return roomsApi.update(
-          id,
-          {
-            name: room.name,
-            volume,
-          },
-        )
-      },
+      }: VolumeUpdateVariables) => playbackApi.setRoomVolume(id, volume),
 
       onMutate: async ({
         id,
@@ -178,14 +155,13 @@ export function useRooms() {
         } satisfies VolumeUpdateContext
       },
 
-      onSuccess: (updatedRoom) => {
+      onSuccess: (_state, variables) => {
         queryClient.setQueryData<Room[]>(
           ROOMS_QUERY_KEY,
           (current = []) =>
             current.map((room) =>
-              room.id ===
-              updatedRoom.id
-                ? updatedRoom
+              room.id === variables.id
+                ? { ...room, volume: variables.volume }
                 : room,
             ),
         )
@@ -331,8 +307,6 @@ export function useRooms() {
           },
         )
 
-        // Keep the active playback stream in sync without restarting it.
-        await playbackApi.setRoomVolume(id, normalizedVolume)
       },
       [updateVolumeMutation],
     )
@@ -404,22 +378,20 @@ export function useRooms() {
   )
 
   const playRoom = useCallback(() => {
-    toast.error("Комната не запускается сама по себе", {
-      description: "В Audexa аудио запускается только через сценарий или расписание сценария.",
+    toast.error(t("rooms.notifications.playUnavailable"), {
+      description: t("rooms.notifications.playUnavailableDescription"),
     })
   }, [])
 
-  const stopRoom = useCallback((id: string) => {
-    void playbackApi.stopRoom(id).catch((error) => {
-      toast.error("Не удалось остановить комнату", {
-        description: error instanceof Error ? error.message : String(error),
-      })
+  const stopRoom = useCallback(() => {
+    toast.error(t("rooms.notifications.stopUnavailable"), {
+      description: t("rooms.notifications.stopUnavailableDescription"),
     })
   }, [])
 
   const pauseRoom = useCallback(() => {
     void playbackApi.pause().catch((error) => {
-      toast.error("Не удалось поставить воспроизведение на паузу", {
+      toast.error(t("rooms.notifications.pauseFailed"), {
         description: error instanceof Error ? error.message : String(error),
       })
     })
@@ -427,7 +399,7 @@ export function useRooms() {
 
   const stopAllRooms = useCallback(() => {
     void playbackApi.stop().catch((error) => {
-      toast.error("Не удалось остановить воспроизведение", {
+      toast.error(t("rooms.notifications.stopFailed"), {
         description: error instanceof Error ? error.message : String(error),
       })
     })

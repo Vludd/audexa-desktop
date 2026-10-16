@@ -125,8 +125,8 @@ export const playbackApi = {
     return requestPlaybackState("/api/playback/stop", { method: "POST" })
   },
 
-  stopRoom(id: string) {
-    return requestPlaybackState(`/api/playback/rooms/${id}/stop`, {
+  skipStep(roomId: string) {
+    return requestPlaybackState(`/api/playback/steps/${roomId}/skip`, {
       method: "POST",
     })
   },

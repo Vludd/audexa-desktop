@@ -173,6 +173,9 @@ export default function ScenarioSettings({
                 update({ stopPrevious: checked })
               }
             />
+            <p className="pb-1 text-xs leading-relaxed text-muted-foreground">
+              Если выключено, новый сценарий не остановит уже запущенный — его запуск будет отклонён. Параллельное выполнение сценариев пока не поддерживается.
+            </p>
           </div>
         </div>
 

@@ -180,8 +180,10 @@ export default function Settings({ rooms }: SettingsProps) {
     queryFn: audioDevicesApi.getAll,
     initialData: cachedSettings.audioDevices,
     initialDataUpdatedAt: 0,
+    // Keep device availability current while Settings is mounted.
+    // The saved device ID remains authoritative; polling only refreshes discovery state.
     refetchInterval: (query) =>
-      query.state.status === "error" ? 5_000 : false,
+      query.state.status === "error" ? 5_000 : 3_000,
     refetchIntervalInBackground: true,
   })
   const audioConfigQuery = useQuery({
@@ -212,15 +214,43 @@ export default function Settings({ rooms }: SettingsProps) {
     const outputDevices = response?.devices.filter(
       (device) => device.outputCount > 0 && device.outputs.length > 0,
     ) ?? []
-    const configuredDevice = savedAudioConfig?.deviceId
-      ? response?.devices.find((device) => device.id === savedAudioConfig.deviceId)
-      : undefined
 
-    return configuredDevice &&
-      !outputDevices.some((device) => device.id === configuredDevice.id)
-      ? [configuredDevice, ...outputDevices]
-      : outputDevices
-  }, [devicesQuery.data, savedAudioConfig])
+    const configuredDeviceId = savedAudioConfig?.deviceId
+    if (!configuredDeviceId || outputDevices.some((device) => device.id === configuredDeviceId)) {
+      return outputDevices
+    }
+
+    // Keep the configured device visible even when Windows no longer reports it.
+    // Prefer the last known device metadata from the local settings cache; if the
+    // app was restarted while the device was disconnected, retain its identity
+    // and clearly mark its capabilities as unavailable.
+    const cachedDevice = cachedSettings.audioDevices?.devices.find(
+      (device) => device.id === configuredDeviceId,
+    )
+    const unavailableDevice: AudioDevice = cachedDevice
+      ? { ...cachedDevice, status: "offline" }
+      : {
+          id: configuredDeviceId,
+          name: t("settings.audioDevice.configuredUnavailable"),
+          type: configuredDeviceId.startsWith("wasapi:render:")
+            ? "WASAPI"
+            : configuredDeviceId.startsWith("asio:")
+              ? "ASIO"
+              : configuredDeviceId.startsWith("waveout:")
+                ? "WaveOut"
+                : t("settings.audioDevice.unknownType"),
+          driver: "",
+          status: "offline",
+          outputCount: 0,
+          inputCount: 0,
+          outputs: [],
+          inputs: [],
+          sampleRate: null,
+          bufferSize: null,
+        }
+
+    return [unavailableDevice, ...outputDevices]
+  }, [devicesQuery.data, savedAudioConfig, cachedSettings])
 
   const devicesSupported = devicesQuery.data?.supported ?? true
   const devicesError =
@@ -355,6 +385,7 @@ export default function Settings({ rooms }: SettingsProps) {
               })}
               rooms={rooms}
               selectedDevice={selectedDevice}
+              configuredDevice={devices.find((device) => device.id === savedAudioConfig?.deviceId) ?? null}
               savedConfig={savedAudioConfig}
               isSaving={isSavingAudioConfig}
               backendError={settingsQueryErrorMessage}

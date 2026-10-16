@@ -419,6 +419,18 @@ export const en: Widen<typeof ru> = {
       duplicated: "Room duplicated",
 
       duplicatedDescription: 'A copy of room "{name}" has been created.',
+
+      playUnavailable: "Rooms cannot be started individually",
+
+      playUnavailableDescription: "Start a scenario or its schedule to begin playback.",
+
+      stopUnavailable: "Rooms cannot be stopped individually",
+
+      stopUnavailableDescription: "Stop the entire scenario or skip the current step on the dashboard.",
+
+      pauseFailed: "Failed to pause playback",
+
+      stopFailed: "Failed to stop playback",
     },
 
     dashboard: {
@@ -940,6 +952,11 @@ export const en: Widen<typeof ru> = {
       bufferSize: "Buffer size",
 
       connected: "Device is connected and working",
+      configuredUnavailable: "Configured device (unavailable)",
+      unknownType: "Unknown",
+      configuredDeviceOffline: "Configured audio device is unavailable",
+      configuredDeviceOfflineDescription: "This device remains selected in settings but is not currently detected by Windows. Choose another device manually, or reconnect it and click Refresh.",
+      outputDiagnosticsUnavailable: "Output diagnostics are unavailable while the selected device is disconnected.",
     },
 
     logging: {
@@ -998,6 +1015,11 @@ export const en: Widen<typeof ru> = {
     },
 
     lineMapping: {
+      configuredDevice: "Device currently in configuration:",
+      deviceOffline: "offline",
+      noConfiguredDevice: "Not configured",
+      editingDifferentDevice: "Editing a different device: {name}. The change takes effect after saving.",
+
       title: "Line mapping",
 
       description:

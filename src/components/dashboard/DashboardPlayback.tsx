@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react"
 import { Pause, PlayCircle, Square, Volume2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -15,9 +16,9 @@ interface DashboardPlaybackProps {
   onNavigate: (page: string) => void
   onPause: () => void
   onResume: () => void
-  onStopRoom: (roomId: string) => void
-  onVolumeChange: (roomId: string, volume: number) => void
-  onGainChange: (audioFileId: string, gainDb: number) => void
+  onSkipStep: (roomId: string) => void
+  onVolumeChange: (roomId: string, volume: number) => Promise<void>
+  onGainChange: (audioFileId: string, gainDb: number) => Promise<void>
 }
 
 export default function DashboardPlayback({
@@ -26,7 +27,7 @@ export default function DashboardPlayback({
   onNavigate,
   onPause,
   onResume,
-  onStopRoom,
+  onSkipStep,
   onVolumeChange,
   onGainChange,
 }: DashboardPlaybackProps) {
@@ -46,6 +47,66 @@ export default function DashboardPlayback({
     : undefined
   const room = current ? rooms.find((item) => item.id === current.roomId) : undefined
   const activeRoomState = playback?.rooms.find((item) => item.roomId === current?.roomId)
+  const [roomVolume, setRoomVolume] = useState(activeRoomState?.volume ?? 100)
+  const [audioGainDb, setAudioGainDb] = useState(activeRoomState?.audioGainDb ?? 0)
+  const roomVolumeRef = useRef(roomVolume)
+  const audioGainRef = useRef(audioGainDb)
+  const roomVolumeCommittedRef = useRef(roomVolume)
+  const audioGainCommittedRef = useRef(audioGainDb)
+  const roomVolumeDraggingRef = useRef(false)
+  const audioGainDraggingRef = useRef(false)
+
+  useEffect(() => {
+    if (!activeRoomState) return
+    if (!roomVolumeDraggingRef.current) {
+      setRoomVolume(activeRoomState.volume)
+      roomVolumeRef.current = activeRoomState.volume
+      roomVolumeCommittedRef.current = activeRoomState.volume
+    }
+    if (!audioGainDraggingRef.current) {
+      setAudioGainDb(activeRoomState.audioGainDb)
+      audioGainRef.current = activeRoomState.audioGainDb
+      audioGainCommittedRef.current = activeRoomState.audioGainDb
+    }
+  }, [activeRoomState?.roomId, activeRoomState?.audioFileId, activeRoomState?.volume, activeRoomState?.audioGainDb])
+
+  const commitRoomVolume = async () => {
+    const value = roomVolumeRef.current
+    if (value === roomVolumeCommittedRef.current || !activeRoomState) {
+      roomVolumeDraggingRef.current = false
+      return
+    }
+    roomVolumeCommittedRef.current = value
+    try {
+      await onVolumeChange(activeRoomState.roomId, value)
+    } catch {
+      const fallback = activeRoomState.volume
+      roomVolumeRef.current = fallback
+      roomVolumeCommittedRef.current = fallback
+      setRoomVolume(fallback)
+    } finally {
+      roomVolumeDraggingRef.current = false
+    }
+  }
+
+  const commitAudioGain = async () => {
+    const value = audioGainRef.current
+    if (value === audioGainCommittedRef.current || !activeRoomState?.audioFileId) {
+      audioGainDraggingRef.current = false
+      return
+    }
+    audioGainCommittedRef.current = value
+    try {
+      await onGainChange(activeRoomState.audioFileId, value)
+    } catch {
+      const fallback = activeRoomState.audioGainDb
+      audioGainRef.current = fallback
+      audioGainCommittedRef.current = fallback
+      setAudioGainDb(fallback)
+    } finally {
+      audioGainDraggingRef.current = false
+    }
+  }
 
   return (
     <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
@@ -91,33 +152,43 @@ export default function DashboardPlayback({
               {activeRoomState && (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="block">
-                    <span className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground"><Volume2 className="size-3" /> Громкость комнаты {activeRoomState.volume}%</span>
+                    <span className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground"><Volume2 className="size-3" /> Громкость комнаты {roomVolume}%</span>
                     <Slider
-                      value={[activeRoomState.volume]}
+                      value={[roomVolume]}
                       min={0}
                       max={100}
                       step={1}
                       onValueChange={(value) => {
                         const volume = typeof value === "number" ? value : value[0]
                         if (volume !== undefined) {
-                          onVolumeChange(activeRoomState.roomId, volume)
+                          roomVolumeRef.current = volume
+                          setRoomVolume(volume)
                         }
                       }}
+                      onPointerDown={() => { roomVolumeDraggingRef.current = true }}
+                      onPointerUp={commitRoomVolume}
+                      onKeyDown={() => { roomVolumeDraggingRef.current = true }}
+                      onKeyUp={commitRoomVolume}
                     />
                   </label>
                   <label className="block">
-                    <span className="mb-1 text-[11px] text-muted-foreground">Усиление файла {activeRoomState.audioGainDb > 0 ? "+" : ""}{activeRoomState.audioGainDb} dB</span>
+                    <span className="mb-1 text-[11px] text-muted-foreground">Усиление файла {audioGainDb > 0 ? "+" : ""}{audioGainDb} dB</span>
                     <Slider
-                      value={[activeRoomState.audioGainDb]}
+                      value={[audioGainDb]}
                       min={-24}
                       max={24}
                       step={1}
                       onValueChange={(value) => {
                         const gain = typeof value === "number" ? value : value[0]
                         if (gain !== undefined) {
-                          onGainChange(activeRoomState.audioFileId ?? "", gain)
+                          audioGainRef.current = gain
+                          setAudioGainDb(gain)
                         }
                       }}
+                      onPointerDown={() => { audioGainDraggingRef.current = true }}
+                      onPointerUp={commitAudioGain}
+                      onKeyDown={() => { audioGainDraggingRef.current = true }}
+                      onKeyUp={commitAudioGain}
                       disabled={!activeRoomState.audioFileId}
                     />
                   </label>
@@ -139,9 +210,17 @@ export default function DashboardPlayback({
               ) : (
                 <Button size="sm" onClick={onPause} disabled={playback.status !== "playing"}><Pause className="size-3.5" /> Пауза</Button>
               )}
-              <Button size="sm" variant="secondary" onClick={() => onStopRoom(current.roomId)}><Square className="size-3.5" /> Стоп шага</Button>
+              <Button size="sm" variant="secondary" onClick={() => onSkipStep(current.roomId)}><Square className="size-3.5" /> Пропустить шаг</Button>
               <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onNavigate("scenarios")}>Открыть сценарий</Button>
             </div>
+          </div>
+        ) : playback?.status === "error" ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+            <div className="text-sm font-semibold text-destructive">Воспроизведение остановлено из-за ошибки</div>
+            <p className="mt-1 break-words text-xs text-muted-foreground">
+              {playback.error || "Проверьте аудиоустройство и конфигурацию выходов."}
+            </p>
+            <Button variant="link" className="mt-2 h-auto p-0 text-xs" onClick={() => onNavigate("scenarios")}>Открыть сценарии</Button>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-6 text-center">

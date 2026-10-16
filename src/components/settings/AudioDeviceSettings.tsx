@@ -171,6 +171,20 @@ export default function AudioDeviceSettings({
           </div>
         )}
 
+        {selectedDevice?.status === "offline" && (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <div>
+              <div className="font-medium text-destructive">
+                {t("settings.audioDevice.configuredDeviceOffline")}
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {t("settings.audioDevice.configuredDeviceOfflineDescription")}
+              </div>
+            </div>
+          </div>
+        )}
+
         {selectedDevice && (
           <>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -223,7 +237,13 @@ export default function AudioDeviceSettings({
               </div>
             </div>
 
-            <OutputDiagnostics device={selectedDevice} />
+            {selectedDevice.status === "online" ? (
+              <OutputDiagnostics device={selectedDevice} />
+            ) : (
+              <div className="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+                {t("settings.audioDevice.outputDiagnosticsUnavailable")}
+              </div>
+            )}
           </>
         )}
       </CardContent>

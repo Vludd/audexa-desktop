@@ -23,6 +23,7 @@ type Mapping = AudioOutputMapping
 interface LineMappingSettingsProps {
   rooms: Room[]
   selectedDevice: AudioDevice | null
+  configuredDevice: AudioDevice | null
   savedConfig: AudioSettingsConfig | null
   isSaving: boolean
   backendError: string | null
@@ -71,6 +72,7 @@ function buildMappings(
 export default function LineMappingSettings({
   rooms,
   selectedDevice,
+  configuredDevice,
   savedConfig,
   isSaving,
   backendError,
@@ -212,6 +214,24 @@ export default function LineMappingSettings({
             <CardDescription className="mt-1 text-xs">
               {t("settings.lineMapping.description")}
             </CardDescription>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted-foreground">
+                {t("settings.lineMapping.configuredDevice")}
+              </span>
+              {configuredDevice ? (
+                <Badge variant={configuredDevice.status === "online" ? "secondary" : "destructive"}>
+                  {configuredDevice.name}
+                  {configuredDevice.status !== "online" ? ` · ${t("settings.lineMapping.deviceOffline")}` : ""}
+                </Badge>
+              ) : (
+                <Badge variant="outline">{t("settings.lineMapping.noConfiguredDevice")}</Badge>
+              )}
+              {selectedDevice && configuredDevice && selectedDevice.id !== configuredDevice.id && (
+                <span className="text-amber-600">
+                  {t("settings.lineMapping.editingDifferentDevice", { name: selectedDevice.name })}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Badge variant="outline">

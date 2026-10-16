@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { subscribeBackendStatus } from "@/api/client"
 import { useAudioSystem } from "@/context/useAudioSystem"
@@ -45,6 +46,7 @@ export default function App() {
 
   const [page, setPage] =
     useState<Page>("dashboard")
+  const queryClient = useQueryClient()
 
   const { status } = useAudioSystem()
   const { data: playback } = usePlayback()
@@ -137,22 +139,36 @@ export default function App() {
                   }),
                 )
               }}
-              onStopRoom={stopRoom}
-              onStopAll={stopAllRooms}
-              onVolumeChange={(roomId, volume) => {
-                void playbackApi.setRoomVolume(roomId, volume).catch((error) =>
-                  toast.error("Не удалось изменить громкость", {
+              onSkipStep={(roomId) => {
+                void playbackApi.skipStep(roomId).catch((error) =>
+                  toast.error("Не удалось пропустить шаг", {
                     description: error instanceof Error ? error.message : String(error),
                   }),
                 )
               }}
-              onGainChange={(audioFileId, gainDb) => {
+              onStopAll={stopAllRooms}
+              onVolumeChange={async (roomId, volume) => {
+                try {
+                  const nextState = await playbackApi.setRoomVolume(roomId, volume)
+                  queryClient.setQueryData(["playback"], nextState)
+                } catch (error) {
+                  toast.error("Не удалось изменить громкость", {
+                    description: error instanceof Error ? error.message : String(error),
+                  })
+                  throw error
+                }
+              }}
+              onGainChange={async (audioFileId, gainDb) => {
                 if (!audioFileId) return
-                void playbackApi.setAudioGain(audioFileId, gainDb).catch((error) =>
+                try {
+                  const nextState = await playbackApi.setAudioGain(audioFileId, gainDb)
+                  queryClient.setQueryData(["playback"], nextState)
+                } catch (error) {
                   toast.error("Не удалось изменить усиление", {
                     description: error instanceof Error ? error.message : String(error),
-                  }),
-                )
+                  })
+                  throw error
+                }
               }}
               onNavigate={(nextPage) =>
                 setPage(nextPage as Page)
