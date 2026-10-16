@@ -30,6 +30,7 @@ interface Props {
   onRemoveStep: (scenarioId: string, stepId: string) => void
   onMoveStep: (scenarioId: string, fromIndex: number, toIndex: number) => void
   onValidate: (scenario: Scenario) => ScenarioValidation
+  roomIdsWithoutOutputs: Set<string>
 }
 
 export default function ScenarioEditor({
@@ -43,6 +44,7 @@ export default function ScenarioEditor({
   onRemoveStep,
   onMoveStep,
   onValidate,
+  roomIdsWithoutOutputs,
 }: Props) {
   const duration = getScenarioDuration(scenario)
   const validation = onValidate(scenario)
@@ -152,6 +154,7 @@ export default function ScenarioEditor({
         steps={scenario.steps}
         rooms={rooms}
         audioFiles={audioFiles}
+        roomIdsWithoutOutputs={roomIdsWithoutOutputs}
         onUpdateStep={(stepId, patch) =>
           onUpdateStep(scenario.id, stepId, patch)
         }

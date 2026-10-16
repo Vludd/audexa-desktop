@@ -40,33 +40,22 @@ function buildMappings(
   savedMappings: Mapping[],
   preserveSavedMappings: boolean,
 ): Mapping[] {
-  const savedByRoom = new Map(savedMappings.map((mapping) => [mapping.roomId, mapping]))
-  const validOutputIds = new Set(outputs.map((output) => output.id))
-  const used = new Set(
-    savedMappings
-      .map((mapping) => mapping.outputId)
-      .filter((value): value is string => Boolean(value)),
-  )
+  // For the configured device, persisted mappings are the source of truth.
+  // Never auto-assign a replacement output when a saved room is intentionally
+  // unassigned: that can duplicate an output and create a false conflict.
+  if (preserveSavedMappings) {
+    return rooms.flatMap((room) => {
+      const saved = savedMappings.filter((mapping) => mapping.roomId === room.id)
+      return saved.length > 0 ? saved : [{ roomId: room.id, outputId: null }]
+    })
+  }
 
-  return rooms.map((room, index) => {
-    const saved = savedByRoom.get(room.id)
-
-    // A mapping belongs to the configured audio device. When the user
-    // switches devices, an output id from the previous device must never
-    // leak into the new configuration. The backend validates this too,
-    // but the frontend should send a clean configuration in the first place.
-    if (saved && (preserveSavedMappings || (saved.outputId && validOutputIds.has(saved.outputId)))) {
-      return saved
-    }
-
-    const suggested = outputs.find((output) => !used.has(output.id)) ?? outputs[index] ?? null
-    if (suggested) used.add(suggested.id)
-
-    return {
-      roomId: room.id,
-      outputId: suggested?.id ?? null,
-    }
-  })
+  // When switching to a different device, seed a simple one-output-per-room
+  // proposal without reusing an output. Extra rooms remain unassigned.
+  return rooms.map((room, index) => ({
+    roomId: room.id,
+    outputId: outputs[index]?.id ?? null,
+  }))
 }
 
 export default function LineMappingSettings({
@@ -105,10 +94,15 @@ export default function LineMappingSettings({
     [outputs],
   )
 
-  const mappingByRoomId = useMemo(
-    () => new Map(mappings.map((mapping) => [mapping.roomId, mapping])),
-    [mappings],
-  )
+  const mappingByRoomId = useMemo(() => {
+    const grouped = new Map<string, Mapping[]>()
+    mappings.forEach((mapping) => {
+      const items = grouped.get(mapping.roomId) ?? []
+      items.push(mapping)
+      grouped.set(mapping.roomId, items)
+    })
+    return grouped
+  }, [mappings])
 
   const assignedOutputs = useMemo(() => {
     const map = new Map<string, string>()
@@ -148,12 +142,16 @@ export default function LineMappingSettings({
     JSON.stringify(mappings) !== JSON.stringify(savedSnapshot) ||
     translationOutput !== savedTranslationOutput
 
-  const updateMapping = (roomId: string, outputId: string | null) => {
-    setMappings((current) =>
-      current.map((mapping) =>
-        mapping.roomId === roomId ? { ...mapping, outputId } : mapping,
-      ),
-    )
+  const updateMapping = (roomId: string, outputId: string, checked: boolean) => {
+    setMappings((current) => {
+      const withoutOutput = current.filter((mapping) => !(mapping.roomId === roomId && mapping.outputId === outputId))
+      if (!checked) return withoutOutput
+      return [...withoutOutput, { roomId, outputId }]
+    })
+  }
+
+  const clearRoomMappings = (roomId: string) => {
+    setMappings((current) => current.filter((mapping) => mapping.roomId !== roomId))
   }
 
   const handleReset = () => {
@@ -174,36 +172,7 @@ export default function LineMappingSettings({
     await onSave(config)
   }
 
-  const renderOutputSelect = (roomId: string, value: string | null) => (
-    <Select
-      value={value ?? ""}
-      onValueChange={(outputId) => updateMapping(roomId, outputId)}
-    >
-      <SelectTrigger className="h-8 w-full border-0 bg-transparent px-2 shadow-none hover:bg-muted focus:ring-0">
-        <SelectValue placeholder={t("common.notAssigned")}>
-          {value ? outputById.get(value)?.name ?? t("common.notAssigned") : t("common.notAssigned")}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {outputs.map((output) => {
-          const owner = assignedOutputs.get(output.id)
-          const isOccupied = owner !== undefined && owner !== roomId
-          const ownerRoom = owner ? roomById.get(owner) : undefined
 
-          return (
-            <SelectItem key={output.id} value={output.id} disabled={isOccupied}>
-              <div className="flex min-w-0 items-center gap-2">
-                <span>{output.name}</span>
-                {isOccupied && ownerRoom && (
-                  <span className="truncate text-xs text-muted-foreground">· {ownerRoom.name}</span>
-                )}
-              </div>
-            </SelectItem>
-          )
-        })}
-      </SelectContent>
-    </Select>
-  )
 
   return (
     <Card>
@@ -315,7 +284,7 @@ export default function LineMappingSettings({
                 {t("settings.lineMapping.rooms")}
               </div>
               <div className="overflow-hidden rounded-md border">
-                <div className="grid grid-cols-[48px_minmax(0,1fr)_minmax(150px,220px)_32px_100px] items-center gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+                <div className="grid grid-cols-[48px_minmax(0,1fr)_minmax(220px,1.5fr)_32px_100px] items-center gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
                   <span>#</span>
                   <span>{t("settings.lineMapping.room")}</span>
                   <span>{t("settings.lineMapping.output")}</span>
@@ -324,39 +293,55 @@ export default function LineMappingSettings({
                 </div>
                 <div className="max-h-[360px] overflow-y-auto">
                   {rooms.map((room, index) => {
-                    const mapping = mappingByRoomId.get(room.id)
-                    const output = mapping?.outputId ? outputById.get(mapping.outputId) : undefined
-                    const hasConflict = Boolean(mapping?.outputId && assignedOutputs.get(mapping.outputId) !== room.id)
+                    const roomMappings = mappingByRoomId.get(room.id) ?? []
+                    const selectedIds = new Set(roomMappings.map((mapping) => mapping.outputId).filter((id): id is string => Boolean(id)))
+                    const hasConflict = roomMappings.some((mapping) => mapping.outputId && assignedOutputs.get(mapping.outputId) !== room.id)
 
                     return (
                       <div
                         key={room.id}
                         className={[
-                          "grid grid-cols-[48px_minmax(0,1fr)_minmax(150px,220px)_32px_100px] items-center gap-3 border-b px-3 py-1.5 last:border-b-0 hover:bg-muted/20",
+                          "grid grid-cols-[48px_minmax(0,1fr)_minmax(220px,1.5fr)_32px_100px] items-center gap-3 border-b px-3 py-1.5 last:border-b-0 hover:bg-muted/20",
                           hasConflict ? "bg-destructive/5" : "",
                         ].join(" ")}
                       >
                         <span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
                         <div className="min-w-0"><div className="truncate text-sm font-medium">{room.name}</div></div>
-                        <div className="min-w-0 rounded-md border bg-background">
-                          {renderOutputSelect(room.id, mapping?.outputId ?? null)}
+                        <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 rounded-md border bg-background px-2 py-1.5 sm:grid-cols-3">
+                          {outputs.map((candidate) => {
+                            const owner = assignedOutputs.get(candidate.id)
+                            const occupiedByOtherRoom = owner !== undefined && owner !== room.id
+                            return (
+                              <label key={candidate.id} className="flex min-w-0 items-center gap-1.5 text-xs" title={candidate.name}>
+                                <input
+                                  type="checkbox"
+                                  className="size-3.5 shrink-0 accent-primary"
+                                  checked={selectedIds.has(candidate.id)}
+                                  disabled={occupiedByOtherRoom}
+                                  onChange={(event) => updateMapping(room.id, candidate.id, event.target.checked)}
+                                />
+                                <span className="truncate">{candidate.name}</span>
+                              </label>
+                            )
+                          })}
+                          {outputs.length === 0 && <span className="text-xs text-muted-foreground">Нет доступных выходов</span>}
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon-xs"
-                          disabled={!mapping?.outputId}
+                          disabled={roomMappings.length === 0}
                           aria-label={t("settings.lineMapping.clearOutput", { name: room.name })}
                           title={t("settings.lineMapping.clearOutput", { name: room.name })}
-                          onClick={() => updateMapping(room.id, null)}
+                          onClick={() => clearRoomMappings(room.id)}
                         >
                           <X className="size-3.5" />
                         </Button>
                         <div>
                           {hasConflict ? (
                             <Badge variant="destructive" className="text-[10px]">{t("settings.lineMapping.conflict")}</Badge>
-                          ) : output ? (
-                            <Badge variant="secondary" className="gap-1 text-[10px]"><Check className="size-3" />{t("settings.lineMapping.ok")}</Badge>
+                          ) : roomMappings.some((mapping) => mapping.outputId) ? (
+                            <Badge variant="secondary" className="gap-1 text-[10px]"><Check className="size-3" />{roomMappings.filter((mapping) => mapping.outputId).length} OUT</Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px]">{t("common.notAssigned")}</Badge>
                           )}

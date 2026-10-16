@@ -709,6 +709,8 @@ export const en: Widen<typeof ru> = {
 
       emptyDescription: "Add a room and an audio file to build a sequence.",
 
+      step: "Step",
+
       room: "Room",
 
       audioFile: "Audio file",
@@ -762,6 +764,12 @@ export const en: Widen<typeof ru> = {
       roomRequired: "Step {number}: no room selected.",
 
       roomUnavailable: "Step {number}: the selected room is unavailable.",
+
+      roomOutputRequired: "Step {number}: no audio output is assigned to the selected room.",
+
+      roomOutputHint: "No output is assigned to this room in audio settings.",
+
+      outputMappingUnavailable: "Unable to verify audio output mappings. Check audio settings and the backend connection.",
 
       audioRequired: "Step {number}: no audio file selected.",
 

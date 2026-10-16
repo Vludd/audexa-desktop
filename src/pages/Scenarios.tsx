@@ -36,6 +36,7 @@ interface Props {
   onRemoveStep: (scenarioId: string, stepId: string) => void
   onMoveStep: (scenarioId: string, fromIndex: number, toIndex: number) => void
   onValidate: (scenario: Scenario) => ScenarioValidation
+  roomIdsWithoutOutputs: Set<string>
   isLoading?: boolean
   error?: unknown
   onRetry?: () => void
@@ -75,6 +76,7 @@ export default function Scenarios({
   onRemoveStep,
   onMoveStep,
   onValidate,
+  roomIdsWithoutOutputs,
   isLoading = false,
   error,
   onRetry,
@@ -206,6 +208,7 @@ export default function Scenarios({
             onRemoveStep={onRemoveStep}
             onMoveStep={onMoveStep}
             onValidate={onValidate}
+            roomIdsWithoutOutputs={roomIdsWithoutOutputs}
           />
         ) : (
           <div className="flex min-w-0 flex-1 items-center justify-center">

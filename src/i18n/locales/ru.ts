@@ -416,6 +416,7 @@ export const ru = {
       emptyTitle: "В сценарии пока нет шагов",
       emptyDescription:
         "Добавьте комнату и аудиофайл, чтобы сформировать последовательность.",
+      step: "Шаг",
       room: "Комната",
       audioFile: "Аудиофайл",
       volume: "Громкость",
@@ -446,6 +447,9 @@ export const ru = {
       stepRequired: "Добавьте хотя бы один шаг.",
       roomRequired: "Шаг {number}: не выбрана комната.",
       roomUnavailable: "Шаг {number}: выбранная комната недоступна.",
+      roomOutputRequired: "Шаг {number}: для выбранной комнаты не назначен аудиовыход.",
+      roomOutputHint: "Для этой комнаты не назначен выход в настройках аудио.",
+      outputMappingUnavailable: "Не удалось проверить привязку аудиовыходов. Проверьте настройки аудио и соединение с backend.",
       audioRequired: "Шаг {number}: не выбран аудиофайл.",
       audioUnavailable: "Шаг {number}: выбранный аудиофайл недоступен.",
       volumeRange: "Шаг {number}: громкость должна быть от 0 до 100%.",

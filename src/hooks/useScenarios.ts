@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { scenariosApi } from "@/api/scenarios"
+import { audioSettingsApi } from "@/api/audioSettings"
 import { playbackApi } from "@/api/playback"
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
 import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
 
 const SCENARIOS_QUERY_KEY = ["scenarios"] as const
+const AUDIO_SETTINGS_QUERY_KEY = ["audio-settings"] as const
 
 export interface ScenarioUpdate {
   name?: string
@@ -41,6 +43,23 @@ export function useScenarios({
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const saveChains = useRef<Record<string, Promise<void>>>({})
   const latestScenarios = useRef<Scenario[]>([])
+
+  const audioSettingsQuery = useQuery({
+    queryKey: AUDIO_SETTINGS_QUERY_KEY,
+    queryFn: audioSettingsApi.get,
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  const roomIdsWithoutOutputs = useMemo(() => {
+    if (!audioSettingsQuery.data) return new Set<string>()
+    const mappedRoomIds = new Set(
+      audioSettingsQuery.data.mappings
+        .filter((mapping) => Boolean(mapping.outputId))
+        .map((mapping) => mapping.roomId),
+    )
+    return new Set(rooms.filter((room) => !mappedRoomIds.has(room.id)).map((room) => room.id))
+  }, [audioSettingsQuery.data, rooms])
 
   const context = useMemo(() => ({ rooms, audioFiles }), [audioFiles, rooms])
   const contextKey = JSON.stringify({
@@ -385,12 +404,17 @@ export function useScenarios({
 
       if (!scenario.name.trim()) errors.push(t("scenarios.validation.nameRequired"))
       if (scenario.steps.length === 0) errors.push(t("scenarios.validation.stepRequired"))
+      if (!audioSettingsQuery.data) {
+        errors.push(t("scenarios.validation.outputMappingUnavailable"))
+      }
 
       scenario.steps.forEach((step, index) => {
         const number = index + 1
         if (!step.roomId) errors.push(t("scenarios.validation.roomRequired", { number }))
         else if (!rooms.some((room) => room.id === step.roomId)) {
           errors.push(t("scenarios.validation.roomUnavailable", { number }))
+        } else if (audioSettingsQuery.data && roomIdsWithoutOutputs.has(step.roomId)) {
+          errors.push(t("scenarios.validation.roomOutputRequired", { number }))
         }
         if (!step.audioFileId) errors.push(t("scenarios.validation.audioRequired", { number }))
         else if (!audioFiles.some((file) => file.id === step.audioFileId)) {
@@ -406,7 +430,7 @@ export function useScenarios({
 
       return { valid: errors.length === 0, errors, warnings }
     },
-    [rooms, audioFiles],
+    [rooms, audioFiles, audioSettingsQuery.data, roomIdsWithoutOutputs],
   )
 
   return {
@@ -426,6 +450,8 @@ export function useScenarios({
     removeStep,
     moveStep,
     validateScenario,
+    roomIdsWithoutOutputs,
+    audioSettingsLoading: audioSettingsQuery.isLoading,
   }
 }
 

@@ -27,6 +27,7 @@ interface Props {
   steps: ScenarioStep[]
   rooms: Room[]
   audioFiles: AudioFile[]
+  roomIdsWithoutOutputs: Set<string>
   onUpdateStep: (stepId: string, patch: Partial<ScenarioStep>) => void
   onRemoveStep: (stepId: string) => void
   onMoveStep: (fromIndex: number, toIndex: number) => void
@@ -36,6 +37,7 @@ export default function ScenarioStepsTable({
   steps,
   rooms,
   audioFiles,
+  roomIdsWithoutOutputs,
   onUpdateStep,
   onRemoveStep,
   onMoveStep,
@@ -93,7 +95,7 @@ export default function ScenarioStepsTable({
           <TableHeader>
             <TableRow className="bg-muted/40">
               <TableHead className="w-10" />
-              <TableHead className="w-10">#</TableHead>
+              <TableHead className="w-10">{t("scenarios.steps.step")}</TableHead>
               <TableHead>{t("scenarios.steps.room")}</TableHead>
               <TableHead>{t("scenarios.steps.audioFile")}</TableHead>
               <TableHead className="w-[100px]">
@@ -141,27 +143,34 @@ export default function ScenarioStepsTable({
                     </div>
                   </TableCell>
 
-                  <TableCell className="font-semibold text-muted-foreground">
+                  <TableCell className="font-semibold text-muted-foreground text-center">
                     {index + 1}
                   </TableCell>
 
                   <TableCell>
-                    <select
-                      value={step.roomId}
-                      onChange={(event) =>
-                        handleRoomChange(step, event.target.value)
-                      }
-                      className="h-8 w-full min-w-[150px] rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="">
-                        {t("scenarios.steps.chooseRoom")}
-                      </option>
-                      {rooms.map((room) => (
-                        <option key={room.id} value={room.id}>
-                          {room.name}
+                    <div className="min-w-[150px] space-y-1">
+                      <select
+                        value={step.roomId}
+                        onChange={(event) =>
+                          handleRoomChange(step, event.target.value)
+                        }
+                        className="h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="">
+                          {t("scenarios.steps.chooseRoom")}
                         </option>
-                      ))}
-                    </select>
+                        {rooms.map((room) => (
+                          <option key={room.id} value={room.id}>
+                            {room.name}
+                          </option>
+                        ))}
+                      </select>
+                      {step.roomId && roomIdsWithoutOutputs.has(step.roomId) && (
+                        <p className="text-[10px] leading-tight text-destructive" role="status">
+                          {t("scenarios.validation.roomOutputHint")}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
 
                   <TableCell>

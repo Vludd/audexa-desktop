@@ -89,6 +89,7 @@ export default function App() {
     removeStep,
     moveStep,
     validateScenario,
+    roomIdsWithoutOutputs,
     testScenario,
     isLoading: scenariosLoading,
     error: scenariosError,
@@ -239,6 +240,7 @@ export default function App() {
               onValidate={
                 validateScenario
               }
+              roomIdsWithoutOutputs={roomIdsWithoutOutputs}
               isLoading={scenariosLoading}
               error={scenariosError}
               onRetry={() => {
