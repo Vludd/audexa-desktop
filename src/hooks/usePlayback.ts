@@ -1,11 +1,12 @@
 import { useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { playbackApi, type PlaybackState } from "@/api/playback"
+import { playbackApi, type PlaybackSession, type PlaybackState } from "@/api/playback"
 import type { Room } from "@/types"
 
 const PLAYBACK_QUERY_KEY = ["playback"] as const
 const ROOMS_QUERY_KEY = ["rooms"] as const
+const PLAYBACK_SESSIONS_QUERY_KEY = ["playback-sessions"] as const
 
 export function usePlayback() {
   const queryClient = useQueryClient()
@@ -15,14 +16,23 @@ export function usePlayback() {
     refetchInterval: 500,
     staleTime: 0,
   })
+  const sessionsQuery = useQuery({
+    queryKey: PLAYBACK_SESSIONS_QUERY_KEY,
+    queryFn: playbackApi.getSessions,
+    refetchInterval: 500,
+    staleTime: 0,
+  })
 
   useEffect(() => {
     const state = query.data
-    if (!state) return
+    const sessions = sessionsQuery.data ?? []
+    const sessionRooms = sessions.flatMap((session) => session.state.rooms)
+    const allRooms = sessionRooms.length > 0 ? sessionRooms : (state?.rooms ?? [])
+    if (!state && sessions.length === 0) return
 
     queryClient.setQueryData<Room[]>(ROOMS_QUERY_KEY, (rooms = []) =>
       rooms.map((room) => {
-        const runtime = state.rooms.find((item) => item.roomId === room.id)
+        const runtime = allRooms.find((item) => item.roomId === room.id)
         if (!runtime) {
           return { ...room, status: "idle", position: 0, duration: 0 }
         }
@@ -36,7 +46,11 @@ export function usePlayback() {
         }
       }),
     )
-  }, [query.data, queryClient])
+  }, [query.data, sessionsQuery.data, queryClient])
 
-  return query as typeof query & { data: PlaybackState | undefined }
+  return {
+    ...query,
+    data: query.data as PlaybackState | undefined,
+    sessions: (sessionsQuery.data ?? []) as PlaybackSession[],
+  }
 }

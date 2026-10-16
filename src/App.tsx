@@ -49,7 +49,7 @@ export default function App() {
   const queryClient = useQueryClient()
 
   const { status } = useAudioSystem()
-  const { data: playback } = usePlayback()
+  const { data: playback, sessions: playbackSessions } = usePlayback()
 
   const { files: audioFiles } = useAudioFiles({})
 
@@ -132,6 +132,22 @@ export default function App() {
               system={status}
               logs={logs}
               playback={playback}
+              playbackSessions={playbackSessions}
+              onPauseSession={(sessionId) => {
+                void playbackApi.pauseSession(sessionId).then(() => queryClient.invalidateQueries({ queryKey: ["playback-sessions"] })).catch((error) =>
+                  toast.error("Не удалось приостановить сценарий", { description: error instanceof Error ? error.message : String(error) }),
+                )
+              }}
+              onResumeSession={(sessionId) => {
+                void playbackApi.resumeSession(sessionId).then(() => queryClient.invalidateQueries({ queryKey: ["playback-sessions"] })).catch((error) =>
+                  toast.error("Не удалось продолжить сценарий", { description: error instanceof Error ? error.message : String(error) }),
+                )
+              }}
+              onStopSession={(sessionId) => {
+                void playbackApi.stopSession(sessionId).then(() => queryClient.invalidateQueries({ queryKey: ["playback-sessions"] })).catch((error) =>
+                  toast.error("Не удалось остановить сценарий", { description: error instanceof Error ? error.message : String(error) }),
+                )
+              }}
               onPause={pauseRoom}
               onResume={() => {
                 void playbackApi.resume().catch((error) =>
@@ -227,6 +243,17 @@ export default function App() {
                 )
               }}
               playback={playback}
+              playbackSessions={playbackSessions}
+              onPauseSession={(sessionId) => {
+                void playbackApi.pauseSession(sessionId).then(() => queryClient.invalidateQueries({ queryKey: ["playback-sessions"] })).catch((error) =>
+                  toast.error("Не удалось приостановить сценарий", { description: error instanceof Error ? error.message : String(error) }),
+                )
+              }}
+              onResumeSession={(sessionId) => {
+                void playbackApi.resumeSession(sessionId).then(() => queryClient.invalidateQueries({ queryKey: ["playback-sessions"] })).catch((error) =>
+                  toast.error("Не удалось продолжить сценарий", { description: error instanceof Error ? error.message : String(error) }),
+                )
+              }}
               onCreate={createScenario}
               onUpdate={updateScenario}
               onDelete={deleteScenario}

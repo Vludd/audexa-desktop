@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
-import type { PlaybackState } from "@/api/playback"
+import type { PlaybackSession, PlaybackState } from "@/api/playback"
 import Header from "@/components/Header"
 import { t } from "@/i18n"
 import ScenarioEditor from "@/components/scenarios/ScenarioEditor"
@@ -19,10 +19,13 @@ interface Props {
   audioFiles: AudioFile[]
   onPlay: (id: string) => void
   onTest: (id: string) => void
-  onStop: () => void
+  onStop: (scenarioId: string) => void
   onPause: () => void
   onResume: () => void
+  onPauseSession: (sessionId: string) => void
+  onResumeSession: (sessionId: string) => void
   playback?: PlaybackState
+  playbackSessions: PlaybackSession[]
   onCreate: (patch?: ScenarioUpdate) => Promise<string>
   onUpdate: (id: string, patch: ScenarioUpdate) => void
   onDelete: (id: string) => void
@@ -66,7 +69,10 @@ export default function Scenarios({
   onStop,
   onPause,
   onResume,
+  onPauseSession,
+  onResumeSession,
   playback,
+  playbackSessions,
   onCreate,
   onUpdate,
   onDelete,
@@ -224,15 +230,24 @@ export default function Scenarios({
         <ScenarioQuickActions
           scenario={scenario}
           playbackStatus={
-            playback?.scenarioId === scenario?.id
-              ? playback.status
-              : undefined
+            playbackSessions.find((session) =>
+              session.state.scenarioId === scenario?.id &&
+              ["starting", "playing", "paused", "waiting"].includes(session.state.status),
+            )?.state.status ?? (playback?.scenarioId === scenario?.id ? playback.status : undefined)
           }
           onPlay={onPlay}
           onTest={onTest}
-          onStop={onStop}
-          onPause={onPause}
-          onResume={onResume}
+          onStop={() => { if (scenario) onStop(scenario.id) }}
+          onPause={() => {
+            const session = playbackSessions.find((item) => item.state.scenarioId === scenario?.id && item.state.status === "playing")
+            if (session) onPauseSession(session.sessionId)
+            else onPause()
+          }}
+          onResume={() => {
+            const session = playbackSessions.find((item) => item.state.scenarioId === scenario?.id && item.state.status === "paused")
+            if (session) onResumeSession(session.sessionId)
+            else onResume()
+          }}
           onValidate={onValidate}
         />
           </>

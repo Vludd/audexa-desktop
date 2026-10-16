@@ -145,7 +145,9 @@ export default function DashboardPlayback({
 
               {playback.status === "waiting" && (
                 <div className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                  Начало шага через {current.delayRemainingSeconds.toFixed(1)} сек.
+                  {current.delayRemainingSeconds > 0
+                    ? t("dashboard.playback.delayCountdown", { seconds: current.delayRemainingSeconds.toFixed(1) })
+                    : t("dashboard.playback.waitingForRoom")}
                 </div>
               )}
 

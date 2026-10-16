@@ -65,6 +65,11 @@ export interface PlaybackState {
   error: string | null
 }
 
+export interface PlaybackSession {
+  sessionId: string
+  state: PlaybackState
+}
+
 const PLAYBACK_STATUSES = new Set<PlaybackStatus>([
   "idle", "starting", "playing", "paused", "waiting", "stopped", "error",
 ])
@@ -107,6 +112,11 @@ export const playbackApi = {
     return requestPlaybackState("/api/playback")
   },
 
+  async getSessions(): Promise<PlaybackSession[]> {
+    const sessions = await apiRequest<PlaybackSession[]>("/api/playback/sessions")
+    return sessions.map((session) => ({ ...session, state: assertPlaybackState(session.state) }))
+  },
+
   startScenario(id: string) {
     return requestPlaybackState(`/api/playback/scenarios/${id}/start`, {
       method: "POST",
@@ -117,12 +127,24 @@ export const playbackApi = {
     return requestPlaybackState("/api/playback/pause", { method: "POST" })
   },
 
+  pauseSession(sessionId: string) {
+    return apiRequest<PlaybackSession[]>(`/api/playback/sessions/${sessionId}/pause`, { method: "POST" })
+  },
+
   resume() {
     return requestPlaybackState("/api/playback/resume", { method: "POST" })
   },
 
+  resumeSession(sessionId: string) {
+    return apiRequest<PlaybackSession[]>(`/api/playback/sessions/${sessionId}/resume`, { method: "POST" })
+  },
+
   stop() {
     return requestPlaybackState("/api/playback/stop", { method: "POST" })
+  },
+
+  stopSession(sessionId: string) {
+    return apiRequest<PlaybackSession[]>(`/api/playback/sessions/${sessionId}/stop`, { method: "POST" })
   },
 
   skipStep(roomId: string) {

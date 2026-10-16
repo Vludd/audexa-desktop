@@ -810,6 +810,14 @@ export const en: Widen<typeof ru> = {
 
     playback: {
       title: "Current playback",
+      parallelTitle: "Parallel scenarios",
+      activeCount: "{count} active",
+      scenarioFallback: "Scenario",
+      stepProgress: "Step {current}/{total}",
+      delayCountdown: "Step starts in {seconds} s.",
+      waitingForRoom: "The room is occupied by another scenario or a delay is running. This step will restart from the beginning when the room is free.",
+      preparingFirstStep: "Preparing the first step…",
+      sessionStatus: { starting: "Starting", playing: "Playing", paused: "Paused", waiting: "Waiting for room" },
 
       playing: "PLAYING",
 

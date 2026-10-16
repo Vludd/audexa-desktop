@@ -1,10 +1,11 @@
 import type { LogEntry, Room, ScheduleItem, SystemStatus } from "@/types"
-import type { PlaybackState } from "@/api/playback"
+import type { PlaybackSession, PlaybackState } from "@/api/playback"
 
 import Header from "@/components/Header"
 import { t } from "@/i18n"
 import DashboardHealth from "@/components/dashboard/DashboardHealth"
 import DashboardPlayback from "@/components/dashboard/DashboardPlayback"
+import DashboardPlaybackSessions from "@/components/dashboard/DashboardPlaybackSessions"
 import DashboardRooms from "@/components/dashboard/DashboardRooms"
 import DashboardSchedule from "@/components/dashboard/DashboardSchedule"
 import DashboardQuickActions from "@/components/dashboard/DashboardQuickActions"
@@ -17,6 +18,10 @@ interface Props {
   system: SystemStatus
   logs: LogEntry[]
   playback?: PlaybackState
+  playbackSessions: PlaybackSession[]
+  onPauseSession: (sessionId: string) => void
+  onResumeSession: (sessionId: string) => void
+  onStopSession: (sessionId: string) => void
   onStopAll: () => void
   onPause: () => void
   onResume: () => void
@@ -32,6 +37,10 @@ export default function Dashboard({
   system,
   logs,
   playback,
+  playbackSessions,
+  onPauseSession,
+  onResumeSession,
+  onStopSession,
   onStopAll,
   onPause,
   onResume,
@@ -58,6 +67,12 @@ export default function Dashboard({
 
             <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
               <div className="flex min-w-0 flex-col gap-3">
+                <DashboardPlaybackSessions
+                  sessions={playbackSessions}
+                  onPause={onPauseSession}
+                  onResume={onResumeSession}
+                  onStop={onStopSession}
+                />
                 <DashboardPlayback
                   rooms={rooms}
                   playback={playback}

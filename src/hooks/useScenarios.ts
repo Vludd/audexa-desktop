@@ -385,11 +385,16 @@ export function useScenarios({
   )
 
   const stopScenario = useCallback(
-    async () => {
+    async (scenarioId: string) => {
       try {
-        await playbackApi.stop()
+        const sessions = await playbackApi.getSessions()
+        const matching = sessions.filter((session) =>
+          session.state.scenarioId === scenarioId &&
+          ["starting", "playing", "paused", "waiting"].includes(session.state.status),
+        )
+        await Promise.all(matching.map((session) => playbackApi.stopSession(session.sessionId)))
       } catch (error) {
-        toast.error("Не удалось остановить воспроизведение", {
+        toast.error("Не удалось остановить сценарий", {
           description: error instanceof Error ? error.message : String(error),
         })
       }
