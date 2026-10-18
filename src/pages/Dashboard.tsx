@@ -1,5 +1,6 @@
 import type { LogEntry, Room, ScheduleItem, SystemStatus } from "@/types"
 import type { PlaybackSession, PlaybackState } from "@/api/playback"
+import type { BackendConnectionState } from "@/api/client"
 
 import Header from "@/components/Header"
 import { t } from "@/i18n"
@@ -16,6 +17,7 @@ interface Props {
   rooms: Room[]
   schedule: ScheduleItem[]
   system: SystemStatus
+  connectionState: BackendConnectionState
   logs: LogEntry[]
   playback?: PlaybackState
   playbackSessions: PlaybackSession[]
@@ -35,6 +37,7 @@ export default function Dashboard({
   rooms,
   schedule,
   system,
+  connectionState,
   logs,
   playback,
   playbackSessions,
@@ -62,6 +65,7 @@ export default function Dashboard({
             <DashboardHealth
               rooms={rooms}
               system={system}
+              connectionState={connectionState}
               logs={logs}
             />
 
@@ -105,6 +109,7 @@ export default function Dashboard({
 
                 <DashboardAudioSystem
                   system={system}
+                  connectionState={connectionState}
                 />
               </div>
             </div>

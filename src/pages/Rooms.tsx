@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import type { BackendConnectionState } from "@/api/client"
 
 import type { Room, RoomOperation } from "@/types"
 import { toast } from "@/lib/toast"
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/table"
 
 import { useConfirm } from "@/hooks/useConfirm"
+import BackendStatusBanner from "@/components/BackendStatusBanner"
 
 interface Props {
   rooms: Room[]
@@ -77,6 +79,7 @@ interface Props {
   ) => void | Promise<void>
 
   isLoading: boolean
+  connectionState: BackendConnectionState
   error: Error | null
   onRetry: () => void
 }
@@ -98,6 +101,7 @@ export default function Rooms({
   onDuplicateRoom,
 
   isLoading,
+  connectionState,
   error,
   onRetry,
 }: Props) {
@@ -117,6 +121,16 @@ export default function Rooms({
     useState<Room | null>(null)
 
   const confirmation = useConfirm()
+  const backendUnavailable = connectionState !== "online"
+  const controlsBlocked = isLoading || error !== null || backendUnavailable
+
+  const { close: closeConfirmation } = confirmation
+
+  useEffect(() => {
+    if (backendUnavailable) {
+      closeConfirmation()
+    }
+  }, [backendUnavailable, closeConfirmation])
 
   const counts: Record<
     RoomFilter,
@@ -340,7 +354,13 @@ export default function Rooms({
         )}
       />
 
+      <BackendStatusBanner
+        connectionState={connectionState}
+        onRetry={() => { void onRetry() }}
+      />
+
       <main className="min-h-0 flex-1 overflow-auto p-4">
+        <div inert={backendUnavailable || isLoading} aria-disabled={controlsBlocked || undefined}>
         <RoomToolbar
           query={query}
           viewGrid={viewGrid}
@@ -353,6 +373,7 @@ export default function Rooms({
           onAddRoom={
             openCreateDialog
           }
+          disabled={controlsBlocked}
         />
 
         <RoomFilters
@@ -473,13 +494,14 @@ export default function Rooms({
             onVolumeCommit={onVolumeCommit}
           />
         )}
+        </div>
       </main>
 
       <RoomDialog
         key={
           `${editingRoom?.id ?? "new"}-${dialogOpen}`
         }
-        open={dialogOpen}
+        open={dialogOpen && !backendUnavailable}
         room={editingRoom}
         onOpenChange={
           handleDialogChange
@@ -488,7 +510,7 @@ export default function Rooms({
       />
 
       <ConfirmDialog
-        open={confirmation.open}
+        open={confirmation.open && !backendUnavailable}
         onOpenChange={(
           open,
         ) => {

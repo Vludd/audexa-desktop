@@ -137,6 +137,7 @@ export default function App() {
               rooms={rooms}
               schedule={schedule}
               system={status}
+              connectionState={connectionState}
               logs={logs}
               playback={playback}
               playbackSessions={playbackSessions}
@@ -220,6 +221,7 @@ export default function App() {
               onDuplicateRoom={duplicateRoom}
 
               isLoading={roomsLoading}
+              connectionState={connectionState}
 
               error={
                 roomsError instanceof Error
@@ -280,6 +282,7 @@ export default function App() {
               }
               roomIdsWithoutOutputs={roomIdsWithoutOutputs}
               isLoading={scenariosLoading}
+              connectionState={connectionState}
               error={scenariosError}
               onRetry={() => {
                 void refetchScenarios()
@@ -300,6 +303,7 @@ export default function App() {
               onToggle={toggleSchedule}
               isLoading={scheduleLoading}
               isSaving={scheduleSaving}
+              connectionState={connectionState}
               error={scheduleError}
               onRetry={() => {
                 void refetchSchedule()
@@ -308,7 +312,12 @@ export default function App() {
           )}
 
           {page === "audiofiles" && (
-            <AudioFiles />
+            <AudioFiles
+              connectionState={connectionState}
+              onRetry={() => {
+                void queryClient.invalidateQueries({ queryKey: ["audio-files"] })
+              }}
+            />
           )}
 
           {page === "settings" && (

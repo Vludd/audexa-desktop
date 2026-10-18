@@ -71,6 +71,24 @@ export const en: Widen<typeof ru> = {
     executing: "Working...",
 
     closeNotification: "Dismiss notification",
+
+    backendUnavailable: "Backend is unavailable.",
+
+    backendReconnecting: "Reconnecting to the backend.",
+
+    backendControlsBlocked: "Some features are unavailable; the last loaded data remains on screen.",
+
+    retryLoading: "Retry loading",
+
+    scenariosRefreshFailed: "Failed to refresh scenarios.",
+
+    scenariosLoading: "Loading scenarios…",
+
+    audioFilesRefreshFailed: "Failed to refresh audio files.",
+
+    audioFilesLoading: "Loading audio files…",
+
+    scheduleRefreshFailed: "Failed to refresh the schedule.",
   },
 
   units: {

@@ -1,9 +1,11 @@
 import { Badge } from "@/components/ui/badge"
 import type { SystemStatus } from "@/types"
+import type { BackendConnectionState } from "@/api/client"
 import { t } from "@/i18n"
 
 interface DashboardAudioSystemProps {
   system: SystemStatus
+  connectionState: BackendConnectionState
 }
 
 const stateLabel: Record<SystemStatus["state"], string> = {
@@ -15,9 +17,10 @@ const stateLabel: Record<SystemStatus["state"], string> = {
   error: "ERROR",
 }
 
-export default function DashboardAudioSystem({ system }: DashboardAudioSystemProps) {
-  const healthy = system.state === "ready"
-  const degraded = system.state === "degraded"
+export default function DashboardAudioSystem({ system, connectionState }: DashboardAudioSystemProps) {
+  const healthy = connectionState === "online" && system.state === "ready"
+  const degraded = connectionState === "reconnecting" || (connectionState === "online" && system.state === "degraded")
+  const statusText = connectionState === "offline" ? "BACKEND OFFLINE" : connectionState === "reconnecting" ? "RECONNECTING" : stateLabel[system.state]
 
   return (
     <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
@@ -26,7 +29,7 @@ export default function DashboardAudioSystem({ system }: DashboardAudioSystemPro
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-3.5">
-        <InfoRow label={t("dashboard.audioSystem.backend")} value={system.backend.toUpperCase()} />
+        <InfoRow label={t("dashboard.audioSystem.backend")} value={connectionState.toUpperCase()} />
 
         <InfoRow label={t("dashboard.audioSystem.device")} value={system.device ?? "—"} />
 
@@ -34,7 +37,7 @@ export default function DashboardAudioSystem({ system }: DashboardAudioSystemPro
           label={t("dashboard.audioSystem.status")}
           value={
             <Badge variant={healthy ? "success" : degraded ? "warning" : "destructive"}>
-              {stateLabel[system.state]}
+              {statusText}
             </Badge>
           }
         />

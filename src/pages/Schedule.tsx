@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import type { BackendConnectionState } from "@/api/client"
 
 import Header from "@/components/Header"
 import { formatDate, t } from "@/i18n"
@@ -18,6 +19,7 @@ import type {
   ScheduleFormData,
   ScheduleItem,
 } from "@/types"
+import BackendStatusBanner from "@/components/BackendStatusBanner"
 
 interface Props {
   schedule: ScheduleItem[]
@@ -32,6 +34,7 @@ interface Props {
   onToggle: (id: number) => void
   isLoading?: boolean
   isSaving?: boolean
+  connectionState: BackendConnectionState
   error?: unknown
   onRetry?: () => void
 }
@@ -62,6 +65,7 @@ export default function Schedule({
   onToggle,
   isLoading = false,
   isSaving = false,
+  connectionState,
   error = null,
   onRetry,
 }: Props) {
@@ -80,6 +84,8 @@ export default function Schedule({
     )
 
   const confirmation = useConfirm()
+  const backendUnavailable = connectionState !== "online"
+  const controlsBlocked = isLoading || isSaving || error != null || backendUnavailable
 
   const selectedItem = useMemo(
     () =>
@@ -107,6 +113,7 @@ export default function Schedule({
   }, [schedule])
 
   const openCreate = () => {
+    if (controlsBlocked) return
     const firstScenario = scenarios[0]
 
     setEditingId(null)
@@ -123,7 +130,7 @@ export default function Schedule({
   }
 
   const openEdit = () => {
-    if (!selectedItem) {
+    if (controlsBlocked || !selectedItem) {
       return
     }
 
@@ -159,6 +166,7 @@ export default function Schedule({
   }
 
   const handleSave = async () => {
+    if (controlsBlocked) return
     if (
       !form.scenarioId ||
       !form.time ||
@@ -184,7 +192,7 @@ export default function Schedule({
   }
 
   const handleDelete = () => {
-    if (!selectedItem) {
+    if (controlsBlocked || !selectedItem) {
       return
     }
 
@@ -205,12 +213,12 @@ export default function Schedule({
   }
 
   const handleDuplicate = () => {
-    if (!selectedItem) return
+    if (controlsBlocked || !selectedItem) return
     onDuplicate(selectedItem.id)
   }
 
   const handleRunNow = async () => {
-    if (!selectedItem) return
+    if (controlsBlocked || !selectedItem) return
     try {
       await playbackApi.startScenario(selectedItem.scenarioId)
       toast.success(`Сценарий «${selectedItem.scenarioName}» запущен`)
@@ -222,7 +230,7 @@ export default function Schedule({
   }
 
   const handleValidate = async () => {
-    if (!selectedItem) return
+    if (controlsBlocked || !selectedItem) return
     const scenario = scenarios.find((item) => item.id === selectedItem.scenarioId)
 
     if (!scenario) {
@@ -250,9 +258,9 @@ export default function Schedule({
     }
   }
 
-  const handleDialogChange = (
-    open: boolean,
-  ) => {
+  const handleDialogChange = (open: boolean) => {
+    if (controlsBlocked && open) return
+
     setShowModal(open)
 
     if (!open) {
@@ -265,6 +273,11 @@ export default function Schedule({
       <Header
         title={t("pages.schedule.title")}
         subtitle={t("pages.schedule.subtitle")}
+      />
+
+      <BackendStatusBanner
+        connectionState={connectionState}
+        onRetry={() => { void onRetry?.() }}
       />
 
       <ScheduleToolbar
@@ -280,39 +293,32 @@ export default function Schedule({
         onDuplicate={handleDuplicate}
         onRunNow={() => void handleRunNow()}
         onValidate={() => void handleValidate()}
+        busy={controlsBlocked}
       />
 
-      {error != null && (
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b bg-destructive/5 px-5 py-3 text-sm">
-          <span className="text-destructive">
-            Не удалось загрузить расписание: {error instanceof Error ? error.message : String(error)}
-          </span>
-          {onRetry && (
-            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
-              Повторить
-            </Button>
-          )}
+      {connectionState === "online" && error != null && (
+        <div role="status" className="mx-4 mt-2 flex shrink-0 items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+          <span>{t("common.scheduleRefreshFailed")} {t("common.backendControlsBlocked")}</span>
+          {onRetry && <Button type="button" size="sm" variant="outline" onClick={onRetry}>{t("common.retryLoading")}</Button>}
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden" inert={controlsBlocked} aria-disabled={controlsBlocked || undefined}>
         <main className="min-w-0 flex-1 overflow-auto p-5">
           <ScheduleTable
             schedule={sortedSchedule}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onToggle={onToggle}
-            isLoading={isLoading}
+            isLoading={isLoading && schedule.length === 0}
+            disabled={controlsBlocked}
           />
         </main>
-
-        <UpcomingEvents
-          items={upcoming}
-        />
+        <UpcomingEvents items={upcoming} />
       </div>
 
       <ScheduleDialog
-        open={showModal}
+        open={showModal && !controlsBlocked}
         editing={editingId !== null}
         form={form}
         scenarios={scenarios}
@@ -323,7 +329,7 @@ export default function Schedule({
       />
 
       <ConfirmDialog
-        open={confirmation.open}
+        open={confirmation.open && !controlsBlocked}
         onOpenChange={(open) => {
           if (!open) confirmation.close()
         }}

@@ -1,4 +1,5 @@
 import { useState } from "react"
+import type { BackendConnectionState } from "@/api/client"
 
 import {
   CheckCircle2,
@@ -30,8 +31,14 @@ import { Input } from "@/components/ui/input"
 import { useConfirm } from "@/hooks/useConfirm"
 import { useAudioFiles } from "@/hooks/useAudioFiles"
 import { useFilePicker } from "@/hooks/useFilePicker"
+import BackendStatusBanner from "@/components/BackendStatusBanner"
 
-export default function AudioFiles() {
+interface Props {
+  connectionState: BackendConnectionState
+  onRetry?: () => void
+}
+
+export default function AudioFiles({ connectionState, onRetry }: Props) {
   const audio = useAudioFiles({})
 
   const filePicker = useFilePicker({
@@ -40,6 +47,8 @@ export default function AudioFiles() {
     onPick: (files) => void audio.addFiles(files),
   })
   const confirm = useConfirm()
+  const backendUnavailable = connectionState !== "online"
+  const controlsBlocked = backendUnavailable || audio.isLoading || audio.error != null
 
   const [renameFileId, setRenameFileId] = useState<
     string | null
@@ -52,6 +61,8 @@ export default function AudioFiles() {
   )
 
   const handleRename = (id: string) => {
+    if (controlsBlocked) return
+
     const file = audio.files.find(
       (item) => item.id === id,
     )
@@ -65,7 +76,7 @@ export default function AudioFiles() {
   }
 
   const handleRenameSubmit = async () => {
-    if (!renameFileId) {
+    if (controlsBlocked || !renameFileId) {
       return
     }
 
@@ -81,6 +92,8 @@ export default function AudioFiles() {
   }
 
   const handleDelete = (id: string) => {
+    if (controlsBlocked) return
+
     const file = audio.files.find(
       (item) => item.id === id,
     )
@@ -104,6 +117,8 @@ export default function AudioFiles() {
   }
 
   const handleDeleteSelected = () => {
+    if (controlsBlocked) return
+
     const count = audio.selectedIds.length
 
     if (!count) {
@@ -131,25 +146,50 @@ export default function AudioFiles() {
         subtitle={t("pages.audioFiles.subtitle")}
       />
 
-      <AudioToolbar
-        query={audio.query}
-        onQueryChange={audio.setQuery}
-        fileCount={audio.files.length}
-        storageBytes={audio.files.reduce((total, file) => total + file.size, 0)}
-        onAdd={() => void filePicker.open()}
-        isAddPending={filePicker.isOpening}
-        selectedCount={audio.selectedIds.length}
-        onDeleteSelected={handleDeleteSelected}
+      <BackendStatusBanner
+        connectionState={connectionState}
+        onRetry={() => { void onRetry?.() }}
       />
 
-      <input {...filePicker.inputProps} />
+      <div inert={controlsBlocked} aria-disabled={controlsBlocked || undefined} className="shrink-0">
+        <AudioToolbar
+          query={audio.query}
+          onQueryChange={audio.setQuery}
+          fileCount={audio.files.length}
+          storageBytes={audio.files.reduce((total, file) => total + file.size, 0)}
+          onAdd={() => { if (!controlsBlocked) void filePicker.open() }}
+          isAddPending={filePicker.isOpening}
+          selectedCount={audio.selectedIds.length}
+          onDeleteSelected={handleDeleteSelected}
+          disabled={controlsBlocked}
+        />
+      </div>
+
+      {connectionState === "online" && (audio.isLoading || audio.error != null) && (
+        <div role="status" className="mx-4 mt-2 flex shrink-0 items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+          <span className="min-w-0 flex-1">
+            {audio.error ? t("common.audioFilesRefreshFailed") : t("common.audioFilesLoading")}{" "}
+            {t("common.backendControlsBlocked")}
+          </span>
+          {audio.error && (
+            <Button type="button" size="sm" variant="outline" disabled={audio.isLoading} onClick={() => { onRetry?.(); void audio.reload() }}>
+              <RotateCcw className="size-3.5" />
+              {t("common.retryLoading")}
+            </Button>
+          )}
+        </div>
+      )}
+
+      <input {...filePicker.inputProps} disabled={controlsBlocked} />
 
       <div
         className="relative min-h-0 flex-1 overflow-auto p-4"
-        onDragEnter={audio.handleDragEnter}
-        onDragOver={audio.handleDragOver}
-        onDragLeave={audio.handleDragLeave}
-        onDrop={audio.handleDrop}
+        inert={controlsBlocked}
+        aria-disabled={controlsBlocked || undefined}
+        onDragEnter={(event) => { if (!controlsBlocked) audio.handleDragEnter(event) }}
+        onDragOver={(event) => { if (!controlsBlocked) audio.handleDragOver(event) }}
+        onDragLeave={(event) => { if (!controlsBlocked) audio.handleDragLeave(event) }}
+        onDrop={(event) => { if (!controlsBlocked) audio.handleDrop(event) }}
       >
         {audio.isDragging && (
           <div className="absolute inset-4 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/95 backdrop-blur-sm">
@@ -176,7 +216,7 @@ export default function AudioFiles() {
           </div>
         )}
 
-        {audio.isLoading ? (
+        {audio.isLoading && audio.files.length === 0 ? (
           <div className="overflow-hidden rounded-lg border bg-card">
             <div className="divide-y">
               {Array.from({ length: 5 }).map((_, index) => (
@@ -193,7 +233,7 @@ export default function AudioFiles() {
               ))}
             </div>
           </div>
-        ) : audio.error ? (
+        ) : audio.error && audio.files.length === 0 ? (
           <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border bg-card text-center">
             <div className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
               <X className="size-5" />
@@ -247,7 +287,7 @@ export default function AudioFiles() {
                   size="sm"
                   className="mt-4"
                   onClick={() => void filePicker.open()}
-                  disabled={filePicker.isOpening}
+                  disabled={controlsBlocked || filePicker.isOpening}
                   aria-busy={filePicker.isOpening}
                 >
                   {filePicker.isOpening ? (
@@ -285,7 +325,7 @@ export default function AudioFiles() {
         )}
       </div>
 
-      <div className="shrink-0 bg-background">
+      <div className="shrink-0 bg-background" inert={controlsBlocked} aria-disabled={controlsBlocked || undefined}>
         <AudioPlayer
           file={audio.currentFile}
           isPlaying={audio.isPlaying}
@@ -304,7 +344,7 @@ export default function AudioFiles() {
       </div>
 
       <ConfirmDialog
-        open={confirm.open}
+        open={confirm.open && !controlsBlocked}
         onOpenChange={(open) => {
           if (!open) {
             confirm.close()
@@ -320,7 +360,7 @@ export default function AudioFiles() {
       />
 
       <Dialog
-        open={renameFileId !== null}
+        open={renameFileId !== null && !controlsBlocked}
         onOpenChange={(open) => {
           if (!open) {
             setRenameFileId(null)
@@ -379,7 +419,7 @@ export default function AudioFiles() {
                 setRenameFileId(null)
                 setRenameName("")
               }}
-              disabled={audio.isRenaming}
+              disabled={controlsBlocked || audio.isRenaming}
             >
               {t("common.cancel")}
             </Button>

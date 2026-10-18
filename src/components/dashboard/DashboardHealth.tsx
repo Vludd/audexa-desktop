@@ -8,22 +8,29 @@ import {
 
 import { Card } from "@/components/ui/card"
 import type { LogEntry, Room, SystemStatus } from "@/types"
+import type { BackendConnectionState } from "@/api/client"
 import { t } from "@/i18n"
 
 interface DashboardHealthProps {
   rooms: Room[]
   system: SystemStatus
+  connectionState: BackendConnectionState
   logs: LogEntry[]
 }
 
 export default function DashboardHealth({
   rooms,
   system,
+  connectionState,
   logs,
 }: DashboardHealthProps) {
   const playingRooms = rooms.filter(
     (room) => room.status === "playing",
   )
+
+  const backendUnavailable = connectionState !== "online"
+  const systemHealthy = !backendUnavailable && system.state === "ready"
+  const systemDegraded = !backendUnavailable && system.state === "degraded"
 
   const issues = logs.filter((log) => {
     if (log.level !== "ERROR" && log.level !== "WARNING") return false
@@ -43,10 +50,10 @@ export default function DashboardHealth({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <HealthCard
-        icon={system.state === "ready" ? CheckCircle2 : XCircle}
+        icon={systemHealthy ? CheckCircle2 : XCircle}
         label={t("dashboard.health.system")}
-        value={system.state === "ready" ? t("common.online") : system.state === "degraded" ? "DEGRADED" : system.state === "initializing" ? "INIT" : t("common.offline")}
-        status={system.state === "ready" ? "success" : system.state === "degraded" ? "warning" : "error"}
+        value={connectionState === "offline" ? "BACKEND OFFLINE" : connectionState === "reconnecting" ? "RECONNECTING" : system.state === "ready" ? t("common.online") : system.state === "degraded" ? "DEGRADED" : system.state === "initializing" ? "INIT" : system.state === "unconfigured" ? "UNCONFIGURED" : t("common.offline")}
+        status={systemHealthy ? "success" : systemDegraded || connectionState === "reconnecting" ? "warning" : "error"}
       />
 
       <HealthCard

@@ -15,6 +15,7 @@ interface Props {
   onQueryChange: (value: string) => void
   onViewChange: (grid: boolean) => void
   onAddRoom: () => void
+  disabled?: boolean
 }
 
 export default function RoomToolbar({
@@ -23,12 +24,13 @@ export default function RoomToolbar({
   onQueryChange,
   onViewChange,
   onAddRoom,
+  disabled = false,
 }: Props) {
   return (
     <div className="mb-4 flex items-center gap-3">
       
 
-      <Button type="button" onClick={onAddRoom}>
+      <Button type="button" disabled={disabled} onClick={onAddRoom}>
         <Plus className="size-4" />
         {t("rooms.toolbar.add")}
       </Button>
@@ -41,6 +43,7 @@ export default function RoomToolbar({
           size="icon"
           variant={viewGrid ? "secondary" : "ghost"}
           className="size-8"
+          disabled={disabled}
           onClick={() => onViewChange(true)}
           aria-label={t("rooms.toolbar.showGrid")}
         >
@@ -52,6 +55,7 @@ export default function RoomToolbar({
           size="icon"
           variant={!viewGrid ? "secondary" : "ghost"}
           className="size-8"
+          disabled={disabled}
           onClick={() => onViewChange(false)}
           aria-label={t("rooms.toolbar.showList")}
         >
@@ -65,6 +69,7 @@ export default function RoomToolbar({
 
         <Input
           value={query}
+          disabled={disabled}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={t("rooms.toolbar.search")}
           className="pl-9"

@@ -17,6 +17,7 @@ interface Props {
   onSelect: (id: number) => void
   onToggle: (id: number) => void
   isLoading?: boolean
+  disabled?: boolean
 }
 
 export default function ScheduleTable({
@@ -25,6 +26,7 @@ export default function ScheduleTable({
   onSelect,
   onToggle,
   isLoading = false,
+  disabled = false,
 }: Props) {
   return (
     <div className="overflow-hidden rounded-lg border bg-card">
@@ -91,6 +93,7 @@ export default function ScheduleTable({
                   >
                     <Switch
                       checked={item.enabled}
+                      disabled={disabled || isLoading}
                       onCheckedChange={() =>
                         onToggle(item.id)
                       }
