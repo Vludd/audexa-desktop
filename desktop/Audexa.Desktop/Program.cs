@@ -41,7 +41,7 @@ internal sealed class MainForm : Form
 
     // Replace with the repository that hosts the desktop release assets.
     private const string ManifestUrl =
-        "https://github.com/Vludd/audexa-desktop-ota-starter/releases/latest/download/latest.json";
+        "https://github.com/Vludd/audexa-desktop/releases/latest/download/latest.json";
 
     public MainForm()
     {
