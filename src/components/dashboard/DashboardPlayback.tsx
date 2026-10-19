@@ -145,18 +145,18 @@ export default function DashboardPlayback({
           <h3 className="text-sm font-semibold">{t("dashboard.playback.title")}</h3>
           {isPlaybackActive && playback?.scenarioName && (
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {playback.scenarioName} · шаг {playback.currentStep}/{playback.totalSteps}
+              {playback.scenarioName} · {t("dashboard.playback.stepProgress", { current: playback.currentStep, total: playback.totalSteps })}
             </p>
           )}
         </div>
-        {current && <Badge variant="success">{playback?.status === "waiting" ? "Ожидание" : playback?.status === "paused" ? "Пауза" : "Играет"}</Badge>}
+        {current && <Badge variant="success">{playback?.status === "waiting" ? t("dashboard.playback.statusWaiting") : playback?.status === "paused" ? t("dashboard.playback.statusPaused") : t("dashboard.playback.statusPlaying")}</Badge>}
       </div>
 
       <div className="p-3.5">
         {playback && current && room ? (
           <div className="space-y-3">
             <div className="rounded-md border bg-muted/20 p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Сейчас</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("dashboard.playback.current")}</div>
               <div className="mt-1 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-bold">{String(playback.currentStep).padStart(2, "0")} — {room.name}</div>
@@ -187,7 +187,7 @@ export default function DashboardPlayback({
               {activeRoomState && (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="block">
-                    <span className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground"><Volume2 className="size-3" /> Громкость комнаты {roomVolume}%</span>
+                    <span className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground"><Volume2 className="size-3" /> {t("dashboard.playback.roomVolume", { volume: roomVolume })}</span>
                     <Slider
                       value={[roomVolume]}
                       min={0}
@@ -207,7 +207,7 @@ export default function DashboardPlayback({
                     />
                   </label>
                   <label className="block">
-                    <span className="mb-1 text-[11px] text-muted-foreground">Усиление файла {audioGainDb > 0 ? "+" : ""}{audioGainDb} dB</span>
+                    <span className="mb-1 text-[11px] text-muted-foreground">{t("dashboard.playback.fileGain", { gain: `${audioGainDb > 0 ? "+" : ""}${audioGainDb}` })}</span>
                     <Slider
                       value={[audioGainDb]}
                       min={-24}
@@ -233,9 +233,9 @@ export default function DashboardPlayback({
 
             {next && (
               <div className="rounded-md border border-dashed p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Следующий</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("dashboard.playback.next")}</div>
                 <div className="mt-1 font-semibold">{String(next.step).padStart(2, "0")} — {next.roomName}</div>
-                <div className="text-xs text-muted-foreground">{next.audioFileName} · перед стартом {next.delayMs / 1000}s</div>
+                <div className="text-xs text-muted-foreground">{next.audioFileName} · {t("dashboard.playback.nextDelay", { seconds: next.delayMs / 1000 })}</div>
               </div>
             )}
 
@@ -259,32 +259,32 @@ export default function DashboardPlayback({
 
             <div className="flex items-center gap-2">
               {playback.status === "paused" ? (
-                <Button size="sm" onClick={onResume}><PlayCircle className="size-3.5" /> Продолжить</Button>
+                <Button size="sm" onClick={onResume}><PlayCircle className="size-3.5" /> {t("common.resume")}</Button>
               ) : (
-                <Button size="sm" onClick={onPause} disabled={playback.status !== "playing"}><Pause className="size-3.5" /> Пауза</Button>
+                <Button size="sm" onClick={onPause} disabled={playback.status !== "playing"}><Pause className="size-3.5" /> {t("common.pause")}</Button>
               )}
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={() => currentSession && onSkipStep(currentSession.sessionId, current.step)}
                 disabled={!currentSession}
-              ><Square className="size-3.5" /> Пропустить шаг</Button>
-              <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onNavigate("scenarios")}>Открыть сценарий</Button>
+              ><Square className="size-3.5" /> {t("dashboard.playback.skipStep")}</Button>
+              <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onNavigate("scenarios")}>{t("dashboard.playback.openScenario")}</Button>
             </div>
           </div>
         ) : showPlaybackError ? (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-            <div className="text-sm font-semibold text-destructive">Воспроизведение остановлено из-за ошибки</div>
+            <div className="text-sm font-semibold text-destructive">{t("dashboard.playback.errorTitle")}</div>
             <p className="mt-1 break-words text-xs text-muted-foreground">
-              {playback.error || "Проверьте аудиоустройство и конфигурацию выходов."}
+              {playback.error || t("dashboard.playback.errorDescription")}
             </p>
-            <Button variant="link" className="mt-2 h-auto p-0 text-xs" onClick={() => onNavigate("scenarios")}>Открыть сценарии</Button>
+            <Button variant="link" className="mt-2 h-auto p-0 text-xs" onClick={() => onNavigate("scenarios")}>{t("dashboard.playback.openScenarios")}</Button>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-6 text-center">
             <PlayCircle className="mb-2 size-7 text-muted-foreground/50" />
             <div className="text-sm text-muted-foreground">{t("dashboard.playback.empty")}</div>
-            <Button variant="link" className="mt-1 h-auto p-0 text-xs" onClick={() => onNavigate("scenarios")}>Открыть сценарии</Button>
+            <Button variant="link" className="mt-1 h-auto p-0 text-xs" onClick={() => onNavigate("scenarios")}>{t("dashboard.playback.openScenarios")}</Button>
           </div>
         )}
       </div>
