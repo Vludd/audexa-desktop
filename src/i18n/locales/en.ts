@@ -163,6 +163,7 @@ export const en: Widen<typeof ru> = {
     },
     toolbar: {
       add: "Add schedule",
+      runNow: "Run now",
       time: "Time",
       scenario: "Scenario",
       days: "Days",

@@ -52,17 +52,17 @@ export default function ScheduleToolbar({
 
       <Button type="button" size="sm" variant="success" disabled={!hasSelection || busy} onClick={onRunNow}>
         <Play className="size-3.5" />
-        Запустить сейчас
+        {t("schedule.toolbar.runNow")}
       </Button>
 
-      <Button type="button" size="sm" variant="outline" disabled={!hasSelection || busy} onClick={onValidate}>
+      <Button type="button" size="sm" variant="outline" hidden disabled={!hasSelection || busy} onClick={onValidate}>
         <CheckCircle2 className="size-3.5" />
         Проверить
       </Button>
 
       <div className="ml-auto flex-1" />
 
-      <Button type="button" variant="outline" size="sm" className="font-normal" disabled>
+      <Button type="button" variant="outline" size="sm" hidden className="font-normal">
         <Calendar className="size-3.5 text-primary" />
         {selectedDate}
       </Button>

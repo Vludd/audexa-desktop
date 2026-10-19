@@ -149,6 +149,7 @@ export const ru = {
     },
     toolbar: {
       add: "Добавить расписание",
+      runNow: "Запустить сейчас",
       time: "Время",
       scenario: "Сценарий",
       days: "Дни",

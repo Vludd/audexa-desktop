@@ -21,6 +21,7 @@ export default function UpcomingEvents({
           variant="link"
           size="sm"
           className="h-auto p-0 text-xs"
+          disabled
         >
           {t("schedule.upcoming.all")}
         </Button>
