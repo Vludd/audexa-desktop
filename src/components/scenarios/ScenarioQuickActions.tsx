@@ -1,6 +1,6 @@
 import {
   AlertTriangle,
-  Headphones,
+  LoaderCircle,
   Pause,
   Play,
   Square,
@@ -13,12 +13,12 @@ import type { Scenario } from "@/types"
 import type { ScenarioValidation } from "@/hooks/useScenarios"
 import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
+import { useState } from "react"
 
 interface Props {
   scenario?: Scenario
   playbackStatus?: string
-  onPlay: (id: string) => void
-  onTest: (id: string) => void
+  onPlay: (id: string) => void | Promise<void>
   onStop: () => void
   onPause: () => void
   onResume: () => void
@@ -29,7 +29,6 @@ export default function ScenarioQuickActions({
   scenario,
   playbackStatus,
   onPlay,
-  onTest,
   onStop,
   onPause,
   onResume,
@@ -38,17 +37,26 @@ export default function ScenarioQuickActions({
   const validation = scenario ? onValidate(scenario) : null
   const canRun = Boolean(scenario) && scenario?.status === "active" && Boolean(validation?.valid)
   const isThisScenario = Boolean(scenario && ["starting", "playing", "paused", "waiting"].includes(playbackStatus ?? ""))
+  const [isStarting, setIsStarting] = useState(false)
 
-  const handlePlay = () => {
-    if (!scenario) return
-    if (!validation) return
+  const handlePlay = async () => {
+    if (!scenario || !validation || !canRun || isStarting) return
+
     if (!validation.valid) {
       toast.error(t("scenarios.quickActions.cannotRun"), {
         description: validation.errors.join(" "),
       })
       return
     }
-    onPlay(scenario.id)
+
+    try {
+      setIsStarting(true)
+      await onPlay(scenario.id)
+    } catch {
+      toast.error(t("scenarios.quickActions.cannotRun"))
+    } finally {
+      setIsStarting(false)
+    }
   }
 
   return (
@@ -60,11 +68,16 @@ export default function ScenarioQuickActions({
           type="button"
           variant="success"
           className="w-full justify-start"
-          disabled={!canRun}
-          onClick={handlePlay}
+          disabled={!canRun || isStarting || isThisScenario}
+          onClick={() => void handlePlay()}
         >
-          <Play className="size-4" fill="currentColor" />
-          {t("scenarios.quickActions.run")}
+          {isStarting ? (
+            <LoaderCircle className="size-4 animate-spin" />
+          ) : (
+            <Play className="size-4" fill="currentColor" />
+          )}
+
+          {isStarting ? "Запуск…" : t("scenarios.quickActions.run")}
         </Button>
 
         {playbackStatus === "paused" ? (
@@ -96,7 +109,7 @@ export default function ScenarioQuickActions({
           {t("scenarios.quickActions.stop")}
         </Button>
 
-        <Button
+        {/* <Button
           type="button"
           variant="outline"
           size="sm"
@@ -109,7 +122,7 @@ export default function ScenarioQuickActions({
         </Button>
         <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">
           Тестовый запуск воспроизводит звук через выбранные аудиовыходы.
-        </p>
+        </p> */}
       </div>
 
       {scenario && !validation?.valid && (

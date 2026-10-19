@@ -7,7 +7,6 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import ConfirmDialog from "@/components/ui/confirm-dialog"
 import { useConfirm } from "@/hooks/useConfirm"
 import {
@@ -22,6 +21,8 @@ import {
 import type { AudioFile, Room, ScenarioStep } from "@/types"
 import { t } from "@/i18n"
 import { formatTime } from "@/lib/audio"
+import { Slider } from "../ui/slider"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
 
 interface Props {
   steps: ScenarioStep[]
@@ -149,24 +150,37 @@ export default function ScenarioStepsTable({
 
                   <TableCell>
                     <div className="min-w-[150px] space-y-1">
-                      <select
-                        value={step.roomId}
-                        onChange={(event) =>
-                          handleRoomChange(step, event.target.value)
-                        }
-                        className="h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                      <Select
+                        value={step.roomId || undefined}
+                        onValueChange={(roomId) => {
+                          if (roomId == null) return
+                          handleRoomChange(step, roomId)
+                        }}
                       >
-                        <option value="">
-                          {t("scenarios.steps.chooseRoom")}
-                        </option>
-                        {rooms.map((room) => (
-                          <option key={room.id} value={room.id}>
-                            {room.name}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger
+                          className="h-8 w-full min-w-[150px] text-xs"
+                          aria-label={t("scenarios.steps.room")}
+                        >
+                          <SelectValue placeholder={t("scenarios.steps.chooseRoom")}>
+                            {rooms.find((room) => room.id === step.roomId)?.name ??
+                              t("scenarios.steps.chooseRoom")}
+                          </SelectValue>
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          {rooms.map((room) => (
+                            <SelectItem key={room.id} value={room.id}>
+                              {room.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
                       {step.roomId && roomIdsWithoutOutputs.has(step.roomId) && (
-                        <p className="text-[10px] leading-tight text-destructive" role="status">
+                        <p
+                          className="text-[10px] leading-tight text-destructive"
+                          role="status"
+                        >
                           {t("scenarios.validation.roomOutputHint")}
                         </p>
                       )}
@@ -174,37 +188,60 @@ export default function ScenarioStepsTable({
                   </TableCell>
 
                   <TableCell>
-                    <select
-                      value={selectedAudioId}
-                      onChange={(event) =>
-                        handleAudioChange(step, event.target.value)
-                      }
-                      className="h-8 w-full min-w-[180px] rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    <Select
+                      value={selectedAudioId || undefined}
+                      onValueChange={(fileId) => {
+                        if (fileId == null) return
+                        handleAudioChange(step, fileId)
+                      }}
                     >
-                      <option value="">
-                        {t("scenarios.steps.chooseAudioFile")}
-                      </option>
-                      {audioFiles.map((file) => (
-                        <option key={file.id} value={file.id}>
-                          {file.name} · {file.filename}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger
+                        className="h-8 w-full min-w-[180px] text-xs"
+                        aria-label={t("scenarios.steps.audioFile")}
+                      >
+                        <SelectValue placeholder={t("scenarios.steps.chooseAudioFile")}>
+                          {audioFiles.find((file) => file.id === selectedAudioId)
+                            ? (() => {
+                                const file = audioFiles.find(
+                                  (item) => item.id === selectedAudioId,
+                                )!
+                                return `${file.name}`
+                              })()
+                            : t("scenarios.steps.chooseAudioFile")}
+                        </SelectValue>
+                      </SelectTrigger>
+
+                      <SelectContent>
+                        {audioFiles.map((file) => (
+                          <SelectItem key={file.id} value={file.id}>
+                            {file.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
 
                   <TableCell>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      value={step.delay}
-                      onChange={(event) =>
-                        onUpdateStep(step.id, {
-                          delay: Math.max(0, Number(event.target.value)),
-                        })
-                      }
-                      className="h-8 text-xs"
-                    />
+                    <div className="flex min-w-[140px] items-center gap-3">
+                      <Slider
+                        min={0}
+                        max={30}
+                        step={1}
+                        value={[step.delay]}
+                        onValueChange={(value) =>
+                          onUpdateStep(step.id, {
+                            delay: Array.isArray(value) ? value[0] : value,
+                          })
+                        }
+                        aria-label={t("scenarios.steps.delayBeforeStartSeconds")}
+                        className="flex-1"
+                        trackClassName="bg-muted-foreground/25"
+                      />
+
+                      <span className="w-12 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {step.delay.toFixed(1)} с
+                      </span>
+                    </div>
                   </TableCell>
 
                   <TableCell className="text-xs text-muted-foreground">

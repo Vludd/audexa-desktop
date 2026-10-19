@@ -92,7 +92,15 @@ export default function ScenarioSettings({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-1">
+        <form
+          id="scenario-settings-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!value.name.trim() || saving) return
+            void handleSave()
+          }}
+          className="grid gap-4 py-1"
+        >
           <FieldRow label={t("scenarios.settings.name")}>
             <Input
               value={value.name}
@@ -115,15 +123,18 @@ export default function ScenarioSettings({
             <FieldRow label={t("scenarios.settings.playbackMode")}>
               <Select
                 value={value.playMode}
-                onValueChange={() =>
+                onValueChange={(next) =>
                   update({
-                    playMode:
-                      "sequential",
+                    playMode: next as Scenario["playMode"],
                   })
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {value.playMode === "sequential"
+                      ? t("scenarios.settings.sequential")
+                      : value.playMode}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sequential">
@@ -143,7 +154,11 @@ export default function ScenarioSettings({
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {value.repeat === "loop"
+                      ? t("scenarios.settings.loop")
+                      : t("scenarios.settings.once")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="once">
@@ -177,7 +192,7 @@ export default function ScenarioSettings({
               {t("scenarios.settings.stopPreviousDescription")}
             </p>
           </div>
-        </div>
+        </form>
 
         <DialogFooter>
           <Button
@@ -188,9 +203,9 @@ export default function ScenarioSettings({
             {t("common.cancel")}
           </Button>
           <Button
-            type="button"
+            type="submit"
+            form="scenario-settings-form"
             disabled={!value.name.trim() || saving}
-            onClick={() => void handleSave()}
           >
             {t("common.save")}
           </Button>

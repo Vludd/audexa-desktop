@@ -447,14 +447,16 @@ export function useScenarios({
   )
 
   const playScenario = useCallback(
-    (id: string) => runScenario(id, false),
+    async (id: string): Promise<void> => {
+      await runScenario(id, false)
+    },
     [runScenario],
   )
 
-  const testScenario = useCallback(
-    (id: string) => runScenario(id, true),
-    [runScenario],
-  )
+  // const testScenario = useCallback(
+  //   (id: string) => runScenario(id, true),
+  //   [runScenario],
+  // )
 
   const stopScenario = useCallback(
     async (scenarioId: string) => {
@@ -518,7 +520,6 @@ export function useScenarios({
     saveStatuses,
     retrySaveScenario,
     playScenario,
-    testScenario,
     stopScenario,
     createScenario,
     updateScenario,

@@ -96,7 +96,6 @@ export default function App() {
     moveStep,
     validateScenario,
     roomIdsWithoutOutputs,
-    testScenario,
     isLoading: scenariosLoading,
     error: scenariosError,
     refetch: refetchScenarios,
@@ -245,7 +244,6 @@ export default function App() {
               rooms={rooms}
               audioFiles={audioFiles}
               onPlay={playScenario}
-              onTest={testScenario}
               onStop={stopScenario}
               onPause={pauseRoom}
               onResume={() => {

@@ -23,8 +23,7 @@ interface Props {
   onRetrySave: (id: string) => void
   rooms: Room[]
   audioFiles: AudioFile[]
-  onPlay: (id: string) => void
-  onTest: (id: string) => void
+  onPlay: (id: string) => void | Promise<void>
   onStop: (scenarioId: string) => void
   onPause: () => void
   onResume: () => void
@@ -70,7 +69,6 @@ export default function Scenarios({
   rooms,
   audioFiles,
   onPlay,
-  onTest,
   onStop,
   onPause,
   onResume,
@@ -276,7 +274,6 @@ export default function Scenarios({
               )?.state.status ?? (playback?.scenarioId === scenario?.id ? playback.status : undefined)
             }
             onPlay={onPlay}
-            onTest={onTest}
             onStop={() => { if (scenario) onStop(scenario.id) }}
             onPause={() => {
               const session = playbackSessions.find((item) => item.state.scenarioId === scenario?.id && item.state.status === "playing")
