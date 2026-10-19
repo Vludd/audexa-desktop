@@ -16,7 +16,6 @@ npm-debug.log*
 *.cache
 
 **/AppData/
-**/data/
 *.db
 *.db-shm
 *.db-wal
