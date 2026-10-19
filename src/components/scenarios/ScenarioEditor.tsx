@@ -64,6 +64,9 @@ export default function ScenarioEditor({
       file: "",
       delay: 0,
       duration: 0,
+      translationAudioFileId: null,
+      translationFile: "",
+      translationDuration: 0,
     })
   }
 

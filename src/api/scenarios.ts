@@ -7,6 +7,7 @@ interface BackendScenarioStep {
   roomId: string
   audioFileId: string
   delayMs: number
+  translationAudioFileId: string | null
 }
 
 interface BackendScenario {
@@ -32,7 +33,8 @@ interface ScenarioPayload {
   steps: Array<{
     roomId: string
     audioFileId: string
-      delayMs: number
+    delayMs: number
+    translationAudioFileId: string | null
   }>
 }
 
@@ -61,6 +63,9 @@ function mapScenario(
         const audio = context.audioFiles.find(
           (item) => item.id === step.audioFileId,
         )
+        const translationAudio = context.audioFiles.find(
+          (item) => item.id === step.translationAudioFileId,
+        )
 
         return {
           id: step.id,
@@ -68,8 +73,11 @@ function mapScenario(
           roomName: room?.name ?? "",
           audioFileId: step.audioFileId,
           file: audio?.filename ?? "",
-                delay: step.delayMs / 1000,
+          delay: step.delayMs / 1000,
           duration: audio?.duration ?? 0,
+          translationAudioFileId: step.translationAudioFileId ?? null,
+          translationFile: translationAudio?.filename ?? "",
+          translationDuration: translationAudio?.duration ?? 0,
         }
       }),
   }
@@ -87,6 +95,7 @@ function toPayload(scenario: Scenario): ScenarioPayload {
       roomId: step.roomId,
       audioFileId: step.audioFileId ?? "",
       delayMs: Math.round(step.delay * 1000),
+      translationAudioFileId: step.translationAudioFileId ?? null,
     })),
   }
 }

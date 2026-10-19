@@ -8,6 +8,9 @@ export interface ScenarioStep {
   file: string
   delay: number
   duration: number
+  translationAudioFileId: EntityId | null
+  translationFile: string
+  translationDuration: number
 }
 
 export type ScenarioStatus = "active" | "inactive"

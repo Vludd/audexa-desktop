@@ -99,6 +99,7 @@ export default function ScenarioStepsTable({
               <TableHead className="w-10">{t("scenarios.steps.step")}</TableHead>
               <TableHead>{t("scenarios.steps.room")}</TableHead>
               <TableHead>{t("scenarios.steps.audioFile")}</TableHead>
+              <TableHead>{t("scenarios.steps.translationAudio")}</TableHead>
               <TableHead className="w-[100px]">
                 {t("scenarios.steps.delayBeforeStartSeconds")}
               </TableHead>
@@ -219,6 +220,51 @@ export default function ScenarioStepsTable({
                         ))}
                       </SelectContent>
                     </Select>
+                  </TableCell>
+
+                  <TableCell>
+                    <div className="min-w-[170px] space-y-1">
+                      <Select
+                        value={step.translationAudioFileId ?? "__none__"}
+                        onValueChange={(fileId) => {
+                          const selected = fileId === "__none__"
+                            ? undefined
+                            : audioFiles.find((file) => file.id === fileId)
+                          onUpdateStep(step.id, {
+                            translationAudioFileId: selected?.id ?? null,
+                            translationFile: selected?.filename ?? "",
+                            translationDuration: selected?.duration ?? 0,
+                          })
+                        }}
+                      >
+                        <SelectTrigger
+                          className="h-8 w-full min-w-[170px] text-xs"
+                          aria-label={t("scenarios.steps.translationAudio")}
+                        >
+                          <SelectValue>
+                            {step.translationAudioFileId
+                              ? audioFiles.find((file) => file.id === step.translationAudioFileId)?.name ?? t("scenarios.steps.translationFileUnavailable")
+                              : t("scenarios.steps.noTranslation")}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">{t("scenarios.steps.noTranslation")}</SelectItem>
+                          {audioFiles.map((file) => (
+                            <SelectItem key={file.id} value={file.id}>
+                              {file.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {step.translationAudioFileId && step.duration > 0 && step.translationDuration > 0 && Math.abs(step.duration - step.translationDuration) >= 1 && (
+                        <p className="flex items-center gap-1 text-[10px] leading-tight text-amber-600 dark:text-amber-400" role="status">
+                          <span aria-hidden="true">⚠</span>
+                          {t("scenarios.steps.durationMismatch", {
+                            seconds: Math.round(Math.abs(step.duration - step.translationDuration)),
+                          })}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
 
                   <TableCell>

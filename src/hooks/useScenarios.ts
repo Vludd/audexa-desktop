@@ -371,6 +371,9 @@ export function useScenarios({
             file: step?.file ?? "",
             delay: step?.delay ?? 0,
             duration: step?.duration ?? 0,
+            translationAudioFileId: step?.translationAudioFileId ?? null,
+            translationFile: step?.translationFile ?? "",
+            translationDuration: step?.translationDuration ?? 0,
           }
 
           return { ...scenario, steps: [...scenario.steps, newStep] }
@@ -603,6 +606,8 @@ function canPersistScenario(
       rooms.some((room) => room.id === step.roomId) &&
       Boolean(step.audioFileId) &&
       audioFiles.some((file) => file.id === step.audioFileId) &&
+      (step.translationAudioFileId === null ||
+        audioFiles.some((file) => file.id === step.translationAudioFileId)) &&
       Number.isFinite(step.delay) &&
       step.delay >= 0,
   )
