@@ -1,0 +1,55 @@
+name: Build release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 1.0.1"
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Build payload
+        shell: pwsh
+        run: ./scripts/build.ps1
+      - name: Package update payload
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force update-payload | Out-Null
+          Copy-Item publish/desktop/* update-payload/ -Recurse -Force
+          Copy-Item publish/frontend update-payload/frontend -Recurse -Force
+          Copy-Item publish/backend update-payload/backend -Recurse -Force
+          Copy-Item publish/updater update-payload/updater -Recurse -Force
+          Compress-Archive -Path update-payload/* -DestinationPath Audexa-Update-${{ inputs.version }}-win-x64.zip
+          iscc /DAppVersion=${{ inputs.version }} installer/Audexa.iss
+          $hash = (Get-FileHash Audexa-Update-${{ inputs.version }}-win-x64.zip -Algorithm SHA256).Hash.ToLower()
+          @"
+          {
+            "version": "${{ inputs.version }}",
+            "packageUrl": "https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/Audexa-Update-${{ inputs.version }}-win-x64.zip",
+            "sha256": "$hash",
+            "releaseNotes": "See the GitHub release notes."
+          }
+          "@ | Set-Content latest.json
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Audexa v${{ inputs.version }}
+          files: |
+            Audexa-Update-${{ inputs.version }}-win-x64.zip
+            artifacts/installer/*
+            latest.json

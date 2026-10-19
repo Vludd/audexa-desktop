@@ -1,0 +1,41 @@
+# Node.js
+**/node_modules/
+**/dist/
+**/coverage/
+npm-debug.log*
+.env
+.env.*
+!.env.example
+
+# .NET
+**/bin/
+**/obj/
+**/publish/
+*.user
+*.suo
+*.cache
+
+**/AppData/
+**/data/
+*.db
+*.db-shm
+*.db-wal
+*.pfx
+*.p12
+*.key
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini
+
+/dist/
+/publish/
+*.exe
+*.msi
+*.zip
