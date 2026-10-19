@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { scenariosApi } from "@/api/scenarios"
 import { audioSettingsApi } from "@/api/audioSettings"
-import { playbackApi } from "@/api/playback"
+import { playbackApi, type PlaybackSession, type PlaybackState } from "@/api/playback"
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
 import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
@@ -31,6 +31,54 @@ export interface ScenarioValidation {
 interface ScenarioData {
   rooms: Room[]
   audioFiles: AudioFile[]
+}
+
+const ACTIVE_PLAYBACK_STATUSES = new Set(["playing", "paused", "waiting"])
+const PLAYBACK_START_TIMEOUT_MS = 15_000
+const PLAYBACK_POLL_INTERVAL_MS = 200
+
+async function waitForScenarioActivation(
+  scenarioId: string,
+  initialState: PlaybackState,
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  const startedAt = Date.now()
+  let state = initialState
+
+  while (Date.now() - startedAt < PLAYBACK_START_TIMEOUT_MS) {
+    if (state.scenarioId === scenarioId) {
+      if (state.status === "error") {
+        throw new Error(state.error || t("scenarios.errors.playbackFailed"))
+      }
+      if (ACTIVE_PLAYBACK_STATUSES.has(state.status)) return
+    }
+
+    const sessions: PlaybackSession[] = await playbackApi.getSessions()
+    queryClient.setQueryData<PlaybackSession[]>(["playback-sessions"], sessions)
+    const matchingSession = sessions.find((session) => session.state.scenarioId === scenarioId)
+
+    if (matchingSession) {
+      state = matchingSession.state
+      queryClient.setQueryData<PlaybackState>(["playback"], state)
+      if (state.status === "error") {
+        throw new Error(state.error || t("scenarios.errors.playbackFailed"))
+      }
+      if (ACTIVE_PLAYBACK_STATUSES.has(state.status)) return
+    } else {
+      state = await playbackApi.getState()
+      queryClient.setQueryData<PlaybackState>(["playback"], state)
+      if (state.scenarioId === scenarioId) {
+        if (state.status === "error") {
+          throw new Error(state.error || t("scenarios.errors.playbackFailed"))
+        }
+        if (ACTIVE_PLAYBACK_STATUSES.has(state.status)) return
+      }
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, PLAYBACK_POLL_INTERVAL_MS))
+  }
+
+  throw new Error(t("scenarios.errors.activationTimeout"))
 }
 
 export function useScenarios({
@@ -109,7 +157,7 @@ export function useScenarios({
   const saveMutation = useMutation({
     mutationFn: (scenario: Scenario) => {
       if (!canPersistScenario(scenario, rooms, audioFiles)) {
-        throw new Error("Сценарий содержит незаполненные или некорректные шаги")
+        throw new Error(t("scenarios.errors.invalidConfiguration"))
       }
       return scenariosApi.update(scenario, context)
     },
@@ -148,7 +196,7 @@ export function useScenarios({
       }
 
       setSaveStatuses((current) => ({ ...current, [submitted.id]: "error" }))
-      toast.error("Не удалось сохранить сценарий", {
+      toast.error(t("scenarios.errors.saveFailed"), {
         description: error instanceof Error ? error.message : String(error),
       })
     },
@@ -221,7 +269,7 @@ export function useScenarios({
       setSaveStatuses((current) => ({ ...current, [created.id]: "saved" }))
     },
     onError: (error) => {
-      toast.error("Не удалось создать сценарий", {
+      toast.error(t("scenarios.errors.createFailed"), {
         description: error instanceof Error ? error.message : String(error),
       })
     },
@@ -277,7 +325,7 @@ export function useScenarios({
       updateCache((current) => current.filter((scenario) => scenario.id !== id))
     },
     onError: (error) => {
-      toast.error("Не удалось удалить сценарий", {
+      toast.error(t("scenarios.errors.deleteFailed"), {
         description: error instanceof Error ? error.message : String(error),
       })
     },
@@ -293,7 +341,7 @@ export function useScenarios({
   const duplicateScenario = useCallback(
     async (id: string): Promise<string> => {
       const source = latestScenarios.current.find((item) => item.id === id)
-      if (!source) throw new Error("Scenario not found")
+      if (!source) throw new Error(t("scenarios.errors.notFound"))
 
       const copy: Scenario = {
         ...structuredClone(source),
@@ -400,9 +448,10 @@ export function useScenarios({
   )
 
   const runScenario = useCallback(
-    async (id: string, isTestRun: boolean) => {
+    async (id: string, isTestRun: boolean): Promise<void> => {
       try {
         const pendingTimer = saveTimers.current[id]
+
         if (pendingTimer) {
           clearTimeout(pendingTimer)
           delete saveTimers.current[id]
@@ -411,39 +460,49 @@ export function useScenarios({
         await saveChains.current[id]?.catch(() => undefined)
 
         const latest = latestScenarios.current.find((item) => item.id === id)
-        if (!latest) throw new Error("Сценарий не найден в текущем состоянии приложения")
-        if (!canPersistScenario(latest, rooms, audioFiles)) {
-          throw new Error("Сначала заполните все шаги сценария и исправьте ошибки конфигурации")
+
+        if (!latest) {
+          throw new Error(t("scenarios.errors.notFound"))
         }
 
-        // Persist the exact version the operator is about to run. This prevents
-        // a debounced autosave from leaving the backend with an older scenario.
+        if (!canPersistScenario(latest, rooms, audioFiles)) {
+          throw new Error(t("scenarios.errors.invalidConfiguration"))
+        }
+
         setSaveStatuses((current) => ({ ...current, [id]: "saving" }))
-        try {
-          await saveMutation.mutateAsync(latest)
-        } catch {
-          // The mutation already reports and records the save failure.
+
+        await saveMutation.mutateAsync(latest)
+
+        const validation = await scenariosApi.validate(id)
+
+        if (!validation.valid) {
+          throw new Error(
+            validation.errors.join("\n") || t("scenarios.errors.validationFailed"),
+          )
+        }
+
+        const startState = await playbackApi.startScenario(id)
+
+        queryClient.setQueryData<PlaybackState>(["playback"], startState)
+
+        await waitForScenarioActivation(id, startState, queryClient)
+
+        if (isTestRun) {
+          toast.info(t("scenarios.notifications.testRunStarted"))
+        }
+      } catch (error) {
+        if (isTestRun) {
+          toast.error(t("scenarios.errors.testRunFailed"), {
+            description: error instanceof Error ? error.message : String(error),
+          })
+
           return
         }
 
-        const validation = await scenariosApi.validate(id)
-        if (!validation.valid) {
-          throw new Error(validation.errors.join("\n") || "Сценарий не прошёл проверку")
-        }
-
-        await playbackApi.startScenario(id)
-        if (isTestRun) {
-          toast.info("Тестовый запуск начат: звук будет воспроизводиться через выбранные аудиовыходы.")
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        toast.error(
-          isTestRun ? "Не удалось выполнить тестовый запуск" : "Не удалось запустить сценарий",
-          { description: message },
-        )
+        throw error
       }
     },
-    [audioFiles, rooms, saveMutation],
+    [audioFiles, rooms, queryClient, saveMutation],
   )
 
   const playScenario = useCallback(
@@ -452,11 +511,6 @@ export function useScenarios({
     },
     [runScenario],
   )
-
-  // const testScenario = useCallback(
-  //   (id: string) => runScenario(id, true),
-  //   [runScenario],
-  // )
 
   const stopScenario = useCallback(
     async (scenarioId: string) => {
@@ -468,7 +522,7 @@ export function useScenarios({
         )
         await Promise.all(matching.map((session) => playbackApi.stopSession(session.sessionId)))
       } catch (error) {
-        toast.error("Не удалось остановить сценарий", {
+        toast.error(t("scenarios.errors.stopFailed"), {
           description: error instanceof Error ? error.message : String(error),
         })
       }

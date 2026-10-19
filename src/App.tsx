@@ -285,6 +285,9 @@ export default function App() {
               onRetry={() => {
                 void refetchScenarios()
               }}
+              onNavigate={(nextPage) =>
+                setPage(nextPage as Page)
+              }
             />
           )}
 

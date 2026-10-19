@@ -49,6 +49,7 @@ interface Props {
   connectionState: BackendConnectionState
   error?: unknown
   onRetry?: () => void
+  onNavigate: (page: string) => void
 }
 
 const createDraft: Scenario = {
@@ -90,6 +91,7 @@ export default function Scenarios({
   connectionState,
   error,
   onRetry,
+  onNavigate
 }: Props) {
   const [selected, setSelected] = useState<string | null>(scenarios[0]?.id ?? null)
   const [query, setQuery] = useState("")
@@ -286,6 +288,7 @@ export default function Scenarios({
               else onResume()
             }}
             onValidate={onValidate}
+            onNavigate={onNavigate}
           />
             </>
           )}

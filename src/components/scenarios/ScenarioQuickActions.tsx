@@ -3,6 +3,7 @@ import {
   LoaderCircle,
   Pause,
   Play,
+  Radio,
   Square,
 } from "lucide-react"
 
@@ -13,7 +14,7 @@ import type { Scenario } from "@/types"
 import type { ScenarioValidation } from "@/hooks/useScenarios"
 import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 interface Props {
   scenario?: Scenario
@@ -23,6 +24,7 @@ interface Props {
   onPause: () => void
   onResume: () => void
   onValidate: (scenario: Scenario) => ScenarioValidation
+  onNavigate: (page: string) => void
 }
 
 export default function ScenarioQuickActions({
@@ -33,14 +35,16 @@ export default function ScenarioQuickActions({
   onPause,
   onResume,
   onValidate,
+  onNavigate
 }: Props) {
   const validation = scenario ? onValidate(scenario) : null
   const canRun = Boolean(scenario) && scenario?.status === "active" && Boolean(validation?.valid)
   const isThisScenario = Boolean(scenario && ["starting", "playing", "paused", "waiting"].includes(playbackStatus ?? ""))
   const [isStarting, setIsStarting] = useState(false)
+  const startLock = useRef(false)
 
   const handlePlay = async () => {
-    if (!scenario || !validation || !canRun || isStarting) return
+    if (!scenario || !validation || !canRun || startLock.current || isStarting || isThisScenario) return
 
     if (!validation.valid) {
       toast.error(t("scenarios.quickActions.cannotRun"), {
@@ -49,12 +53,19 @@ export default function ScenarioQuickActions({
       return
     }
 
+    startLock.current = true
+    setIsStarting(true)
     try {
-      setIsStarting(true)
       await onPlay(scenario.id)
-    } catch {
-      toast.error(t("scenarios.quickActions.cannotRun"))
+    } catch (error) {
+      toast.error(t("scenarios.quickActions.cannotRun"), {
+        description:
+          error instanceof Error
+            ? error.message
+            : t("scenarios.errors.startFailed"),
+      })
     } finally {
+      startLock.current = false
       setIsStarting(false)
     }
   }
@@ -77,13 +88,13 @@ export default function ScenarioQuickActions({
             <Play className="size-4" fill="currentColor" />
           )}
 
-          {isStarting ? "Запуск…" : t("scenarios.quickActions.run")}
+          {isStarting ? t("common.starting") : t("scenarios.quickActions.run")}
         </Button>
 
         {playbackStatus === "paused" ? (
           <Button type="button" variant="outline" className="w-full justify-start" onClick={onResume}>
             <Play className="size-4" />
-            Продолжить
+            {t("common.resume")}
           </Button>
         ) : (
           <Button
@@ -109,20 +120,20 @@ export default function ScenarioQuickActions({
           {t("scenarios.quickActions.stop")}
         </Button>
 
-        {/* <Button
+        <Separator />
+
+        <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="w-full justify-start"
-          disabled={!canRun || isThisScenario}
-          onClick={() => scenario && onTest(scenario.id)}
+          className="w-full justify-start gap-2.5"
+          onClick={() => {
+            window.location.hash = "audio-device-settings"
+            onNavigate("settings")
+          }}
         >
-          <Headphones className="size-3.5" />
-          Тестовый запуск
+          <Radio className="size-4" />
+          {t("dashboard.quickActions.testOutputs")}
         </Button>
-        <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">
-          Тестовый запуск воспроизводит звук через выбранные аудиовыходы.
-        </p> */}
       </div>
 
       {scenario && !validation?.valid && (
