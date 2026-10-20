@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from "react"
 import { AlertCircle, CheckCircle2, Download, RefreshCw } from "lucide-react"
 
@@ -36,32 +37,46 @@ function getWebViewBridge(): WebViewBridge | null {
 export default function UpdateSettings() {
   const isDesktop = isDesktopApp()
 
-  const [update, setUpdate] = useState<UpdateCheckResponse | null>(null)
+  const [update, setUpdate] = useState<UpdateCheckResponse | null>(
+    () => updatesApi.getCached(),
+  )
+
   const [isChecking, setIsChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null)
   const [installRequested, setInstallRequested] = useState(false)
 
-  const checkForUpdates = useCallback(async () => {
-    if (!isDesktop) return
+  const [hasLoaded, setHasLoaded] = useState(
+    () => Boolean(updatesApi.getCached()),
+  )
 
-    setIsChecking(true)
-    setError(null)
+  const isLoading = isChecking || (isDesktop && !hasLoaded)
 
-    try {
-      const result = await updatesApi.check()
-      setUpdate(result)
-      setLastCheckedAt(new Date())
-    } catch (checkError) {
-      setError(
-        checkError instanceof Error
-          ? checkError.message
-          : t("settings.updates.checkFailed"),
-      )
-    } finally {
-      setIsChecking(false)
-    }
-  }, [isDesktop])
+  const checkForUpdates = useCallback(
+    async (force = false) => {
+      if (!isDesktop) return
+
+      setIsChecking(true)
+      setError(null)
+
+      try {
+        const result = await updatesApi.check(force)
+        setUpdate(result)
+        setLastCheckedAt(new Date())
+        setHasLoaded(true)
+      } catch (checkError) {
+        setError(
+          checkError instanceof Error
+            ? checkError.message
+            : t("settings.updates.checkFailed"),
+        )
+        setHasLoaded(true)
+      } finally {
+        setIsChecking(false)
+      }
+    },
+    [isDesktop],
+  )
 
   useEffect(() => {
     const bridge = getWebViewBridge()
@@ -82,6 +97,38 @@ export default function UpdateSettings() {
       bridge.removeEventListener("message", handleBridgeMessage)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isDesktop || updatesApi.getCached()) {
+      return
+    }
+
+    let cancelled = false
+
+    updatesApi.check().then(
+      (result) => {
+        if (cancelled) return
+
+        setUpdate(result)
+        setLastCheckedAt(new Date())
+        setHasLoaded(true)
+      },
+      (checkError: unknown) => {
+        if (cancelled) return
+
+        setError(
+          checkError instanceof Error
+            ? checkError.message
+            : t("settings.updates.checkFailed"),
+        )
+        setHasLoaded(true)
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [isDesktop])
 
   const installUpdate = () => {
     if (!isDesktop) return
@@ -148,7 +195,7 @@ export default function UpdateSettings() {
               )}
             </div>
 
-            {isChecking && (
+            {isLoading && (
               <p
                 className="flex items-center gap-2 text-sm text-muted-foreground"
                 role="status"
@@ -158,7 +205,7 @@ export default function UpdateSettings() {
               </p>
             )}
 
-            {!isChecking && update && !update.updateAvailable && (
+            {!isLoading && update && !update.updateAvailable && (
               <p
                 className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"
                 role="status"
@@ -168,7 +215,7 @@ export default function UpdateSettings() {
               </p>
             )}
 
-            {!isChecking && update?.updateAvailable && (
+            {!isLoading && update?.updateAvailable && (
               <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
                 <p className="flex items-center gap-2 text-sm font-medium">
                   <Download className="size-4" />
@@ -214,11 +261,11 @@ export default function UpdateSettings() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => void checkForUpdates()}
-                  disabled={isChecking || installRequested}
+                  onClick={() => void checkForUpdates(true)}
+                  disabled={isLoading || installRequested}
                 >
                   <RefreshCw
-                    className={isChecking ? "animate-spin" : ""}
+                    className={isLoading ? "animate-spin" : ""}
                   />
                   {t("settings.updates.checkButton")}
                 </Button>
@@ -227,7 +274,7 @@ export default function UpdateSettings() {
                   <Button
                     type="button"
                     onClick={installUpdate}
-                    disabled={isChecking || installRequested}
+                    disabled={isLoading || installRequested}
                   >
                     <Download />
                     {t("settings.updates.installButton")}
