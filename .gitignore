@@ -38,3 +38,11 @@ Desktop.ini
 *.exe
 *.msi
 *.zip
+
+# Generated build and release artifacts
+**/bin/
+**/obj/
+/publish/
+/update-payload/
+/artifacts/installer/
+

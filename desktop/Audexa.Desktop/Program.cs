@@ -125,8 +125,7 @@ internal sealed class MainForm : Form
             {
                 WorkingDirectory = Path.GetDirectoryName(backendExe)!,
                 UseShellExecute = false,
-                CreateNoWindow = false,
-                WindowStyle = ProcessWindowStyle.Normal,
+                CreateNoWindow = true,
             };
 
             // Keep the local API inaccessible from the LAN.
