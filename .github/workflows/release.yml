@@ -1,4 +1,6 @@
+
 name: Build release
+
 on:
   workflow_dispatch:
     inputs:
@@ -6,50 +8,200 @@ on:
         description: "Release version, e.g. 1.0.1"
         required: true
         type: string
+
 permissions:
   contents: write
+
 jobs:
   release:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.15.1
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - uses: actions/setup-dotnet@v4
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
       - name: Install Inno Setup
+        shell: pwsh
         run: choco install innosetup --yes --no-progress
+
+      - name: Validate release version
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $Version = $env:RELEASE_VERSION
+
+          if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid version '$Version'. Expected MAJOR.MINOR.PATCH."
+          }
+
+          $Tag = "v$Version"
+
+          git fetch --tags --force
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to fetch Git tags."
+          }
+
+          $ExistingTag = git tag --list $Tag
+          if ($ExistingTag) {
+            throw "Git tag $Tag already exists. Choose a new version."
+          }
+
+          Write-Host "Validated release version: $Version"
+
       - name: Build payload
         shell: pwsh
         run: ./scripts/build.ps1
+
       - name: Package update payload
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          New-Item -ItemType Directory -Force update-payload | Out-Null
-          Copy-Item publish/desktop/* update-payload/ -Recurse -Force
-          Copy-Item publish/frontend update-payload/frontend -Recurse -Force
-          Copy-Item publish/backend update-payload/backend -Recurse -Force
-          Copy-Item publish/updater update-payload/updater -Recurse -Force
-          Compress-Archive -Path update-payload/* -DestinationPath Audexa-Update-${{ inputs.version }}-win-x64.zip
-          iscc /DAppVersion=${{ inputs.version }} installer/Audexa.iss
-          $hash = (Get-FileHash Audexa-Update-${{ inputs.version }}-win-x64.zip -Algorithm SHA256).Hash.ToLower()
-          @"
-          {
-            "version": "${{ inputs.version }}",
-            "packageUrl": "https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/Audexa-Update-${{ inputs.version }}-win-x64.zip",
-            "sha256": "$hash",
-            "releaseNotes": "See the GitHub release notes."
+          $ErrorActionPreference = "Stop"
+
+          $Version = $env:RELEASE_VERSION
+          $Tag = "v$Version"
+          $ArchiveName = "Audexa-Update-$Version-win-x64.zip"
+          $InstallerName = "Audexa-Setup-$Version-x64.exe"
+
+          $RequiredFiles = @(
+            "publish\desktop\Audexa.Desktop.exe",
+            "publish\backend\audexa-backend.exe",
+            "publish\updater\Audexa.Updater.exe",
+            "publish\frontend\index.html"
+          )
+
+          foreach ($File in $RequiredFiles) {
+            if (-not (Test-Path $File -PathType Leaf)) {
+              throw "Required build file is missing: $File"
+            }
           }
-          "@ | Set-Content latest.json
-      - uses: softprops/action-gh-release@v2
+
+          if (Test-Path "update-payload") {
+            Remove-Item "update-payload" -Recurse -Force
+          }
+
+          if (Test-Path $ArchiveName) {
+            Remove-Item $ArchiveName -Force
+          }
+
+          New-Item -ItemType Directory -Force "update-payload" | Out-Null
+
+          # Desktop application files go directly into the ZIP root.
+          Copy-Item "publish\desktop\*" "update-payload\" -Recurse -Force
+
+          # Other components retain their directory structure.
+          Copy-Item "publish\frontend" "update-payload\frontend" -Recurse -Force
+          Copy-Item "publish\backend" "update-payload\backend" -Recurse -Force
+          Copy-Item "publish\updater" "update-payload\updater" -Recurse -Force
+
+          # Create the ZIP from the directory itself.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            (Join-Path $PWD "update-payload"),
+            (Join-Path $PWD $ArchiveName),
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false
+          )
+
+          if (-not (Test-Path $ArchiveName -PathType Leaf)) {
+            throw "Update archive was not created."
+          }
+
+          # Verify the expected archive layout.
+          $Zip = [System.IO.Compression.ZipFile]::OpenRead(
+            (Join-Path $PWD $ArchiveName)
+          )
+
+          try {
+            $Entries = @($Zip.Entries | ForEach-Object { $_.FullName })
+
+            $RequiredEntries = @(
+              "Audexa.Desktop.exe",
+              "backend/audexa-backend.exe",
+              "frontend/index.html",
+              "updater/Audexa.Updater.exe"
+            )
+
+            foreach ($Entry in $RequiredEntries) {
+              if ($Entries -notcontains $Entry) {
+                throw "Required entry is missing from ZIP: $Entry"
+              }
+            }
+
+            if ($Entries | Where-Object { $_ -like "update-payload/*" }) {
+              throw "Unexpected update-payload directory inside ZIP."
+            }
+          }
+          finally {
+            $Zip.Dispose()
+          }
+
+          # Compile the installer using the same release version.
+          iscc "/DAppVersion=$Version" "installer/Audexa.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed with exit code $LASTEXITCODE."
+          }
+
+          $InstallerPath = "artifacts\installer\$InstallerName"
+
+          if (-not (Test-Path $InstallerPath -PathType Leaf)) {
+            throw "Installer was not created: $InstallerPath"
+          }
+
+          # Hash the exact ZIP that will be published.
+          $Hash = (Get-FileHash $ArchiveName -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          $Manifest = @{
+            version      = $Version
+            packageUrl   = "https://github.com/$env:REPOSITORY/releases/download/$Tag/$ArchiveName"
+            sha256       = $Hash
+            releaseNotes = "See the GitHub release notes."
+          }
+
+          $Manifest |
+            ConvertTo-Json -Depth 3 |
+            Set-Content "latest.json" -Encoding utf8
+
+          Write-Host "Version:   $Version"
+          Write-Host "Archive:   $ArchiveName"
+          Write-Host "SHA256:    $Hash"
+          Write-Host "Installer: $InstallerPath"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ inputs.version }}
           name: Audexa v${{ inputs.version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             Audexa-Update-${{ inputs.version }}-win-x64.zip
-            artifacts/installer/*
+            artifacts/installer/Audexa-Setup-${{ inputs.version }}-x64.exe
             latest.json

@@ -1,7 +1,9 @@
+
 #define AppName "Audexa"
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
+
 [Setup]
 AppId={{8C7F51DA-9C6A-4E2D-8F9B-0F3E8D2D11A7}
 AppName={#AppName}
@@ -10,7 +12,7 @@ DefaultDirName={localappdata}\Programs\Audexa
 DefaultGroupName=Audexa
 OutputDir=..\artifacts\installer
 OutputBaseFilename=Audexa-Setup-{#AppVersion}-x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 Compression=lzma2
 SolidCompression=yes
