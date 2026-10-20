@@ -12,9 +12,19 @@ string Arg(string name)
         a.Equals(name, StringComparison.OrdinalIgnoreCase));
 
     if (i < 0 || i + 1 >= args.Length)
-        throw new ArgumentException($"РќРµ СѓРєР°Р·Р°РЅ Р°СЂРіСѓРјРµРЅС‚ {name}.");
+        throw new ArgumentException($"Required argument is missing: {name}.");
 
     return args[i + 1].Trim('"');
+}
+
+string? OptionalArg(string name)
+{
+    var i = Array.FindIndex(args, a =>
+        a.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    return i < 0 || i + 1 >= args.Length
+        ? null
+        : args[i + 1].Trim('"');
 }
 
 bool HasFlag(string name) =>
@@ -23,19 +33,22 @@ bool HasFlag(string name) =>
 string target = Path.GetFullPath(Arg("--target"));
 string url = Arg("--url");
 string expectedHash = Arg("--sha256");
-int pid = int.TryParse(Arg("--pid"), out var parsed) ? parsed : -1;
+string? optionalPid = OptionalArg("--pid");
+int pid = int.TryParse(optionalPid, out var parsed) && parsed > 0
+    ? parsed
+    : -1;
 
 if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
     uri.Scheme != Uri.UriSchemeHttps)
 {
     throw new InvalidDataException(
-        "URL РѕР±РЅРѕРІР»РµРЅРёСЏ РґРѕР»Р¶РµРЅ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ HTTPS.");
+        "Update URL must use HTTPS.");
 }
 
 if (expectedHash.Length != 64 || !expectedHash.All(Uri.IsHexDigit))
 {
     throw new InvalidDataException(
-        "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ SHA-256 РІ РјР°РЅРёС„РµСЃС‚Рµ.");
+        "The manifest contains an invalid SHA-256 hash.");
 }
 
 string appPath = Path.Combine(target, "Audexa.Desktop.exe");
@@ -43,7 +56,7 @@ string appPath = Path.Combine(target, "Audexa.Desktop.exe");
 if (!File.Exists(appPath))
 {
     throw new DirectoryNotFoundException(
-        $"РќРµ РЅР°Р№РґРµРЅРѕ РїСЂРёР»РѕР¶РµРЅРёРµ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ: {appPath}");
+        $"Application executable not found for update: {appPath}");
 }
 
 if (!HasFlag("--bootstrap-copy"))
@@ -65,7 +78,7 @@ if (!HasFlag("--bootstrap-copy"))
 
     string processPath = Environment.ProcessPath
         ?? throw new InvalidOperationException(
-            "РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ РёСЃРїРѕР»РЅСЏРµРјС‹Р№ С„Р°Р№Р» РѕР±РЅРѕРІР»СЏС‚РѕСЂР°.");
+            "Could not determine the updater executable path.");
 
     string executable = Path.Combine(
         bootstrapDirectory, Path.GetFileName(processPath));
@@ -87,7 +100,7 @@ if (!HasFlag("--bootstrap-copy"))
     if (bootstrapProcess is null)
     {
         throw new InvalidOperationException(
-            "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ РєРѕРїРёСЋ РѕР±РЅРѕРІР»СЏС‚РѕСЂР°.");
+            "Could not start the updater bootstrap process.");
     }
 
     bootstrapProcess.Dispose();
@@ -125,7 +138,7 @@ try
                 if (!process.WaitForExit(10000))
                 {
                     throw new TimeoutException(
-                        "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РІРµСЂС€РёС‚СЊ Audexa РїРµСЂРµРґ РѕР±РЅРѕРІР»РµРЅРёРµРј.");
+                        "Could not stop Audexa before applying the update.");
                 }
             }
         }
@@ -152,7 +165,7 @@ try
             length > MaxArchiveSize)
         {
             throw new InvalidDataException(
-                "РђСЂС…РёРІ РѕР±РЅРѕРІР»РµРЅРёСЏ РїСЂРµРІС‹С€Р°РµС‚ РґРѕРїСѓСЃС‚РёРјС‹Р№ СЂР°Р·РјРµСЂ.");
+                "Update archive exceeds the maximum allowed size.");
         }
 
         await using var input = await response.Content.ReadAsStreamAsync();
@@ -175,7 +188,7 @@ try
             if (total > MaxArchiveSize)
             {
                 throw new InvalidDataException(
-                    "РђСЂС…РёРІ РѕР±РЅРѕРІР»РµРЅРёСЏ РїСЂРµРІС‹С€Р°РµС‚ РґРѕРїСѓСЃС‚РёРјС‹Р№ СЂР°Р·РјРµСЂ.");
+                    "Update archive exceeds the maximum allowed size.");
             }
 
             await output.WriteAsync(buffer.AsMemory(0, read));
@@ -190,7 +203,7 @@ try
         if (!CryptographicOperations.FixedTimeEquals(actual, expected))
         {
             throw new CryptographicException(
-                "SHA-256 РЅРµ СЃРѕРІРїР°РґР°РµС‚. РћР±РЅРѕРІР»РµРЅРёРµ РѕС‚РјРµРЅРµРЅРѕ.");
+                "SHA-256 mismatch. Update cancelled.");
         }
     }
 
@@ -210,7 +223,7 @@ try
                 normalized.Contains(':'))
             {
                 throw new InvalidDataException(
-                    "РђСЂС…РёРІ СЃРѕРґРµСЂР¶РёС‚ РЅРµРґРѕРїСѓСЃС‚РёРјС‹Р№ РїСѓС‚СЊ.");
+                    "Archive contains an invalid path.");
             }
 
             string destination = Path.GetFullPath(
@@ -220,7 +233,7 @@ try
                 root, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException(
-                    "РћР±РЅР°СЂСѓР¶РµРЅ РІС‹С…РѕРґ Р·Р° РїСЂРµРґРµР»С‹ РєР°С‚Р°Р»РѕРіР° СЂР°СЃРїР°РєРѕРІРєРё.");
+                    "Archive entry resolves outside the extraction directory.");
             }
 
             int unixType = (entry.ExternalAttributes >> 16) & 0xF000;
@@ -228,7 +241,7 @@ try
             if (unixType == 0xA000)
             {
                 throw new InvalidDataException(
-                    "РђСЂС…РёРІ СЃРѕРґРµСЂР¶РёС‚ СЃРёРјРІРѕР»РёС‡РµСЃРєСѓСЋ СЃСЃС‹Р»РєСѓ.");
+                    "Archive contains a symbolic link.");
             }
 
             extractedSize += entry.Length;
@@ -236,7 +249,7 @@ try
             if (extractedSize > MaxExtractedSize)
             {
                 throw new InvalidDataException(
-                    "Р Р°СЃРїР°РєРѕРІР°РЅРЅС‹Р№ Р°СЂС…РёРІ РїСЂРµРІС‹С€Р°РµС‚ РґРѕРїСѓСЃС‚РёРјС‹Р№ СЂР°Р·РјРµСЂ.");
+                    "Extracted archive exceeds the maximum allowed size.");
             }
         }
 
@@ -249,7 +262,7 @@ try
         !File.Exists(Path.Combine(staged, "frontend", "index.html")))
     {
         throw new InvalidDataException(
-            "РђСЂС…РёРІ РЅРµ СЃРѕРґРµСЂР¶РёС‚ РІСЃРµС… РѕР±СЏР·Р°С‚РµР»СЊРЅС‹С… С„Р°Р№Р»РѕРІ Audexa.");
+            "Archive is missing one or more required Audexa files.");
     }
 
     var originalFiles = Directory.EnumerateFiles(
@@ -303,7 +316,7 @@ try
     if (app is null)
     {
         throw new InvalidOperationException(
-            "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ РѕР±РЅРѕРІР»С‘РЅРЅСѓСЋ Audexa.");
+            "Could not start the updated Audexa application.");
     }
 
     using (app)
@@ -311,21 +324,21 @@ try
         if (app.WaitForExit(7000))
         {
             throw new InvalidOperationException(
-                $"Audexa Р·Р°РІРµСЂС€РёР»Р°СЃСЊ СЃСЂР°Р·Сѓ РїРѕСЃР»Рµ Р·Р°РїСѓСЃРєР° (РєРѕРґ {app.ExitCode}).");
+                $"Audexa exited shortly after launch (exit code {app.ExitCode}).");
         }
     }
 
-    Console.WriteLine("РћР±РЅРѕРІР»РµРЅРёРµ Audexa СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ.");
+    Console.WriteLine("Audexa update installed successfully.");
 }
 catch (Exception ex)
 {
     Console.Error.WriteLine(
-        $"РќРµ СѓРґР°Р»РѕСЃСЊ СѓСЃС‚Р°РЅРѕРІРёС‚СЊ РѕР±РЅРѕРІР»РµРЅРёРµ Audexa: {ex.Message}");
+        $"Failed to install the Audexa update: {ex.Message}");
 
     if (snapshotComplete && updateStarted)
     {
         Console.Error.WriteLine(
-            "Р’С‹РїРѕР»РЅСЏРµС‚СЃСЏ РѕС‚РєР°С‚ Рє РїСЂРµРґС‹РґСѓС‰РµР№ РІРµСЂСЃРёРё.");
+            "Rolling back to the previous version.");
 
         try
         {
@@ -354,12 +367,12 @@ catch (Exception ex)
             }
 
             Console.Error.WriteLine(
-                "РџСЂРµРґС‹РґСѓС‰Р°СЏ РІРµСЂСЃРёСЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅР°.");
+                "Previous version restored successfully.");
         }
         catch (Exception rollbackError)
         {
             Console.Error.WriteLine(
-                $"РћС€РёР±РєР° РѕС‚РєР°С‚Р°: {rollbackError.Message}");
+                $"Rollback failed: {rollbackError.Message}");
         }
     }
 
