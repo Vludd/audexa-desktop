@@ -6,6 +6,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$AssemblyVersion = "$(($Version -split '-')[0]).0"
+
 $Root = Split-Path -Parent $PSScriptRoot
 $Frontend = Join-Path $Root "frontend"
 $Publish = Join-Path $Root "publish"
@@ -43,8 +45,8 @@ function Publish-DotNetProject {
         "--self-contained", "true",
         "-p:PublishSingleFile=true",
         "-p:Version=$Version",
-        "-p:AssemblyVersion=$Version.0",
-        "-p:FileVersion=$Version.0",
+        "-p:AssemblyVersion=$AssemblyVersion",
+        "-p:FileVersion=$AssemblyVersion",
         "-p:InformationalVersion=$Version",
         "-o", $OutputPath
     )
@@ -87,7 +89,7 @@ Copy-Item (Join-Path $FrontendOutput "*") $PublishFrontend -Recurse -Force
 
 # Publish backend
 Publish-DotNetProject `
-    -ProjectPath (Join-Path $Root "backend\audexa-backend.csproj") `
+    -ProjectPath (Join-Path $Root "backend\audexa-backend\audexa-backend.csproj") `
     -OutputPath (Join-Path $Publish "backend")
 
 # Publish desktop shell
