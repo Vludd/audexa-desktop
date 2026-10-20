@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, e.g. 1.0.3"
+        description: "Release version, e.g. 1.0.4"
         required: true
         type: string
 
@@ -72,7 +72,11 @@ jobs:
 
       - name: Build payload
         shell: pwsh
-        run: ./scripts/build.ps1
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          ./scripts/build.ps1 -Version $env:RELEASE_VERSION
 
       - name: Package update payload
         shell: pwsh
