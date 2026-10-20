@@ -1,7 +1,7 @@
-
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -20,17 +20,6 @@ internal static class Program
 internal sealed class MainForm : Form
 {
     private readonly WebView2 _web = new() { Dock = DockStyle.Fill };
-    private readonly Label _status = new()
-    {
-        AutoSize = true,
-        Text = "Запуск Audexa…"
-    };
-    private readonly Button _updateButton = new()
-    {
-        Text = "Проверить обновления",
-        AutoSize = true
-    };
-
     private Process? _backend;
 
     private readonly string _installDir = ResolveInstallDir();
@@ -51,22 +40,7 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1000, 650);
 
-        var top = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Top,
-            Height = 38,
-            Padding = new Padding(8, 4, 8, 4),
-            WrapContents = false
-        };
-
-        top.Controls.Add(_status);
-        top.Controls.Add(_updateButton);
-
         Controls.Add(_web);
-        Controls.Add(top);
-
-        _updateButton.Click += async (_, _) =>
-            await CheckForUpdatesAsync(showUpToDate: true);
 
         Shown += async (_, _) => await StartAppAsync();
         FormClosing += (_, _) => StopBackend();
@@ -184,6 +158,7 @@ internal sealed class MainForm : Form
             await _web.EnsureCoreWebView2Async();
 
             _web.CoreWebView2.Settings.AreDevToolsEnabled = true;
+            _web.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
 
             _web.CoreWebView2.NavigationCompleted += (_, e) =>
             {
@@ -215,17 +190,9 @@ internal sealed class MainForm : Form
             _web.Source = new Uri(
                 "https://appassets.audexa/index.html");
 
-            var version = Assembly.GetExecutingAssembly()
-                .GetName().Version;
-
-            _status.Text = $"Audexa {version} • Backend online";
-
-            _ = CheckForUpdatesAsync(showUpToDate: false);
         }
         catch (Exception ex)
         {
-            _status.Text = "Ошибка запуска";
-
             MessageBox.Show(
                 ex.Message,
                 "Audexa",
@@ -234,116 +201,102 @@ internal sealed class MainForm : Form
         }
     }
 
-    private async Task CheckForUpdatesAsync(bool showUpToDate)
+    private async void OnWebMessageReceived(
+        object? sender,
+        CoreWebView2WebMessageReceivedEventArgs e)
     {
-        _updateButton.Enabled = false;
+        // Only accept commands from the bundled application UI, never arbitrary pages.
+        if (!Uri.TryCreate(e.Source, UriKind.Absolute, out var source) ||
+            source.Scheme != Uri.UriSchemeHttps ||
+            source.Host != "appassets.audexa")
+        {
+            return;
+        }
 
         try
         {
-            using var client = new HttpClient
+            using var message = JsonDocument.Parse(e.WebMessageAsJson);
+            if (!message.RootElement.TryGetProperty("type", out var type) ||
+                type.GetString() != "install-update")
             {
-                Timeout = TimeSpan.FromSeconds(15)
-            };
-
-            var manifest = await client.GetFromJsonAsync<ReleaseManifest>(
-                ManifestUrl)
-                ?? throw new InvalidDataException(
-                    "Пустой release manifest.");
-
-            var current = Assembly.GetExecutingAssembly()
-                .GetName().Version ?? new Version(1, 0, 0);
-
-            if (!Version.TryParse(manifest.Version, out var available))
-            {
-                throw new InvalidDataException(
-                    "Некорректная версия в manifest.");
-            }
-
-            if (available <= current)
-            {
-                if (showUpToDate)
-                {
-                    MessageBox.Show(
-                        "Установлена актуальная версия Audexa.",
-                        "Обновления");
-                }
-
                 return;
             }
 
-            var answer = MessageBox.Show(
-                $"Доступна Audexa {available} (установлена {current}).\n\n" +
-                $"{manifest.ReleaseNotes}\n\n" +
-                "Скачать и установить обновление?",
-                "Доступно обновление",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Information);
-
-            if (answer != DialogResult.Yes)
-                return;
-
-            var updater = Path.Combine(
-                _installDir,
-                "updater",
-                "Audexa.Updater.exe");
-
-            if (!File.Exists(updater))
-            {
-                throw new FileNotFoundException(
-                    "Не найден updater.",
-                    updater);
-            }
-
-            
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = updater,
-                WorkingDirectory = Path.GetDirectoryName(updater)!,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            startInfo.ArgumentList.Add("--url");
-            startInfo.ArgumentList.Add(manifest.PackageUrl);
-
-            startInfo.ArgumentList.Add("--sha256");
-            startInfo.ArgumentList.Add(manifest.Sha256);
-
-            startInfo.ArgumentList.Add("--target");
-            startInfo.ArgumentList.Add(_installDir);
-
-            startInfo.ArgumentList.Add("--pid");
-            startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
-
-            var updaterProcess = Process.Start(startInfo);
-
-            if (updaterProcess is null)
-            {
-                throw new InvalidOperationException(
-                    "Failed to start the updater.");
-            }
-
-            updaterProcess.Dispose();
-            Close();
-
+            await InstallUpdateAsync();
         }
         catch (Exception ex)
         {
-            if (showUpToDate)
+            _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
             {
-                MessageBox.Show(
-                    $"Не удалось проверить обновления:\n{ex.Message}",
-                    "Audexa",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-            }
+                type = "install-update-failed",
+                message = ex.Message,
+            }));
+        }
+    }
 
-            _status.Text = "Обновления недоступны";
-        }
-        finally
+    private async Task InstallUpdateAsync()
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        var manifest = await client.GetFromJsonAsync<ReleaseManifest>(ManifestUrl)
+            ?? throw new InvalidDataException("Пустой release manifest.");
+
+        if (string.IsNullOrWhiteSpace(manifest.PackageUrl) ||
+            string.IsNullOrWhiteSpace(manifest.Sha256) ||
+            !Uri.TryCreate(manifest.PackageUrl, UriKind.Absolute, out var packageUri) ||
+            packageUri.Scheme != Uri.UriSchemeHttps ||
+            packageUri.Host != "github.com" ||
+            packageUri.AbsolutePath != $"/Vludd/audexa-desktop/releases/download/v{manifest.Version}/Audexa-Update-{manifest.Version}-win-x64.zip" ||
+            manifest.Sha256.Length != 64 ||
+            !manifest.Sha256.All(Uri.IsHexDigit))
         {
-            _updateButton.Enabled = true;
+            throw new InvalidDataException("Манифест содержит некорректный URL или SHA-256.");
         }
+
+        if (!Version.TryParse(manifest.Version, out var available))
+        {
+            throw new InvalidDataException("Некорректная версия в manifest.");
+        }
+
+        var current = Assembly.GetExecutingAssembly().GetName().Version
+            ?? new Version(1, 0, 0);
+
+        if (available <= current)
+        {
+            MessageBox.Show(
+                "Установлена актуальная версия Audexa.",
+                "Обновления",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
+        }
+
+        var updater = Path.Combine(_installDir, "updater", "Audexa.Updater.exe");
+        if (!File.Exists(updater))
+        {
+            throw new FileNotFoundException("Не найден updater.", updater);
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = updater,
+            WorkingDirectory = Path.GetDirectoryName(updater)!,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        startInfo.ArgumentList.Add("--url");
+        startInfo.ArgumentList.Add(manifest.PackageUrl);
+        startInfo.ArgumentList.Add("--sha256");
+        startInfo.ArgumentList.Add(manifest.Sha256);
+        startInfo.ArgumentList.Add("--target");
+        startInfo.ArgumentList.Add(_installDir);
+        startInfo.ArgumentList.Add("--pid");
+        startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
+
+        using var updaterProcess = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Не удалось запустить updater.");
+
+        Close();
     }
 
     private void StopBackend()
