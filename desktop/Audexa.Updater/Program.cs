@@ -202,7 +202,7 @@ internal static class Program
                 {
                     _previewTimer.Stop();
                     _status.Text = "Download complete";
-                    _detail.Text = "Preview mode — no files were changed.";
+                    _detail.Text = "Preview mode - no files were changed.";
                 }
             };
 
@@ -222,7 +222,7 @@ internal static class Program
             _pid = pid;
             _previewMode = previewMode;
 
-            Text = "Audexa — Update";
+            Text = "Audexa Update";
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
