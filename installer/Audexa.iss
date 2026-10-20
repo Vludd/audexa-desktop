@@ -30,4 +30,4 @@ Name: "{group}\Audexa"; Filename: "{app}\Audexa.Desktop.exe"
 Name: "{autodesktop}\Audexa"; Filename: "{app}\Audexa.Desktop.exe"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"; GroupDescription: "Дополнительные значки:"
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
