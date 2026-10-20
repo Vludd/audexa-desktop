@@ -1,12 +1,15 @@
-declare global {
-  interface Window {
-    audexa?: {
-      desktop?: boolean
+export function isDesktopApp(): boolean {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  const windowWithBridge = window as Window & {
+    chrome?: {
+      webview?: {
+        postMessage?: (message: unknown) => void
+      }
     }
   }
-}
 
-export function isDesktopApp(): boolean {
-  return typeof window !== "undefined" &&
-    window.audexa?.desktop === true
+  return typeof windowWithBridge.chrome?.webview?.postMessage === "function"
 }
