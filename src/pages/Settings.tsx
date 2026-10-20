@@ -9,6 +9,7 @@ import LineMappingSettings from "@/components/settings/LineMappingSettings"
 import LoggingSettings from "@/components/settings/LoggingSettings"
 import StartupSettings from "@/components/settings/StartupSettings"
 import ThemeSettings from "@/components/settings/ThemeSettings"
+import UpdateSettings from "@/components/settings/UpdateSettings"
 import LanguageSwitcher from "@/components/LanguageSwitcher"
 
 import {
@@ -335,6 +336,13 @@ export default function Settings({ rooms }: SettingsProps) {
 
       <main className="min-h-0 flex-1 overflow-auto p-4">
         <div className="mx-auto max-w-6xl space-y-6">
+          <SettingsSection
+            title={t("settings.updates.title")}
+            description={t("settings.updates.description")}
+          >
+            <UpdateSettings />
+          </SettingsSection>
+
           <SettingsSection
             title={t("settings.sections.general.title")}
             description={t("settings.sections.general.description")}

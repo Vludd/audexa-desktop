@@ -618,6 +618,23 @@ export const ru = {
     },
   },
   settings: {
+    updates: {
+      title: "Обновления Audexa",
+      description: "Проверка и установка официальных обновлений приложения.",
+      currentVersion: "Установленная версия",
+      latestVersion: "Последняя версия",
+      checking: "Проверяем наличие обновлений…",
+      upToDate: "Установлена актуальная версия.",
+      available: "Доступна версия {version}",
+      checkButton: "Проверить обновления",
+      installButton: "Установить обновление",
+      checkFailed: "Не удалось проверить обновления",
+      installFailed: "Не удалось запустить установщик обновления.",
+      desktopOnly: "Установка обновлений доступна только в настольном приложении Audexa.",
+      startingInstall: "Запускаем установщик. Audexa закроется и откроется после обновления.",
+      lastChecked: "Последняя проверка: {time}",
+      notChecked: "Проверка ещё не выполнялась",
+    },
     sections: {
       general: {
         title: "Общие",

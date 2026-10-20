@@ -616,6 +616,23 @@ export const en: Widen<typeof ru> = {
   },
 
   settings: {
+    updates: {
+      title: "Audexa updates",
+      description: "Check for and install official application updates.",
+      currentVersion: "Installed version",
+      latestVersion: "Latest version",
+      checking: "Checking for updates…",
+      upToDate: "Audexa is up to date.",
+      available: "Version {version} is available",
+      checkButton: "Check for updates",
+      installButton: "Install update",
+      checkFailed: "Could not check for updates",
+      installFailed: "Could not start the update installer.",
+      desktopOnly: "Updates can only be installed from the Audexa desktop application.",
+      startingInstall: "Starting the updater. Audexa will close and reopen after the update.",
+      lastChecked: "Last checked: {time}",
+      notChecked: "Updates have not been checked yet",
+    },
     sections: {
       general: {
         title: "General",
