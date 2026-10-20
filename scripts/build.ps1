@@ -1,3 +1,8 @@
+param(
+    [Parameter()]
+    [ValidatePattern('^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$')]
+    [string]$Version = "1.0.0"
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -21,6 +26,32 @@ function Invoke-Checked {
     }
 }
 
+function Publish-DotNetProject {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ProjectPath,
+
+        [Parameter(Mandatory)]
+        [string]$OutputPath
+    )
+
+    Invoke-Checked "dotnet" @(
+        "publish",
+        $ProjectPath,
+        "-c", "Release",
+        "-r", "win-x64",
+        "--self-contained", "true",
+        "-p:PublishSingleFile=true",
+        "-p:Version=$Version",
+        "-p:AssemblyVersion=$Version.0",
+        "-p:FileVersion=$Version.0",
+        "-p:InformationalVersion=$Version",
+        "-o", $OutputPath
+    )
+}
+
+Write-Host "Building Audexa version $Version" -ForegroundColor Cyan
+
 # Verify required tools and lockfile
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
     throw "pnpm is not installed or not available in PATH."
@@ -35,7 +66,7 @@ if (-not (Test-Path $Lockfile)) {
 Remove-Item $Publish -Recurse -Force -ErrorAction SilentlyContinue
 New-Item $Publish -ItemType Directory -Force | Out-Null
 
-# Build frontend using pnpm only
+# Build frontend
 Push-Location $Frontend
 try {
     Invoke-Checked "pnpm" @("install", "--frozen-lockfile")
@@ -55,37 +86,19 @@ New-Item $PublishFrontend -ItemType Directory -Force | Out-Null
 Copy-Item (Join-Path $FrontendOutput "*") $PublishFrontend -Recurse -Force
 
 # Publish backend
-Invoke-Checked "dotnet" @(
-    "publish",
-    (Join-Path $Root "backend\audexa-backend.csproj"),
-    "-c", "Release",
-    "-r", "win-x64",
-    "--self-contained", "true",
-    "-p:PublishSingleFile=true",
-    "-o", (Join-Path $Publish "backend")
-)
+Publish-DotNetProject `
+    -ProjectPath (Join-Path $Root "backend\audexa-backend.csproj") `
+    -OutputPath (Join-Path $Publish "backend")
 
 # Publish desktop shell
-Invoke-Checked "dotnet" @(
-    "publish",
-    (Join-Path $Root "desktop\Audexa.Desktop\Audexa.Desktop.csproj"),
-    "-c", "Release",
-    "-r", "win-x64",
-    "--self-contained", "true",
-    "-p:PublishSingleFile=true",
-    "-o", (Join-Path $Publish "desktop")
-)
+Publish-DotNetProject `
+    -ProjectPath (Join-Path $Root "desktop\Audexa.Desktop\Audexa.Desktop.csproj") `
+    -OutputPath (Join-Path $Publish "desktop")
 
 # Publish updater
-Invoke-Checked "dotnet" @(
-    "publish",
-    (Join-Path $Root "desktop\Audexa.Updater\Audexa.Updater.csproj"),
-    "-c", "Release",
-    "-r", "win-x64",
-    "--self-contained", "true",
-    "-p:PublishSingleFile=true",
-    "-o", (Join-Path $Publish "updater")
-)
+Publish-DotNetProject `
+    -ProjectPath (Join-Path $Root "desktop\Audexa.Updater\Audexa.Updater.csproj") `
+    -OutputPath (Join-Path $Publish "updater")
 
 # Verify essential output files
 $RequiredFiles = @(
@@ -104,5 +117,6 @@ foreach ($RelativePath in $RequiredFiles) {
 
 Write-Host ""
 Write-Host "Publish payload prepared at $Publish" -ForegroundColor Green
+Write-Host "Version: $Version" -ForegroundColor Cyan
 Write-Host "Next: compile installer\Audexa.iss using Inno Setup 6."
 Write-Host "Verify installer and update behavior before publishing a release."

@@ -125,7 +125,8 @@ internal sealed class MainForm : Form
             {
                 WorkingDirectory = Path.GetDirectoryName(backendExe)!,
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = false,
+                WindowStyle = ProcessWindowStyle.Normal,
             };
 
             // Keep the local API inaccessible from the LAN.
@@ -294,19 +295,38 @@ internal sealed class MainForm : Form
                     updater);
             }
 
-            var args =
-                $"--url \"{manifest.PackageUrl}\" " +
-                $"--sha256 \"{manifest.Sha256}\" " +
-                $"--target \"{_installDir}\" " +
-                $"--pid {Environment.ProcessId}";
-
-            Process.Start(new ProcessStartInfo(updater, args)
+            
+            var startInfo = new ProcessStartInfo
             {
-                UseShellExecute = true,
-                WorkingDirectory = Path.GetDirectoryName(updater)!
-            });
+                FileName = updater,
+                WorkingDirectory = Path.GetDirectoryName(updater)!,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
 
+            startInfo.ArgumentList.Add("--url");
+            startInfo.ArgumentList.Add(manifest.PackageUrl);
+
+            startInfo.ArgumentList.Add("--sha256");
+            startInfo.ArgumentList.Add(manifest.Sha256);
+
+            startInfo.ArgumentList.Add("--target");
+            startInfo.ArgumentList.Add(_installDir);
+
+            startInfo.ArgumentList.Add("--pid");
+            startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
+
+            var updaterProcess = Process.Start(startInfo);
+
+            if (updaterProcess is null)
+            {
+                throw new InvalidOperationException(
+                    "Failed to start the updater.");
+            }
+
+            updaterProcess.Dispose();
             Close();
+
         }
         catch (Exception ex)
         {
