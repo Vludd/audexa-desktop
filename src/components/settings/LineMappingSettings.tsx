@@ -16,6 +16,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { t } from "@/i18n"
+import { Checkbox } from "../ui/checkbox"
 // import OutputDiagnostics from "./OutputDiagnostics"
 
 type Mapping = AudioOutputMapping
@@ -324,14 +325,21 @@ export default function LineMappingSettings({
                           {outputs.map((candidate) => {
                             const owner = assignedOutputs.get(candidate.id)
                             const occupiedByOtherRoom = owner !== undefined && owner !== room.id
+
                             return (
-                              <label key={candidate.id} className="flex min-w-0 items-center gap-1.5 text-xs" title={candidate.name}>
-                                <input
-                                  type="checkbox"
-                                  className="size-3.5 shrink-0 accent-primary"
+                              <label
+                                key={candidate.id}
+                                className="flex min-w-0 items-center gap-1.5 text-xs"
+                                title={candidate.name}
+                              >
+                                <Checkbox
                                   checked={selectedIds.has(candidate.id)}
                                   disabled={occupiedByOtherRoom}
-                                  onChange={(event) => updateMapping(room.id, candidate.id, event.target.checked)}
+                                  onCheckedChange={(checked) =>
+                                    updateMapping(room.id, candidate.id, checked === true)
+                                  }
+                                  aria-label={`${room.name}: ${candidate.name}`}
+                                  className="size-3.5 shrink-0"
                                 />
                                 <span className="truncate">{candidate.name}</span>
                               </label>
@@ -372,34 +380,53 @@ export default function LineMappingSettings({
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {t("settings.lineMapping.specialLines")}
               </div>
+
               <div className="overflow-hidden rounded-md border">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(150px,220px)_100px] items-center gap-3 bg-primary/5 px-3 py-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(150px,220px)_auto_100px] items-center gap-3 bg-primary/5 px-3 py-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{t("settings.lineMapping.translation")}</div>
-                    <div className="truncate text-xs text-muted-foreground">{t("settings.lineMapping.dedicatedOutput")}</div>
+                    <div className="truncate text-sm font-medium">
+                      {t("settings.lineMapping.translation")}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {t("settings.lineMapping.dedicatedOutput")}
+                    </div>
                   </div>
+
                   <div className="min-w-0 rounded-md border bg-background">
                     <Select
                       value={translationOutput ?? ""}
                       onValueChange={(value) => {
                         setSaveError(null)
-                        setTranslationOutput(value)
+                        setTranslationOutput(value || null)
                       }}
                     >
                       <SelectTrigger className="h-8 w-full border-0 bg-transparent px-2 shadow-none focus:ring-0">
                         <SelectValue placeholder={t("common.notAssigned")}>
-                          {translationOutput ? outputById.get(translationOutput)?.name ?? t("common.notAssigned") : t("common.notAssigned")}
+                          {translationOutput
+                            ? outputById.get(translationOutput)?.name ??
+                              t("common.notAssigned")
+                            : t("common.notAssigned")}
                         </SelectValue>
                       </SelectTrigger>
+
                       <SelectContent>
                         {outputs.map((output) => {
                           const owner = assignedOutputs.get(output.id)
                           const ownerRoom = owner ? roomById.get(owner) : undefined
+
                           return (
-                            <SelectItem key={output.id} value={output.id} disabled={Boolean(owner)}>
+                            <SelectItem
+                              key={output.id}
+                              value={output.id}
+                              disabled={Boolean(owner)}
+                            >
                               <div className="flex min-w-0 items-center gap-2">
                                 <span>{output.name}</span>
-                                {ownerRoom && <span className="truncate text-xs text-muted-foreground">· {ownerRoom.name}</span>}
+                                {ownerRoom && (
+                                  <span className="truncate text-xs text-muted-foreground">
+                                    · {ownerRoom.name}
+                                  </span>
+                                )}
                               </div>
                             </SelectItem>
                           )
@@ -407,13 +434,37 @@ export default function LineMappingSettings({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    disabled={!translationOutput || isSaving}
+                    onClick={() => {
+                      setSaveError(null)
+                      setTranslationOutput(null)
+                    }}
+                    aria-label="Сбросить выход синхроперевода"
+                    title="Сбросить выход синхроперевода"
+                  >
+                    <X className="size-4" />
+                  </Button>
+
                   <div>
                     {translationOutputOwner ? (
-                      <Badge variant="destructive" className="text-[10px]">{t("settings.lineMapping.conflict")}</Badge>
+                      <Badge variant="destructive" className="text-[10px]">
+                        {t("settings.lineMapping.conflict")}
+                      </Badge>
                     ) : translationOutput ? (
-                      <Badge variant="secondary" className="gap-1 text-[10px]"><Check className="size-3" />{t("settings.lineMapping.ok")}</Badge>
+                      <Badge variant="secondary" className="gap-1 text-[10px]">
+                        <Check className="size-3" />
+                        {t("settings.lineMapping.ok")}
+                      </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px]">{t("common.notAssigned")}</Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        {t("common.notAssigned")}
+                      </Badge>
                     )}
                   </div>
                 </div>
