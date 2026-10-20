@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, e.g. 1.0.8"
+        description: "Release version in MAJOR.MINOR.PATCH format. E.g. 1.2.3"
         required: true
         type: string
 
