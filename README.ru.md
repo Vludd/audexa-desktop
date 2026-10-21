@@ -45,30 +45,30 @@ Audexa умеет проверять наличие официальных ре�
 ## Скриншоты
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8155be7a-92af-4478-91b4-10b350f46b4f" alt="Главная страница Audexa" width="100%" />
+  <img src="https://github.com/user-attachments/assets/52c5dd8a-10b1-4498-ad73-faeeb2910eff" alt="Главная страница Audexa" width="100%" />
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="https://github.com/user-attachments/assets/8a917637-6464-4e51-bf5f-94958a666c0e" alt="Комнаты" width="100%" /></td>
-    <td width="50%"><img src="https://github.com/user-attachments/assets/dbc5634c-a7d7-4323-a0c5-49499ec4b301" alt="Сценарии" width="100%" /></td>
+    <td width="50%"><img src="https://github.com/user-attachments/assets/3533995e-054d-4679-a8b1-ad3b192eabae" alt="Комнаты" width="100%" /></td>
+    <td width="50%"><img src="https://github.com/user-attachments/assets/dac02966-d285-4457-a833-32df37f8c56b" alt="Сценарии" width="100%" /></td>
   </tr>
 </table>
 
 <details>
-  <summary>Другие скриншоты</summary>
+  <summary>More screenshots</summary>
   <br />
   <table>
     <tr>
-      <td width="50%"><img src="https://github.com/user-attachments/assets/87d1ce4d-efdd-462b-b52a-18368566cb82" alt="Расписание" width="100%" /></td>
-      <td width="50%"><img src="https://github.com/user-attachments/assets/e227bafd-f639-473d-91ad-fb56ed769cde" alt="Аудиофайлы" width="100%" /></td>
+      <td width="50%"><img src="https://github.com/user-attachments/assets/638e22c9-bdf2-410a-8ac4-9bc8fd10af11" alt="Расписание" width="100%" /></td>
+      <td width="50%"><img src="https://github.com/user-attachments/assets/c1797f4b-b5c3-4814-813e-4f4c8b083377" alt="Аудиофайлы" width="100%" /></td>
     </tr>
     <tr>
-      <td width="50%"><img src="https://github.com/user-attachments/assets/a08a9be1-74f4-44f6-8b61-40fd347a25a8" alt="Настройки" width="100%" /></td>
-      <td width="50%"><img src="https://github.com/user-attachments/assets/cc6c9c9b-1224-4dd5-84c9-63fcd5e68e05" alt="Журнал событий" width="100%" /></td>
+      <td width="50%"><img src="https://github.com/user-attachments/assets/9e196fca-340d-4e42-9c67-b7ee2d2da07a" alt="Настройки" width="100%" /></td>
+      <td width="50%"><img src="https://github.com/user-attachments/assets/439b3b7c-b0fe-42d5-b485-fdb2e5de184c" alt="Журнал событий" width="100%" /></td>
     </tr>
     <tr>
-      <td colspan="2"><img src="https://github.com/user-attachments/assets/30608a77-73a4-4eb8-880a-66975b32148a" alt="Дополнительный экран приложения" width="100%" /></td>
+      <td colspan="2"><img src="https://github.com/user-attachments/assets/c6c7f979-501a-4984-95c8-65ddfd431ce7" alt="Дополнительный экран приложения" width="100%" /></td>
     </tr>
   </table>
 </details>
