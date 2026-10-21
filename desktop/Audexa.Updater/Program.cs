@@ -426,12 +426,7 @@ internal static class Program
         string staged = Path.Combine(temp, "staged");
         string backup = Path.Combine(temp, "backup");
 
-        bool snapshotComplete = false;
-        bool updateStarted = false;
         bool preserveTempForRecovery = false;
-
-        var transaction = new UpdateFileTransaction();
-        UpdateFileTransaction.Snapshot? snapshot = null;
 
         try
         {
@@ -656,8 +651,6 @@ internal static class Program
                 throw new InvalidDataException("Archive is missing one or more required Audexa files.");
             }
 
-            report(new("Preparing installation", "Creating a backup of the current installation...", null));
-
             // Read and validate the previous manifest before modifying installation files.
             EnsureNoReparsePoints(target);
 
@@ -681,22 +674,6 @@ internal static class Program
 
             string updateVersion = versionMatch.Groups["fileVersion"].Value;
 
-            report(new(
-                "Preparing installation",
-                "Creating a backup of the current installation...",
-                null));
-
-            // The installation tree was checked for reparse points immediately above.
-            snapshot = transaction.CreateBackup(target, backup);
-
-            snapshotComplete = true;
-            updateStarted = true;
-
-            report(new(
-                "Installing update",
-                "Replacing application files...",
-                null));
-
             // Never accept a package-supplied managed-files manifest.
             string stagedManifest = Path.Combine(
                 staged,
@@ -708,112 +685,117 @@ internal static class Program
                     "The update package must not contain the managed-files manifest.");
             }
 
-            string[] stagedFiles = Directory
-                .EnumerateFiles(staged, "*", SearchOption.AllDirectories)
-                .ToArray();
+            report(new(
+                "Preparing installation",
+                "Creating a backup of the current installation...",
+                null));
 
-            var newManagedFiles = stagedFiles
-                .Select(file => Path.GetRelativePath(staged, file)
-                    .Replace('\\', '/'))
-                .Append(ManagedFilesManifestName)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var installer = new UpdateInstaller();
 
-            foreach (string directory in Directory
-                .EnumerateDirectories(staged, "*", SearchOption.AllDirectories)
-                .OrderBy(d => d.Length))
+            try
             {
-                string relative = Path.GetRelativePath(staged, directory);
-                Directory.CreateDirectory(Path.Combine(target, relative));
-            }
-
-            foreach (string file in stagedFiles)
-            {
-                string relative = Path.GetRelativePath(staged, file);
-                string destination = Path.Combine(target, relative);
-
-                Directory.CreateDirectory(
-                    Path.GetDirectoryName(destination)!);
-
-                File.Copy(file, destination, overwrite: true);
-            }
-
-            // Write the new manifest before removing any stale files.
-            WriteManagedFilesManifest(
-                target,
-                updateVersion,
-                newManagedFiles.Where(
-                    file => !file.Equals(
-                        ManagedFilesManifestName,
-                        StringComparison.OrdinalIgnoreCase)));
-
-            if (previousManifest is not null)
-            {
-                EnsureNoReparsePoints(target);
-
-                foreach (string oldFile in previousManifest.Files)
-                {
-                    string safeRelative = GetSafeRelativePath(oldFile)
-                        .Replace('\\', '/');
-
-                    if (newManagedFiles.Contains(safeRelative))
-                        continue;
-
-                    string stalePath = ResolveManagedPath(target, oldFile);
-
-                    if (File.Exists(stalePath))
-                        File.Delete(stalePath);
-                    else if (Directory.Exists(stalePath))
-                        throw new InvalidDataException(
-                            $"A managed file path unexpectedly points to a directory: {oldFile}");
-                }
-            }
-
-            report(new("Restarting Audexa", "Starting the updated application...", null));
-            Process app = Process.Start(new ProcessStartInfo(appPath)
-            {
-                UseShellExecute = true,
-                WorkingDirectory = target
-            }) ?? throw new InvalidOperationException("Could not start the updated Audexa application.");
-
-            using (app)
-            {
-                if (app.WaitForExit(7000))
-                    throw new InvalidOperationException($"Audexa exited shortly after launch (exit code {app.ExitCode}).");
-            }
-        }
-        catch (Exception ex)
-        {
-            if (snapshotComplete && updateStarted)
-            {
-                report(new(
-                    "Restoring previous version",
-                    "The update failed. Restoring the previous files...",
-                    null));
-
-                try
-                {
-                    if (snapshot is null)
+                installer.Execute(
+                    target,
+                    backup,
+                    _ =>
                     {
-                        throw new InvalidOperationException(
-                            "Rollback cannot continue because the installation snapshot is missing.");
-                    }
+                        report(new(
+                            "Installing update",
+                            "Replacing application files...",
+                            null));
 
-                    transaction.Rollback(target, backup, snapshot);
-                }
-                catch (Exception rollbackError)
-                {
-                    // Preserve the only recovery copy if rollback cannot be completed.
-                    preserveTempForRecovery = true;
+                        string[] stagedFiles = Directory
+                            .EnumerateFiles(staged, "*", SearchOption.AllDirectories)
+                            .ToArray();
 
-                    throw new InvalidOperationException(
-                        $"Update failed: {ex.Message}{Environment.NewLine}" +
-                        $"Rollback also failed: {rollbackError.Message}{Environment.NewLine}" +
-                        $"The backup was preserved at: {temp}",
-                        ex);
-                }
+                        var newManagedFiles = stagedFiles
+                            .Select(file => Path.GetRelativePath(staged, file)
+                                .Replace('\\', '/'))
+                            .Append(ManagedFilesManifestName)
+                            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                        foreach (string directory in Directory
+                            .EnumerateDirectories(staged, "*", SearchOption.AllDirectories)
+                            .OrderBy(d => d.Length))
+                        {
+                            string relative = Path.GetRelativePath(staged, directory);
+                            Directory.CreateDirectory(Path.Combine(target, relative));
+                        }
+
+                        foreach (string file in stagedFiles)
+                        {
+                            string relative = Path.GetRelativePath(staged, file);
+                            string destination = Path.Combine(target, relative);
+
+                            Directory.CreateDirectory(
+                                Path.GetDirectoryName(destination)!);
+
+                            File.Copy(file, destination, overwrite: true);
+                        }
+
+                        // Write the new manifest before removing any stale files.
+                        WriteManagedFilesManifest(
+                            target,
+                            updateVersion,
+                            newManagedFiles.Where(
+                                file => !file.Equals(
+                                    ManagedFilesManifestName,
+                                    StringComparison.OrdinalIgnoreCase)));
+
+                        if (previousManifest is not null)
+                        {
+                            EnsureNoReparsePoints(target);
+
+                            foreach (string oldFile in previousManifest.Files)
+                            {
+                                string safeRelative = GetSafeRelativePath(oldFile)
+                                    .Replace('\\', '/');
+
+                                if (newManagedFiles.Contains(safeRelative))
+                                    continue;
+
+                                string stalePath = ResolveManagedPath(target, oldFile);
+
+                                if (File.Exists(stalePath))
+                                {
+                                    File.Delete(stalePath);
+                                }
+                                else if (Directory.Exists(stalePath))
+                                {
+                                    throw new InvalidDataException(
+                                        $"A managed file path unexpectedly points to a directory: {oldFile}");
+                                }
+                            }
+                        }
+
+                        report(new(
+                            "Restarting Audexa",
+                            "Starting the updated application...",
+                            null));
+
+                        Process app = Process.Start(new ProcessStartInfo(appPath)
+                        {
+                            UseShellExecute = true,
+                            WorkingDirectory = target
+                        }) ?? throw new InvalidOperationException(
+                            "Could not start the updated Audexa application.");
+
+                        using (app)
+                        {
+                            if (app.WaitForExit(7000))
+                            {
+                                throw new InvalidOperationException(
+                                    $"Audexa exited shortly after launch (exit code {app.ExitCode}).");
+                            }
+                        }
+                    });
             }
-
-            throw;
+            catch (UpdateInstaller.RollbackFailedException ex)
+            {
+                // Preserve the recovery copy if automatic rollback could not complete.
+                preserveTempForRecovery = true;
+                throw new InvalidOperationException(ex.Message, ex);
+            }
         }
         finally
         {
