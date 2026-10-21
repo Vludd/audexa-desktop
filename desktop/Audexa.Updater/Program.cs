@@ -725,6 +725,18 @@ internal static class Program
                         foreach (string file in stagedFiles)
                         {
                             string relative = Path.GetRelativePath(staged, file);
+                            string normalizedRelative = relative.Replace('\\', '/');
+
+                            // The updater is currently running from the installation directory.
+                            // Do not overwrite its executable while the process is running.
+                            // Keep it in the managed manifest so it is not treated as stale.
+                            if (normalizedRelative.Equals(
+                                "updater/Audexa.Updater.exe",
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
                             string destination = Path.Combine(target, relative);
 
                             Directory.CreateDirectory(
