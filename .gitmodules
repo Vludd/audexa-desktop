@@ -1,6 +1,0 @@
-[submodule "backend"]
-	path = backend
-	url = https://github.com/Vludd/audexa-backend.git
-[submodule "frontend"]
-	path = frontend
-	url = https://github.com/Vludd/audexa-frontend.git
