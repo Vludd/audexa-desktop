@@ -46,3 +46,6 @@ Desktop.ini
 /update-payload/
 /artifacts/installer/
 
+
+# Generated build and release artifacts
+/artifacts/
