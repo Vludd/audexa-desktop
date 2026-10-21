@@ -1,0 +1,123 @@
+# =========================
+# .NET / Build
+# =========================
+
+bin/
+obj/
+out/
+
+*.dll
+*.exe
+*.pdb
+
+# =========================
+# Visual Studio
+# =========================
+
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# =========================
+# JetBrains Rider / ReSharper
+# =========================
+
+.idea/
+*.sln.iml
+_ReSharper*/
+*.[Rr]e[Ss]harper*
+*.DotSettings.user
+
+# =========================
+# VS Code
+# =========================
+
+.vscode/
+
+# =========================
+# NuGet
+# =========================
+
+packages/
+*.nupkg
+*.snupkg
+
+# NuGet cache / generated files
+project.assets.json
+project.nuget.cache
+*.nuget.props
+*.nuget.targets
+
+# =========================
+# Test / Coverage
+# =========================
+
+TestResults/
+coverage/
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# =========================
+# Logs
+# =========================
+
+*.log
+logs/
+
+# =========================
+# Local configuration
+# =========================
+
+appsettings.Local.json
+appsettings.*.Local.json
+
+# User-specific launch settings
+launchSettings.local.json
+
+# =========================
+# Audexa local data
+# =========================
+
+# Local SQLite database
+*.db
+*.db-shm
+*.db-wal
+
+# Local audio storage
+Audio/
+
+# =========================
+# OS
+# =========================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+
+# =========================
+# Temporary files
+# =========================
+
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# =========================
+# Compressed files
+# =========================
+*.zip
+*.rar
+*.tar.gz
+*.7z
