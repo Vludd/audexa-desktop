@@ -157,7 +157,35 @@ internal sealed class MainForm : Form
 
             await _web.EnsureCoreWebView2Async();
 
-            _web.CoreWebView2.Settings.AreDevToolsEnabled = true;
+            // Disable developer tools in production builds.
+            _web.CoreWebView2.Settings.AreDevToolsEnabled = false;
+
+            _web.CoreWebView2.NavigationStarting += (_, e) =>
+            {
+                if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri))
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                bool isAppAsset =
+                    uri.Scheme == Uri.UriSchemeHttps &&
+                    uri.Host.Equals(
+                        "appassets.audexa",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    uri.Port == 443;
+
+                bool isLocalApi =
+                    uri.Scheme == Uri.UriSchemeHttp &&
+                    uri.Host == "127.0.0.1" &&
+                    uri.Port == 5081;
+
+                if (!isAppAsset && !isLocalApi)
+                {
+                    e.Cancel = true;
+                }
+            };
+
             _web.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
 
             _web.CoreWebView2.NavigationCompleted += (_, e) =>
@@ -176,16 +204,6 @@ internal sealed class MainForm : Form
                 "appassets.audexa",
                 Path.Combine(_installDir, "frontend"),
                 CoreWebView2HostResourceAccessKind.DenyCors);
-
-            _web.CoreWebView2.NavigationStarting += (_, e) =>
-            {
-                if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) ||
-                    (uri.Host != "appassets.audexa" &&
-                     uri.Host != "127.0.0.1"))
-                {
-                    e.Cancel = true;
-                }
-            };
 
             _web.Source = new Uri(
                 "https://appassets.audexa/index.html");
@@ -240,21 +258,24 @@ internal sealed class MainForm : Form
         var manifest = await client.GetFromJsonAsync<ReleaseManifest>(ManifestUrl)
             ?? throw new InvalidDataException("Пустой release manifest.");
 
-        if (string.IsNullOrWhiteSpace(manifest.PackageUrl) ||
+        if (string.IsNullOrWhiteSpace(manifest.Version) ||
+            string.IsNullOrWhiteSpace(manifest.PackageUrl) ||
             string.IsNullOrWhiteSpace(manifest.Sha256) ||
+            !Version.TryParse(manifest.Version, out var available) ||
             !Uri.TryCreate(manifest.PackageUrl, UriKind.Absolute, out var packageUri) ||
             packageUri.Scheme != Uri.UriSchemeHttps ||
-            packageUri.Host != "github.com" ||
-            packageUri.AbsolutePath != $"/Vludd/audexa-desktop/releases/download/v{manifest.Version}/Audexa-Update-{manifest.Version}-win-x64.zip" ||
+            !packageUri.IsDefaultPort ||
+            !packageUri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
+            packageUri.UserInfo.Length > 0 ||
+            packageUri.Query.Length > 0 ||
+            packageUri.Fragment.Length > 0 ||
+            packageUri.AbsolutePath !=
+                $"/Vludd/audexa-desktop/releases/download/v{manifest.Version}/Audexa-Update-{manifest.Version}-win-x64.zip" ||
             manifest.Sha256.Length != 64 ||
             !manifest.Sha256.All(Uri.IsHexDigit))
         {
-            throw new InvalidDataException("Манифест содержит некорректный URL или SHA-256.");
-        }
-
-        if (!Version.TryParse(manifest.Version, out var available))
-        {
-            throw new InvalidDataException("Некорректная версия в manifest.");
+            throw new InvalidDataException(
+                "Манифест содержит некорректный URL, версию или SHA-256.");
         }
 
         var current = Assembly.GetExecutingAssembly().GetName().Version
