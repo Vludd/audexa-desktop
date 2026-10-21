@@ -66,6 +66,15 @@ public sealed class UpdateFileTransaction
 
         foreach (string relative in snapshot.OriginalFiles)
         {
+            // The running updater cannot reliably overwrite its own executable.
+            // It was deliberately excluded from the update copy operation.
+            if (relative.Equals(
+                "updater/Audexa.Updater.exe",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             string source = ResolveManagedPath(backup, relative);
             string destination = ResolveManagedPath(target, relative);
 
