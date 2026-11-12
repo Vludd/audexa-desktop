@@ -35,7 +35,7 @@ public sealed class JsonFileLoggerProvider : ILoggerProvider
             category,
             eventId.Id,
             exception?.GetType().Name,
-            exception?.Message);
+            exception?.ToString());
 
         var line = JsonSerializer.Serialize(record);
         lock (_writeLock)

@@ -1068,7 +1068,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             using var enumerator = new MMDeviceEnumerator();
             var endpoint = enumerator.GetDevice(endpointId);
             var mixFormat = endpoint.AudioClient.MixFormat;
-            targetFormat = new WaveFormat(mixFormat.SampleRate, 16, mixFormat.Channels);
+            targetFormat = mixFormat;
             if (maxChannel >= mixFormat.Channels)
                 throw new PlaybackException("OUTPUT_CHANNEL_OUT_OF_RANGE", $"Requested output channel {maxChannel + 1} is outside the endpoint's {mixFormat.Channels} channels.");
             return new WasapiOut(endpoint, AudioClientShareMode.Shared, true, 100);
@@ -1224,9 +1224,22 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             _mainSource = mainSource;
             _translationSource = translationSource;
             _target = target;
-            _mainChannels = mainChannels.Distinct().Select(channel => Math.Clamp(channel, 0, Math.Max(0, target.Channels - 1))).ToArray();
-            _translationChannels = (translationChannels ?? Array.Empty<int>())
-                .Distinct().Select(channel => Math.Clamp(channel, 0, Math.Max(0, target.Channels - 1))).ToArray();
+            _mainChannels = mainChannels.Distinct().ToArray();
+            _translationChannels = (translationChannels ?? Array.Empty<int>()).Distinct().ToArray();
+
+            if (_mainChannels.Concat(_translationChannels)
+                .Any(channel => channel < 0 || channel >= target.Channels))
+            {
+                throw new PlaybackException(
+                    "OUTPUT_CHANNEL_OUT_OF_RANGE",
+                    $"A requested output channel is outside the endpoint's {target.Channels} channels.");
+            }
+
+            if (!AudioSampleFormat.IsSupported(target))
+                throw new PlaybackException(
+                    "UNSUPPORTED_OUTPUT_FORMAT",
+                    $"The endpoint format '{target}' is not supported by the audio router.");
+
             _runtime = runtime;
 
             _mainInput = CreateMonoInput(mainSource, target.SampleRate, out var mainResampler);
@@ -1318,18 +1331,14 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
 
         private void WriteSample(byte[] buffer, int offset, int frame, IReadOnlyList<int> channels, float sample)
         {
+            var bytesPerSample = AudioSampleFormat.BytesPerSample(_target);
             foreach (var channel in channels)
             {
-                var sampleOffset = offset + frame * _target.BlockAlign + channel * (_target.BitsPerSample / 8);
-
-                if (_target.Encoding == WaveFormatEncoding.IeeeFloat && _target.BitsPerSample == 32)
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 4), sample);
-                else if (_target.Encoding == WaveFormatEncoding.Pcm && _target.BitsPerSample == 16)
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 2), (short)Math.Clamp(sample * short.MaxValue, short.MinValue, short.MaxValue));
-                else if (_target.Encoding == WaveFormatEncoding.Pcm && _target.BitsPerSample == 32)
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 4), (int)Math.Clamp(sample * int.MaxValue, int.MinValue, int.MaxValue));
-                else
-                    throw new PlaybackException("UNSUPPORTED_FORMAT", $"Unsupported target format {_target}");
+                var sampleOffset = offset + frame * _target.BlockAlign + channel * bytesPerSample;
+                AudioSampleFormat.WriteSample(
+                    buffer.AsSpan(sampleOffset, bytesPerSample),
+                    _target,
+                    sample);
             }
         }
 

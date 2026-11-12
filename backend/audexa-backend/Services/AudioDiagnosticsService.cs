@@ -8,10 +8,14 @@ namespace audexa_backend.Services;
 public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
 {
     private readonly IAudioDeviceService _audioDeviceService;
+    private readonly ILogger<AudioDiagnosticsService> _logger;
 
-    public AudioDiagnosticsService(IAudioDeviceService audioDeviceService)
+    public AudioDiagnosticsService(
+        IAudioDeviceService audioDeviceService,
+        ILogger<AudioDiagnosticsService> logger)
     {
         _audioDeviceService = audioDeviceService;
+        _logger = logger;
     }
 
     public async Task<AudioTestResponse> TestOutputAsync(
@@ -78,7 +82,7 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
         return results;
     }
 
-    private static async Task<AudioTestResponse> TestOutputOnDeviceAsync(
+    private async Task<AudioTestResponse> TestOutputOnDeviceAsync(
         AudioDeviceDto device,
         string outputId,
         string mode,
@@ -100,6 +104,10 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
             return new AudioTestResponse(false, outputId, $"Audio device '{device.Name}' is offline.");
         }
 
+        _logger.LogInformation(
+            "Audio output test started. Device={DeviceName} DeviceId={DeviceId} Type={DeviceType} Driver={Driver} OutputId={OutputId} OutputIndex={OutputIndex} Mode={Mode} DurationMs={DurationMs} Volume={Volume}",
+            device.Name, device.Id, device.Type, device.Driver, outputId, output.Index, mode, durationMs, volume);
+
         try
         {
             var effectiveDurationMs = mode.Equals("voice", StringComparison.OrdinalIgnoreCase)
@@ -107,6 +115,9 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
                 : durationMs;
 
             await PlayAsync(device, output.Index, mode, effectiveDurationMs, volume, cancellationToken);
+            _logger.LogInformation(
+                "Audio output test completed. DeviceId={DeviceId} OutputId={OutputId} OutputIndex={OutputIndex} Mode={Mode}",
+                device.Id, outputId, output.Index, mode);
             return new AudioTestResponse(true, outputId, "Audio signal was sent to the selected output.");
         }
         catch (OperationCanceledException)
@@ -115,11 +126,15 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
         }
         catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "Audio output test failed. DeviceId={DeviceId} DeviceType={DeviceType} Driver={Driver} OutputId={OutputId} OutputIndex={OutputIndex} Mode={Mode}",
+                device.Id, device.Type, device.Driver, outputId, output.Index, mode);
             return new AudioTestResponse(false, outputId, ex.Message);
         }
     }
 
-    private static async Task PlayAsync(
+    private async Task PlayAsync(
         AudioDeviceDto device,
         int outputIndex,
         string mode,
@@ -158,7 +173,7 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
             $"Diagnostic playback is not implemented for device type '{device.Type}'.");
     }
 
-    private static async Task PlayWasapiAsync(
+    private async Task PlayWasapiAsync(
         AudioDeviceDto device,
         int outputIndex,
         string mode,
@@ -169,11 +184,58 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
         var endpointId = device.Id["wasapi:render:".Length..];
         using var enumerator = new MMDeviceEnumerator();
         using var endpoint = enumerator.GetDevice(endpointId);
+        // WASAPI Shared must be initialized with the endpoint's actual mix format.
+        // UMC1820 exposes a 12-channel, 32-bit IEEE-float extensible mix format.
         var mixFormat = endpoint.AudioClient.MixFormat;
-        var format = new WaveFormat(mixFormat.SampleRate, 16, mixFormat.Channels);
+        if (outputIndex < 0 || outputIndex >= mixFormat.Channels)
+        {
+            throw new AudioDiagnosticException(
+                "OUTPUT_CHANNEL_OUT_OF_RANGE",
+                $"Requested output channel {outputIndex + 1} is outside the endpoint's {mixFormat.Channels} channels.");
+        }
+
+        var format = mixFormat;
         var provider = await CreateProviderAsync(mode, durationMs, volume, format, outputIndex, cancellationToken);
 
         using var output = new WasapiOut(endpoint, AudioClientShareMode.Shared, true, 100);
+
+        var providerFormat = provider.WaveFormat;
+
+        if (mixFormat is WaveFormatExtensible extensible)
+        {
+            _logger.LogInformation(
+                "WASAPI SUBFORMAT: {SubFormat}",
+                extensible.SubFormat);
+        }
+
+        _logger.LogInformation(
+            "WASAPI MIX FORMAT: Encoding={Encoding}, SampleRate={SampleRate}, " +
+            "Channels={Channels}, Bits={Bits}, BlockAlign={BlockAlign}, ExtraSize={ExtraSize}",
+            mixFormat.Encoding,
+            mixFormat.SampleRate,
+            mixFormat.Channels,
+            mixFormat.BitsPerSample,
+            mixFormat.BlockAlign,
+            mixFormat.ExtraSize);
+
+        _logger.LogInformation(
+            "WASAPI PROVIDER FORMAT: Encoding={Encoding}, SampleRate={SampleRate}, " +
+            "Channels={Channels}, Bits={Bits}, BlockAlign={BlockAlign}, ExtraSize={ExtraSize}",
+            providerFormat.Encoding,
+            providerFormat.SampleRate,
+            providerFormat.Channels,
+            providerFormat.BitsPerSample,
+            providerFormat.BlockAlign,
+            providerFormat.ExtraSize);
+
+        _logger.LogInformation(
+            "WASAPI OUTPUT: Endpoint={Endpoint}, OutputIndex={OutputIndex}, " +
+            "ShareMode={ShareMode}, Latency={Latency}",
+            endpoint.FriendlyName,
+            outputIndex,
+            AudioClientShareMode.Shared,
+            100);
+
         output.Init(provider);
         output.Play();
 
@@ -209,7 +271,7 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
         output.Stop();
     }
 
-    private static async Task PlayAsioAsync(
+    private async Task PlayAsioAsync(
         AudioDeviceDto device,
         int outputIndex,
         string mode,
@@ -218,16 +280,80 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
         CancellationToken cancellationToken)
     {
         var driverName = device.Driver;
-        using var output = new AsioOut(driverName);
-        var channels = Math.Max(device.OutputCount, outputIndex + 1);
-        var format = WaveFormat.CreateIeeeFloatWaveFormat(48000, channels);
-        var provider = await CreateProviderAsync(mode, durationMs, volume, format, outputIndex, cancellationToken);
+        var stage = "open-driver";
 
-        output.Init(provider);
-        output.Play();
+        try
+        {
+            _logger.LogInformation(
+                "Opening ASIO driver for output test. Driver={Driver} RequestedOutputIndex={OutputIndex} DeviceOutputCount={DeviceOutputCount}",
+                driverName, outputIndex, device.OutputCount);
 
-        await WaitForPlaybackAsync(output, durationMs, cancellationToken);
-        output.Stop();
+            using var output = new AsioOut(driverName);
+            var driverOutputCount = output.DriverOutputChannelCount;
+
+            _logger.LogInformation(
+                "ASIO driver opened. Driver={Driver} DriverOutputChannels={DriverOutputChannels} DriverInputChannels={DriverInputChannels} RequestedOutputIndex={OutputIndex}",
+                output.DriverName, driverOutputCount, output.DriverInputChannelCount, outputIndex);
+
+            if (driverOutputCount <= 0)
+                throw new AudioDiagnosticException("ASIO_NO_OUTPUTS", $"ASIO driver '{driverName}' reports no output channels.");
+
+            if (outputIndex < 0 || outputIndex >= driverOutputCount)
+                throw new AudioDiagnosticException(
+                    "ASIO_OUTPUT_OUT_OF_RANGE",
+                    $"Output index {outputIndex} is outside the ASIO driver's output range 0..{driverOutputCount - 1}.");
+
+            stage = "validate-sample-rate";
+            var sampleRate = output.IsSampleRateSupported(48000)
+                ? 48000
+                : output.IsSampleRateSupported(44100)
+                    ? 44100
+                    : 0;
+
+            if (sampleRate == 0)
+                throw new AudioDiagnosticException(
+                    "ASIO_UNSUPPORTED_SAMPLE_RATE",
+                    $"ASIO driver '{driverName}' supports neither 48000 Hz nor 44100 Hz.");
+
+            // Test one physical output at a time. ChannelOffset routes the mono source
+            // to the requested zero-based ASIO output without creating a full-width stream.
+            stage = "create-provider";
+            var format = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 1);
+            var provider = await CreateProviderAsync(mode, durationMs, volume, format, 0, cancellationToken);
+
+            _logger.LogInformation(
+                "ASIO test stream prepared. Driver={Driver} SampleRate={SampleRate} Channels={Channels} BitsPerSample={BitsPerSample} Encoding={Encoding} ChannelOffset={ChannelOffset}",
+                driverName, sampleRate, format.Channels, format.BitsPerSample, format.Encoding, outputIndex);
+
+            stage = "initialize-stream";
+            output.ChannelOffset = outputIndex;
+            output.Init(provider);
+
+            _logger.LogInformation(
+                "ASIO stream initialized. Driver={Driver} OutputWaveFormat={OutputWaveFormat} NumberOfOutputChannels={NumberOfOutputChannels} FramesPerBuffer={FramesPerBuffer}",
+                driverName, output.OutputWaveFormat, output.NumberOfOutputChannels, output.FramesPerBuffer);
+
+            stage = "start-playback";
+            output.Play();
+
+            stage = "wait-for-playback";
+            await WaitForPlaybackAsync(output, durationMs, cancellationToken);
+
+            stage = "stop-playback";
+            output.Stop();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "ASIO output test failed at stage {Stage}. Driver={Driver} OutputIndex={OutputIndex} Mode={Mode}",
+                stage, driverName, outputIndex, mode);
+            throw;
+        }
     }
 
     private static async Task<IWaveProvider> CreateProviderAsync(
@@ -300,7 +426,17 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
             duration);
 
         // Materialize the generated speech before disposing the source stream.
-        var buffer = new byte[targetFormat.AverageBytesPerSecond * Math.Max(1, duration) / 1000];
+        // Use 64-bit arithmetic: a 12-channel Float32 endpoint can exceed Int32
+        // during bytes-per-second * duration even when the final buffer is small.
+        var bufferLength = ((long)targetFormat.AverageBytesPerSecond * Math.Max(1, duration) + 999L) / 1000L;
+        if (bufferLength > Array.MaxLength)
+        {
+            throw new AudioDiagnosticException(
+                "VOICE_TEST_BUFFER_TOO_LARGE",
+                $"Voice test buffer is too large ({bufferLength} bytes). Reduce the test duration.");
+        }
+
+        var buffer = new byte[(int)bufferLength];
         using var output = new MemoryStream();
         var routedRead = 0;
         while (routedRead < buffer.Length)
@@ -397,15 +533,16 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
             int durationMs,
             double volume)
         {
-            if (format.Encoding != WaveFormatEncoding.IeeeFloat &&
-                format.Encoding != WaveFormatEncoding.Pcm)
-                throw new AudioDiagnosticException("UNSUPPORTED_FORMAT", "Diagnostic tone requires PCM or IEEE float playback format.");
+            if (!AudioSampleFormat.IsSupported(format))
+                throw new AudioDiagnosticException(
+                    "UNSUPPORTED_FORMAT",
+                    $"Diagnostic tone does not support the endpoint format {format}.");
 
-            if (format.BitsPerSample is not (16 or 32))
-                throw new AudioDiagnosticException("UNSUPPORTED_FORMAT", $"Diagnostic tone does not support {format.BitsPerSample}-bit playback format.");
+            if (targetChannel < 0 || targetChannel >= format.Channels)
+                throw new AudioDiagnosticException("INVALID_OUTPUT_CHANNEL", $"Target channel {targetChannel} is outside the stream channel range 0..{format.Channels - 1}.");
 
             _format = format;
-            _targetChannel = Math.Clamp(targetChannel, 0, format.Channels - 1);
+            _targetChannel = targetChannel;
             _totalSamples = Math.Max(1, format.SampleRate * durationMs / 1000);
             _amplitude = (float)Math.Clamp(volume, 0.01, 1.0) * 0.15f;
         }
@@ -431,20 +568,10 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
                 var value = Math.Sin(2 * Math.PI * 440 * t) * _amplitude;
                 var sampleOffset = offset + frame * bytesPerFrame + _targetChannel * (_format.BitsPerSample / 8);
 
-                if (_format.Encoding == WaveFormatEncoding.IeeeFloat && _format.BitsPerSample == 32)
-                {
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 4), (float)value);
-                }
-                else if (_format.Encoding == WaveFormatEncoding.Pcm && _format.BitsPerSample == 16)
-                {
-                    var sample = (short)(value * short.MaxValue);
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 2), sample);
-                }
-                else if (_format.Encoding == WaveFormatEncoding.Pcm && _format.BitsPerSample == 32)
-                {
-                    var sample = (int)(value * int.MaxValue);
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 4), sample);
-                }
+                AudioSampleFormat.WriteSample(
+                    buffer.AsSpan(sampleOffset, AudioSampleFormat.BytesPerSample(_format)),
+                    _format,
+                    (float)value);
             }
 
             _samplePosition += frames;
@@ -469,16 +596,17 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
             double volume,
             int durationMs)
         {
-            if (targetFormat.Encoding != WaveFormatEncoding.IeeeFloat &&
-                targetFormat.Encoding != WaveFormatEncoding.Pcm)
-                throw new AudioDiagnosticException("UNSUPPORTED_FORMAT", "Diagnostic voice requires PCM or IEEE float playback format.");
+            if (!AudioSampleFormat.IsSupported(targetFormat))
+                throw new AudioDiagnosticException(
+                    "UNSUPPORTED_FORMAT",
+                    $"Diagnostic voice does not support the endpoint format {targetFormat}.");
 
-            if (targetFormat.BitsPerSample is not (16 or 32))
-                throw new AudioDiagnosticException("UNSUPPORTED_FORMAT", $"Diagnostic voice does not support {targetFormat.BitsPerSample}-bit playback format.");
+            if (targetChannel < 0 || targetChannel >= targetFormat.Channels)
+                throw new AudioDiagnosticException("INVALID_OUTPUT_CHANNEL", $"Target channel {targetChannel} is outside the stream channel range 0..{targetFormat.Channels - 1}.");
 
             _source = source;
             _targetFormat = targetFormat;
-            _targetChannel = Math.Clamp(targetChannel, 0, targetFormat.Channels - 1);
+            _targetChannel = targetChannel;
             _volume = (float)Math.Clamp(volume, 0.01, 1.0);
             _maxFrames = Math.Max(1, targetFormat.SampleRate * durationMs / 1000);
         }
@@ -518,18 +646,10 @@ public sealed class AudioDiagnosticsService : IAudioDiagnosticsService
                 var value = sourceSample * _volume;
                 var sampleOffset = offset + frame * bytesPerFrame + _targetChannel * (_targetFormat.BitsPerSample / 8);
 
-                if (_targetFormat.Encoding == WaveFormatEncoding.IeeeFloat && _targetFormat.BitsPerSample == 32)
-                {
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 4), value);
-                }
-                else if (_targetFormat.Encoding == WaveFormatEncoding.Pcm && _targetFormat.BitsPerSample == 16)
-                {
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 2), (short)(value * short.MaxValue));
-                }
-                else if (_targetFormat.Encoding == WaveFormatEncoding.Pcm && _targetFormat.BitsPerSample == 32)
-                {
-                    BitConverter.TryWriteBytes(buffer.AsSpan(sampleOffset, 4), (int)(value * int.MaxValue));
-                }
+                AudioSampleFormat.WriteSample(
+                    buffer.AsSpan(sampleOffset, AudioSampleFormat.BytesPerSample(_targetFormat)),
+                    _targetFormat,
+                    value);
             }
 
             _framesRead += frames;
