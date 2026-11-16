@@ -61,7 +61,7 @@ export default function Dashboard({
         />
 
         <main className="min-h-0 flex-1 overflow-auto p-4">
-          <div className="flex flex-col gap-4">
+          <div className="flex min-h-full flex-col gap-4">
             <DashboardHealth
               rooms={rooms}
               system={system}
@@ -69,7 +69,7 @@ export default function Dashboard({
               logs={logs}
             />
 
-            <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
+            <div className="grid min-w-0 grid-cols-1 gap-4 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_288px]">
               <div className="flex min-w-0 flex-col gap-3">
                 <DashboardPlaybackSessions
                   sessions={playbackSessions}

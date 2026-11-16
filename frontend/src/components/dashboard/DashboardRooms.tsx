@@ -99,7 +99,7 @@ export default function DashboardRooms({
         : "rooms.dashboard.showMoreMany"
 
   return (
-    <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <div className="flex min-h-0 flex-col rounded-lg border bg-card text-card-foreground shadow-sm xl:flex-1">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <h3 className="text-sm font-semibold">
           {t("rooms.dashboard.title")}
@@ -119,9 +119,9 @@ export default function DashboardRooms({
         </Button>
       </div>
 
-      <div className="p-3.5">
+      <div className="flex-1 p-3.5">
         {activeRooms.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="flex h-full flex-col items-center justify-center py-8 text-center">
             <PlayCircle className="mb-2 size-7 text-muted-foreground/50" />
 
             <div className="text-sm text-muted-foreground">
