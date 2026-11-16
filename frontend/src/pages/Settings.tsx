@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import Header from "@/components/Header"
+import { Button } from "@/components/ui/button"
 import { t } from "@/i18n"
 
 import AudioDeviceSettings from "@/components/settings/AudioDeviceSettings"
@@ -142,6 +143,7 @@ function writeSettingsCache(update: Partial<SettingsCache>) {
 
 interface SettingsProps {
   rooms: Room[]
+  onOpenOnboarding: () => void
 }
 
 function SettingsSection({
@@ -170,7 +172,7 @@ function SettingsSection({
   )
 }
 
-export default function Settings({ rooms }: SettingsProps) {
+export default function Settings({ rooms, onOpenOnboarding }: SettingsProps) {
   const queryClient = useQueryClient()
   const [cachedSettings] = useState(readSettingsCache)
   const [selectedDeviceId, setSelectedDeviceId] = useState("")
@@ -336,6 +338,19 @@ export default function Settings({ rooms }: SettingsProps) {
 
       <main className="min-h-0 flex-1 overflow-auto p-4">
         <div className="mx-auto max-w-6xl space-y-6">
+          <SettingsSection
+            title={t("onboarding.title")}
+            description={t("onboarding.subtitle")}
+          >
+            <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium">{t("onboarding.title")}</h3>
+                <p className="text-xs text-muted-foreground">{t("onboarding.subtitle")}</p>
+              </div>
+              <Button onClick={onOpenOnboarding}>{t("onboarding.start")}</Button>
+            </div>
+          </SettingsSection>
+
           <SettingsSection
             title={t("settings.updates.title")}
             description={t("settings.updates.description")}

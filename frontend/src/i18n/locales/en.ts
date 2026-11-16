@@ -841,4 +841,25 @@ export const en: Widen<typeof ru> = {
       sourceUi: "UI",
     },
   },
+
+  onboarding: {
+    title: "Quick start",
+    imagePlaceholder: "Illustration placeholder",
+    subtitle: "A short guide to the main Audexa workflow",
+    start: "Open guide",
+    skip: "Skip",
+    previous: "Back",
+    next: "Next",
+    finish: "Finish",
+    stepOf: "Step {current} of {total}",
+    steps: {
+      welcome: { title: "Welcome to Audexa", description: "A short walkthrough of the main workflow, from creating a room to monitoring playback on the Dashboard." },
+      rooms: { title: "Create a room in Rooms", description: "Create a room for the required area. You will use it when configuring scenario steps." },
+      audio: { title: "Add audio files", description: "Import the required recordings into the library so they can be assigned to rooms and scenario steps." },
+      scenarios: { title: "Create a scenario", description: "Create a scenario to combine playback actions across rooms into one sequence." },
+      scenarioSteps: { title: "Create scenario steps", description: "Assign a room and audio file to each step. If needed, attach synchronized translation and set a delay before the step runs." },
+      schedule: { title: "Create a playback schedule", description: "Create a schedule entry and link it to a scenario. Set the time and repeat pattern for automatic playback." },
+      dashboard: { title: "Monitor statuses on Dashboard", description: "Use the Dashboard to monitor system health, room statuses, and current playback." },
+    },
+  },
 } satisfies Widen<typeof ru> & TranslationTree

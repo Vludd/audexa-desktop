@@ -7,6 +7,7 @@ import { useAudioSystem } from "@/context/useAudioSystem"
 import { useLocale } from "@/i18n"
 import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
+import { logger } from "@/lib/logger"
 import type { Page } from "./types"
 
 import { useRooms } from "./hooks/useRooms"
@@ -20,6 +21,7 @@ import { useLogs } from "./hooks/useLogs"
 import Sidebar from "./components/Sidebar"
 import Toaster from "./components/ui/Toaster"
 import StatusBar from "./components/StatusBar"
+import GettingStartedDialog from "./components/onboarding/GettingStartedDialog"
 
 import Dashboard from "./pages/Dashboard"
 import Rooms from "./pages/Rooms"
@@ -29,12 +31,40 @@ import AudioFiles from "./pages/AudioFiles"
 import Settings from "./pages/Settings"
 import Logs from "./pages/Logs"
 
+const ONBOARDING_SEEN_KEY = "audexa.onboarding.seen.v1"
+
+function shouldShowOnboarding() {
+  if (typeof window === "undefined") return false
+
+  try {
+    return window.localStorage.getItem(ONBOARDING_SEEN_KEY) !== "true"
+  } catch (error) {
+    logger.warn("APP", "onboarding.state.read_failed", "Failed to read onboarding state.", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return true
+  }
+}
+
 export default function App() {
   useLocale()
 
   const queryClient = useQueryClient()
-  const [page, setPage] =
-    useState<Page>("dashboard")
+  const [page, setPage] = useState<Page>("dashboard")
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(shouldShowOnboarding)
+  const handleOnboardingOpenChange = (open: boolean) => {
+    setIsOnboardingOpen(open)
+
+    if (!open) {
+      try {
+        window.localStorage.setItem(ONBOARDING_SEEN_KEY, "true")
+      } catch (error) {
+        logger.warn("APP", "onboarding.state.write_failed", "Failed to save onboarding state.", {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+  }
 
   useEffect(() => {
     const unsubscribe = subscribeBackendStatus((online) => {
@@ -322,7 +352,7 @@ export default function App() {
           )}
 
           {page === "settings" && (
-            <Settings rooms={rooms} />
+            <Settings rooms={rooms} onOpenOnboarding={() => setIsOnboardingOpen(true)} />
           )}
 
           {page === "logs" && (
@@ -337,8 +367,12 @@ export default function App() {
       <StatusBar
         status={status}
         connectionState={connectionState}
-        // onOpenSettings={() => setPage("settings")}
         onNavigate={(nextPage) => setPage(nextPage as Page)}
+      />
+
+      <GettingStartedDialog
+        open={isOnboardingOpen}
+        onOpenChange={handleOnboardingOpenChange}
       />
 
       <Toaster />

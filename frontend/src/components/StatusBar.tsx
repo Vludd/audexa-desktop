@@ -53,40 +53,44 @@ export default function StatusBar({ status, connectionState, onNavigate }: Props
 
   return (
     <footer className="flex h-8 shrink-0 items-center border-t bg-[#1d2b3d] px-4 text-[11px] text-[#9db0c8]">
-      <label>
+      <span>
         {t("statusBar.audioDevice")}: <strong className="text-[#d7e2ef]">{status.device ?? "—"}</strong>
-      </label>
+      </span>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-      <label>
+      <span>
         {t("statusBar.backend")}: <strong className={connectionState === "online" ? "text-emerald-400" : connectionState === "offline" ? "text-red-400" : "text-amber-400"}>{connectionState.toUpperCase()}</strong>
-      </label>
+      </span>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
 
-      <label className="flex items-center gap-1.5">
-        <span className={`size-1.5 rounded-full ${dotClass}`} />
+      <span className="flex items-center gap-1.5">
+        <span
+          className={`size-1.5 rounded-full ${dotClass} ${
+            connectionState === "reconnecting" ? "animate-pulse" : ""
+          }`}
+        />
         <strong className={stateClass}>{stateText}</strong>
-      </label>
+      </span>
 
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-      <label>
+      <span>
         {t("statusBar.outputs")}: <strong className="text-[#d7e2ef]">{status.availableOutputs} / {status.outputs}</strong>
-      </label>
+      </span>
 
       {status.sampleRate && (
         <>
           <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-          <label>
+          <span>
             {t("statusBar.frequency")}: <strong className="text-[#d7e2ef]">{status.sampleRate / 1000} {t("units.kilohertz")}</strong>
-          </label>
+          </span>
         </>
       )}
 
       {status.bufferSize && (
         <>
           <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-          <label>
+          <span>
             {t("statusBar.buffer")}: <strong className="text-[#d7e2ef]">{status.bufferSize} {t("statusBar.samples")}</strong>
-          </label>
+          </span>
         </>
       )}
 
