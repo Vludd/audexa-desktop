@@ -523,32 +523,24 @@ export function useAudioFiles({
     )
   }, [])
 
-  const toggleSelectAll = useCallback(() => {
-    const visibleIds = filteredFiles.map(
-      (file) => file.id,
-    )
+  const toggleSelectAll = useCallback(
+    (visibleFileIds = filteredFiles.map((file) => file.id)) => {
+      setSelectedIds((current) => {
+        const allSelected =
+          visibleFileIds.length > 0 &&
+          visibleFileIds.every((id) => current.includes(id))
 
-    setSelectedIds((current) => {
-      const allSelected =
-        visibleIds.length > 0 &&
-        visibleIds.every((id) =>
-          current.includes(id),
+        if (allSelected) {
+          return current.filter((id) => !visibleFileIds.includes(id))
+        }
+
+        return Array.from(
+          new Set([...current, ...visibleFileIds]),
         )
-
-      if (allSelected) {
-        return current.filter(
-          (id) => !visibleIds.includes(id),
-        )
-      }
-
-      return Array.from(
-        new Set([
-          ...current,
-          ...visibleIds,
-        ]),
-      )
-    })
-  }, [filteredFiles])
+      })
+    },
+    [filteredFiles],
+  )
 
   const clearSelection = useCallback(() => {
     setSelectedIds([])

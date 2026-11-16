@@ -296,6 +296,10 @@ export const ru = {
       fileCount: "Файлов: {count}",
       storageUsed: "Занято: {size} {unit}",
       search: "Поиск файлов...",
+      fileType: "Тип файла",
+      allFileTypes: "Все типы",
+      showGrid: "Показать плиткой",
+      showList: "Показать списком",
     },
     table: {
       selectAll: "Выбрать все файлы",
@@ -339,6 +343,7 @@ export const ru = {
       loadError: "Не удалось загрузить аудиофайлы",
       noResults: "Ничего не найдено",
       searchHint: "Попробуйте изменить поисковый запрос.",
+      filterHint: "Измените тип файла или поисковый запрос.",
       empty: "Аудиофайлов пока нет",
       emptyDescription:
         "Добавьте MP3 или WAV, чтобы использовать их в комнатах и сценариях.",

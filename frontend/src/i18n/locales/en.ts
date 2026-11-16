@@ -308,6 +308,10 @@ export const en: Widen<typeof ru> = {
       fileCount: "Files: {count}",
       storageUsed: "Storage: {size} {unit}",
       search: "Search files...",
+      fileType: "File type",
+      allFileTypes: "All types",
+      showGrid: "Show as tiles",
+      showList: "Show as list",
     },
     table: {
       selectAll: "Select all files",
@@ -352,6 +356,7 @@ export const en: Widen<typeof ru> = {
       loadError: "Failed to load audio files",
       noResults: "No results found",
       searchHint: "Try changing your search.",
+      filterHint: "Try changing the file type or search.",
       empty: "No audio files yet",
       emptyDescription:
         "Add MP3 or WAV files to use them in rooms and scenarios.",
@@ -478,7 +483,7 @@ export const en: Widen<typeof ru> = {
       dragHandle: "Drag step",
       volumeFor: "Volume for step {number}",
       deleteTitle: "Delete step?",
-      
+
       deleteDescription: "Step {number} will be removed from the scenario.",
     },
     quickActions: {
@@ -506,7 +511,7 @@ export const en: Widen<typeof ru> = {
       delayNonnegative: "Step {number}: delay cannot be negative.",
       durationRequired: "Step {number}: audio duration is unknown.",
     },
-    
+
     errors: {
       startFailed: "Failed to start the scenario. Please try again.",
       playbackFailed: "An error occurred while starting the scenario",

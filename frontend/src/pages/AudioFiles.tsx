@@ -1,8 +1,7 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import type { BackendConnectionState } from "@/api/client"
 
 import {
-  CheckCircle2,
   Loader2,
   Plus,
   RotateCcw,
@@ -12,7 +11,7 @@ import {
 
 import Header from "@/components/Header"
 import { t } from "@/i18n"
-import AudioToolbar from "@/components/audio/AudioToolbar"
+import AudioToolbar, { ALL_FILE_TYPES } from "@/components/audio/AudioToolbar"
 import AudioTable from "@/components/audio/AudioTable"
 import AudioPlayer from "@/components/audio/AudioPlayer"
 
@@ -55,6 +54,32 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
   >(null)
 
   const [renameName, setRenameName] = useState("")
+  const [viewGrid, setViewGrid] = useState(true)
+  const [fileTypeFilter, setFileTypeFilter] = useState(ALL_FILE_TYPES)
+
+  const fileTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          audio.files
+            .map((file) => file.format.trim().toUpperCase())
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [audio.files],
+  )
+  const activeFileTypeFilter = fileTypes.includes(fileTypeFilter)
+    ? fileTypeFilter
+    : ALL_FILE_TYPES
+  const visibleFiles = useMemo(
+    () =>
+      audio.filteredFiles.filter(
+        (file) =>
+          activeFileTypeFilter === ALL_FILE_TYPES ||
+          file.format.trim().toUpperCase() === activeFileTypeFilter,
+      ),
+    [audio.filteredFiles, activeFileTypeFilter],
+  )
 
   const renameFile = audio.files.find(
     (file) => file.id === renameFileId,
@@ -155,9 +180,14 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
         <AudioToolbar
           query={audio.query}
           onQueryChange={audio.setQuery}
+          fileTypes={fileTypes}
+          fileTypeFilter={activeFileTypeFilter}
+          onFileTypeFilterChange={setFileTypeFilter}
           fileCount={audio.files.length}
           storageBytes={audio.files.reduce((total, file) => total + file.size, 0)}
+          viewGrid={viewGrid}
           onAdd={() => { if (!controlsBlocked) void filePicker.open() }}
+          onViewChange={setViewGrid}
           isAddPending={filePicker.isOpening}
           selectedCount={audio.selectedIds.length}
           onDeleteSelected={handleDeleteSelected}
@@ -257,16 +287,18 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
               {t("audio.import.retry")}
             </Button>
           </div>
-        ) : audio.filteredFiles.length === 0 ? (
+        ) : visibleFiles.length === 0 ? (
           <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border bg-card text-center">
-            {audio.query ? (
+            {audio.query || activeFileTypeFilter !== ALL_FILE_TYPES ? (
               <>
                 <div className="text-sm font-medium">
                   {t("audio.import.noResults")}
                 </div>
 
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {t("audio.import.searchHint")}
+                  {activeFileTypeFilter !== ALL_FILE_TYPES
+                    ? t("audio.import.filterHint")
+                    : t("audio.import.searchHint")}
                 </div>
               </>
             ) : (
@@ -305,7 +337,8 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
           </div>
         ) : (
           <AudioTable
-            files={audio.filteredFiles}
+            files={visibleFiles}
+            viewGrid={viewGrid}
             selected={audio.selectedId}
             selectedIds={audio.selectedIds}
             currentFileId={audio.currentFileId}
@@ -315,7 +348,9 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
             duration={audio.duration}
             onSelect={audio.selectFile}
             onToggleSelection={audio.toggleSelection}
-            onToggleSelectAll={audio.toggleSelectAll}
+            onToggleSelectAll={() =>
+              audio.toggleSelectAll(visibleFiles.map((file) => file.id))
+            }
             onTogglePlay={audio.togglePlay}
             onRename={handleRename}
             onDelete={handleDelete}
@@ -433,9 +468,7 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
             >
               {audio.isRenaming ? (
                 <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="size-4" />
-              )}
+              ) : null}
 
               {t("common.save")}
             </Button>

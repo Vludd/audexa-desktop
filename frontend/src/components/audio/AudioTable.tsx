@@ -21,6 +21,7 @@ import AudioFileActions from "./AudioFileActions"
 
 interface Props {
   files: AudioFile[]
+  viewGrid: boolean
   selected: string | null
   selectedIds: string[]
   currentFileId: string | null
@@ -47,8 +48,242 @@ function fmtSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} ${t("units.megabyte")}`
 }
 
+function AudioTiles({
+  files,
+  selected,
+  selectedIds,
+  currentFileId,
+  isPlaying,
+  isPlayPending,
+  currentTime,
+  duration,
+  onSelect,
+  onToggleSelection,
+  onToggleSelectAll,
+  onTogglePlay,
+  onRename,
+  onDelete,
+  onGainPreview,
+  onGainCommit,
+}: Omit<Props, "viewGrid">) {
+  const allSelected =
+    files.length > 0 && files.every((file) => selectedIds.includes(file.id))
+  const someSelected =
+    files.some((file) => selectedIds.includes(file.id)) && !allSelected
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Checkbox
+          checked={allSelected}
+          indeterminate={someSelected}
+          onCheckedChange={onToggleSelectAll}
+          aria-label={t("audio.table.selectAll")}
+        />
+        <span className="text-xs text-muted-foreground">
+          {t("audio.table.selectAll")}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {files.map((file) => {
+          const isCurrent = currentFileId === file.id
+          const isChecked = selectedIds.includes(file.id)
+          const playbackDuration = duration || file.duration || 0
+          const showPlaybackProgress =
+            isCurrent && (isPlaying || isPlayPending || currentTime > 0)
+          const fileDuration =
+            Number.isFinite(file.duration) && file.duration >= 0
+              ? formatTime(file.duration)
+              : "—"
+
+          return (
+            <div
+              key={file.id}
+              data-state={selected === file.id ? "selected" : undefined}
+              className={[
+                "group min-w-0 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 data-[state=selected]:border-primary",
+                isCurrent && "bg-primary/[0.045]",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => onSelect(file.id)}
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <div
+                  className="pt-0.5"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={isChecked}
+                    onCheckedChange={() => onToggleSelection(file.id)}
+                    aria-label={t("audio.table.selectFile", {
+                      name: file.name,
+                    })}
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
+                    <div
+                      className={[
+                        "truncate text-sm font-medium",
+                        isCurrent && "text-primary",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      title={file.name}
+                    >
+                      {file.name}
+                    </div>
+
+                    <span className="shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                      {file.format}
+                    </span>
+                  </div>
+
+                  <div
+                    className="mt-1 truncate font-mono text-xs text-muted-foreground"
+                    title={file.filename}
+                  >
+                    {file.filename}
+                  </div>
+                </div>
+
+                <AudioFileActions
+                  alwaysVisible
+                  onRename={() => onRename(file.id)}
+                  onDelete={() => onDelete(file.id)}
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>{fileDuration}</span>
+                <span>{fmtSize(file.size)}</span>
+                <span>
+                  {file.sampleRate / 1000} {t("units.kilohertz")}
+                </span>
+              </div>
+
+              {isCurrent && (
+                <>
+                  <div className="mt-2 text-[11px] font-medium text-primary">
+                    {isPlaying
+                      ? t("audio.table.playing")
+                      : isPlayPending
+                        ? t("audio.table.starting")
+                        : t("audio.table.selected")}
+                  </div>
+
+                  {showPlaybackProgress && (
+                    <div className="mt-1 flex items-center gap-2">
+                      <div
+                        role="progressbar"
+                        aria-label={t("audio.player.position")}
+                        aria-valuemin={0}
+                        aria-valuemax={playbackDuration}
+                        aria-valuenow={Math.min(currentTime, playbackDuration)}
+                        className="h-1 min-w-12 flex-1 overflow-hidden rounded-full bg-muted"
+                      >
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width]"
+                          style={{
+                            width: `${getProgress(currentTime, playbackDuration)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                        {formatTime(currentTime)} /{" "}
+                        {formatTime(playbackDuration)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="mt-3 flex items-center gap-2 border-t pt-3">
+                <Button
+                  variant={isCurrent ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  className={[
+                    "size-7 rounded-full",
+                    isCurrent &&
+                      "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  title={
+                    isCurrent && isPlaying
+                      ? t("audio.table.pause")
+                      : t("audio.table.play")
+                  }
+                  aria-label={
+                    isCurrent && isPlaying
+                      ? t("audio.table.pause")
+                      : t("audio.table.play")
+                  }
+                  disabled={isCurrent && isPlayPending}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onTogglePlay(file.id)
+                  }}
+                >
+                  {isCurrent && isPlayPending ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : isCurrent && isPlaying ? (
+                    <Pause className="size-3.5" />
+                  ) : (
+                    <Play className="size-3.5 translate-x-px" />
+                  )}
+                </Button>
+
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-2"
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <Slider
+                    value={[file.volumeDb]}
+                    min={-60}
+                    max={12}
+                    step={1}
+                    onValueChange={(value) => {
+                      const gainDb = Array.isArray(value) ? value[0] : value
+                      if (typeof gainDb === "number") {
+                        onGainPreview(file.id, gainDb)
+                      }
+                    }}
+                    onValueCommitted={(value) => {
+                      const gainDb = Array.isArray(value) ? value[0] : value
+                      if (typeof gainDb === "number") {
+                        onGainCommit(file.id, gainDb)
+                      }
+                    }}
+                    aria-label={t("audio.table.gainFor", {
+                      name: file.name,
+                    })}
+                    title={t("audio.player.gainHint")}
+                  />
+                  <span className="w-11 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                    {file.volumeDb > 0 ? "+" : ""}
+                    {file.volumeDb} dB
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function AudioTable({
   files,
+  viewGrid,
   selected,
   selectedIds,
   currentFileId,
@@ -66,15 +301,33 @@ export default function AudioTable({
   onGainCommit,
 }: Props) {
   const allSelected =
-    files.length > 0 &&
-    files.every((file) =>
-      selectedIds.includes(file.id),
-    )
+    files.length > 0 && files.every((file) => selectedIds.includes(file.id))
 
   const someSelected =
-    files.some((file) =>
-      selectedIds.includes(file.id),
-    ) && !allSelected
+    files.some((file) => selectedIds.includes(file.id)) && !allSelected
+
+  if (viewGrid) {
+    return (
+      <AudioTiles
+        files={files}
+        selected={selected}
+        selectedIds={selectedIds}
+        currentFileId={currentFileId}
+        isPlaying={isPlaying}
+        isPlayPending={isPlayPending}
+        currentTime={currentTime}
+        duration={duration}
+        onSelect={onSelect}
+        onToggleSelection={onToggleSelection}
+        onToggleSelectAll={onToggleSelectAll}
+        onTogglePlay={onTogglePlay}
+        onRename={onRename}
+        onDelete={onDelete}
+        onGainPreview={onGainPreview}
+        onGainCommit={onGainCommit}
+      />
+    )
+  }
 
   return (
     <div className="overflow-hidden rounded-lg border bg-card">
@@ -92,9 +345,7 @@ export default function AudioTable({
 
             <TableHead className="w-11" />
 
-            <TableHead className="min-w-56">
-              {t("audio.table.name")}
-            </TableHead>
+            <TableHead className="min-w-56">{t("audio.table.name")}</TableHead>
 
             <TableHead className="min-w-64">
               {t("audio.table.filename")}
@@ -104,9 +355,7 @@ export default function AudioTable({
             <TableHead>{t("audio.table.sampleRate")}</TableHead>
             <TableHead>{t("audio.table.duration")}</TableHead>
             <TableHead>{t("audio.table.size")}</TableHead>
-            <TableHead className="min-w-48">
-              {t("audio.table.gain")}
-            </TableHead>
+            <TableHead className="min-w-48">{t("audio.table.gain")}</TableHead>
 
             <TableHead className="w-20" />
           </TableRow>
@@ -114,27 +363,20 @@ export default function AudioTable({
 
         <TableBody>
           {files.map((file) => {
-            const isCurrent =
-              currentFileId === file.id
+            const isCurrent = currentFileId === file.id
             const showPlaybackProgress =
               isCurrent && (isPlaying || isPlayPending || currentTime > 0)
             const playbackDuration = duration || file.duration || 0
 
-            const isChecked =
-              selectedIds.includes(file.id)
+            const isChecked = selectedIds.includes(file.id)
 
             return (
               <TableRow
                 key={file.id}
-                data-state={
-                  selected === file.id
-                    ? "selected"
-                    : undefined
-                }
+                data-state={selected === file.id ? "selected" : undefined}
                 className={[
                   "group cursor-pointer transition-colors",
-                  isCurrent &&
-                    "bg-primary/[0.045] hover:bg-primary/[0.07]",
+                  isCurrent && "bg-primary/[0.045] hover:bg-primary/[0.07]",
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -142,15 +384,11 @@ export default function AudioTable({
               >
                 <TableCell
                   className="w-10 px-3"
-                  onClick={(event) =>
-                    event.stopPropagation()
-                  }
+                  onClick={(event) => event.stopPropagation()}
                 >
                   <Checkbox
                     checked={isChecked}
-                    onCheckedChange={() =>
-                      onToggleSelection(file.id)
-                    }
+                    onCheckedChange={() => onToggleSelection(file.id)}
                     aria-label={t("audio.table.selectFile", {
                       name: file.name,
                     })}
@@ -159,16 +397,10 @@ export default function AudioTable({
 
                 <TableCell
                   className="pr-0"
-                  onClick={(event) =>
-                    event.stopPropagation()
-                  }
+                  onClick={(event) => event.stopPropagation()}
                 >
                   <Button
-                    variant={
-                      isCurrent
-                        ? "secondary"
-                        : "ghost"
-                    }
+                    variant={isCurrent ? "secondary" : "ghost"}
                     size="icon-sm"
                     className={[
                       "size-7 rounded-full",
@@ -182,12 +414,8 @@ export default function AudioTable({
                         ? t("audio.table.pause")
                         : t("audio.table.play")
                     }
-                    disabled={
-                      isCurrent && isPlayPending
-                    }
-                    onClick={() =>
-                      onTogglePlay(file.id)
-                    }
+                    disabled={isCurrent && isPlayPending}
+                    onClick={() => onTogglePlay(file.id)}
                   >
                     {isCurrent && isPlayPending ? (
                       <Loader2 className="size-3.5 animate-spin" />
@@ -229,7 +457,10 @@ export default function AudioTable({
                             aria-label={t("audio.player.position")}
                             aria-valuemin={0}
                             aria-valuemax={playbackDuration}
-                            aria-valuenow={Math.min(currentTime, playbackDuration)}
+                            aria-valuenow={Math.min(
+                              currentTime,
+                              playbackDuration,
+                            )}
                             className="h-1 min-w-12 flex-1 overflow-hidden rounded-full bg-muted"
                           >
                             <div
@@ -240,7 +471,8 @@ export default function AudioTable({
                             />
                           </div>
                           <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-                            {formatTime(currentTime)} / {formatTime(playbackDuration)}
+                            {formatTime(currentTime)} /{" "}
+                            {formatTime(playbackDuration)}
                           </span>
                         </div>
                       )}
@@ -288,17 +520,13 @@ export default function AudioTable({
                       max={12}
                       step={1}
                       onValueChange={(value) => {
-                        const gainDb = Array.isArray(value)
-                          ? value[0]
-                          : value
+                        const gainDb = Array.isArray(value) ? value[0] : value
                         if (typeof gainDb === "number") {
                           onGainPreview(file.id, gainDb)
                         }
                       }}
                       onValueCommitted={(value) => {
-                        const gainDb = Array.isArray(value)
-                          ? value[0]
-                          : value
+                        const gainDb = Array.isArray(value) ? value[0] : value
                         if (typeof gainDb === "number") {
                           onGainCommit(file.id, gainDb)
                         }
@@ -317,12 +545,8 @@ export default function AudioTable({
 
                 <TableCell>
                   <AudioFileActions
-                    onRename={() =>
-                      onRename(file.id)
-                    }
-                    onDelete={() =>
-                      onDelete(file.id)
-                    }
+                    onRename={() => onRename(file.id)}
+                    onDelete={() => onDelete(file.id)}
                   />
                 </TableCell>
               </TableRow>

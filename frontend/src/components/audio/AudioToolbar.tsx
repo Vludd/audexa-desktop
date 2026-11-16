@@ -1,20 +1,29 @@
-import {
-  Loader2,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react"
+import { LayoutGrid, List, Loader2, Plus, Search, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { t } from "@/i18n"
+
+export const ALL_FILE_TYPES = "__all_file_types__"
 
 interface Props {
   query: string
   onQueryChange: (value: string) => void
+  fileTypes: string[]
+  fileTypeFilter: string
+  onFileTypeFilterChange: (value: string) => void
   fileCount: number
   storageBytes: number
+  viewGrid: boolean
   onAdd: () => void
+  onViewChange: (grid: boolean) => void
   isAddPending?: boolean
 
   selectedCount: number
@@ -25,9 +34,14 @@ interface Props {
 export default function AudioToolbar({
   query,
   onQueryChange,
+  fileTypes,
+  fileTypeFilter,
+  onFileTypeFilterChange,
   fileCount,
   storageBytes,
+  viewGrid,
   onAdd,
+  onViewChange,
   isAddPending = false,
   selectedCount,
   onDeleteSelected,
@@ -47,9 +61,7 @@ export default function AudioToolbar({
           <Plus className="size-4" />
         )}
 
-        {isAddPending
-          ? t("audio.toolbar.opening")
-          : t("audio.toolbar.add")}
+        {isAddPending ? t("audio.toolbar.opening") : t("audio.toolbar.add")}
       </Button>
 
       {selectedCount > 0 && (
@@ -75,6 +87,62 @@ export default function AudioToolbar({
 
       <div className="flex-1" />
 
+      <Select
+        value={fileTypeFilter}
+        onValueChange={(value) => {
+          if (value !== null) onFileTypeFilterChange(value)
+        }}
+      >
+        <SelectTrigger
+          aria-label={t("audio.toolbar.fileType")}
+          className="h-8 w-36 text-xs"
+        >
+          <SelectValue>
+            {fileTypeFilter === ALL_FILE_TYPES
+              ? t("audio.toolbar.allFileTypes")
+              : fileTypeFilter}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_FILE_TYPES}>
+            {t("audio.toolbar.allFileTypes")}
+          </SelectItem>
+          {fileTypes.map((fileType) => (
+            <SelectItem key={fileType} value={fileType}>
+              {fileType}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <div className="flex items-center gap-1 rounded-lg border bg-background p-1">
+        <Button
+          type="button"
+          size="icon"
+          variant={viewGrid ? "secondary" : "ghost"}
+          className="size-8"
+          disabled={disabled}
+          onClick={() => onViewChange(true)}
+          aria-label={t("audio.toolbar.showGrid")}
+          title={t("audio.toolbar.showGrid")}
+        >
+          <LayoutGrid className="size-4" />
+        </Button>
+
+        <Button
+          type="button"
+          size="icon"
+          variant={!viewGrid ? "secondary" : "ghost"}
+          className="size-8"
+          disabled={disabled}
+          onClick={() => onViewChange(false)}
+          aria-label={t("audio.toolbar.showList")}
+          title={t("audio.toolbar.showList")}
+        >
+          <List className="size-4" />
+        </Button>
+      </div>
+
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span>{t("audio.toolbar.fileCount", { count: fileCount })}</span>
         <span>
@@ -90,9 +158,7 @@ export default function AudioToolbar({
 
         <Input
           value={query}
-          onChange={(event) =>
-            onQueryChange(event.target.value)
-          }
+          onChange={(event) => onQueryChange(event.target.value)}
           placeholder={t("audio.toolbar.search")}
           className="h-8 pl-8 text-xs"
           disabled={disabled}
