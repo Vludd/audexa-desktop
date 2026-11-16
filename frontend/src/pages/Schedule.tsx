@@ -304,7 +304,7 @@ export default function Schedule({
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden" inert={controlsBlocked} aria-disabled={controlsBlocked || undefined}>
-        <main className="min-w-0 flex-1 overflow-auto p-5">
+        <main className="min-w-0 flex-1 overflow-auto p-4">
           <ScheduleTable
             schedule={sortedSchedule}
             selectedId={selectedId}
