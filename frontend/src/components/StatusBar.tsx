@@ -1,16 +1,17 @@
-import { Settings } from "lucide-react"
+import { Radio } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { t } from "@/i18n"
 import type { SystemStatus } from "../types"
 import type { BackendConnectionState } from "@/api/client"
+import { Button } from "./ui/button"
 
 interface Props {
   status: SystemStatus
   connectionState: BackendConnectionState
-  onOpenSettings?: () => void
+  onNavigate: (page: string) => void
 }
 
-export default function StatusBar({ status, connectionState, onOpenSettings }: Props) {
+export default function StatusBar({ status, connectionState, onNavigate }: Props) {
   const stateText =
     connectionState === "offline"
       ? "BACKEND OFFLINE"
@@ -52,53 +53,57 @@ export default function StatusBar({ status, connectionState, onOpenSettings }: P
 
   return (
     <footer className="flex h-8 shrink-0 items-center border-t bg-[#1d2b3d] px-4 text-[11px] text-[#9db0c8]">
-      <span>
+      <label>
         {t("statusBar.audioDevice")}: <strong className="text-[#d7e2ef]">{status.device ?? "—"}</strong>
-      </span>
+      </label>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-      <span>
+      <label>
         {t("statusBar.backend")}: <strong className={connectionState === "online" ? "text-emerald-400" : connectionState === "offline" ? "text-red-400" : "text-amber-400"}>{connectionState.toUpperCase()}</strong>
-      </span>
+      </label>
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
 
-      <span className="flex items-center gap-1.5">
+      <label className="flex items-center gap-1.5">
         <span className={`size-1.5 rounded-full ${dotClass}`} />
         <strong className={stateClass}>{stateText}</strong>
-      </span>
+      </label>
 
       <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-      <span>
+      <label>
         {t("statusBar.outputs")}: <strong className="text-[#d7e2ef]">{status.availableOutputs} / {status.outputs}</strong>
-      </span>
+      </label>
 
       {status.sampleRate && (
         <>
           <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-          <span>
+          <label>
             {t("statusBar.frequency")}: <strong className="text-[#d7e2ef]">{status.sampleRate / 1000} {t("units.kilohertz")}</strong>
-          </span>
+          </label>
         </>
       )}
 
       {status.bufferSize && (
         <>
           <Separator orientation="vertical" className="mx-3 h-3.5 bg-white/15" />
-          <span>
+          <label>
             {t("statusBar.buffer")}: <strong className="text-[#d7e2ef]">{status.bufferSize} {t("statusBar.samples")}</strong>
-          </span>
+          </label>
         </>
       )}
 
       <div className="flex-1" />
 
-      <button
+      <Button
         type="button"
-        onClick={onOpenSettings}
-        className="flex h-6 items-center gap-1.5 rounded px-2 text-[11px] text-[#9db0c8] transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        variant="ghost"
+        className="justify-start gap-2.5"
+        onClick={() => {
+          window.location.hash = "audio-device-settings"
+          onNavigate("settings")
+        }}
       >
-        <Settings className="size-3" />
+        <Radio className="size-4" />
         {t("statusBar.audioSettings")}
-      </button>
+      </Button>
     </footer>
   )
 }

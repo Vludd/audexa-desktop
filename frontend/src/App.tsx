@@ -337,7 +337,8 @@ export default function App() {
       <StatusBar
         status={status}
         connectionState={connectionState}
-        onOpenSettings={() => setPage("settings")}
+        // onOpenSettings={() => setPage("settings")}
+        onNavigate={(nextPage) => setPage(nextPage as Page)}
       />
 
       <Toaster />
