@@ -190,6 +190,7 @@ export const en: Widen<typeof ru> = {
       autoStart: "Run this schedule automatically",
       saveChanges: "Save changes",
       create: "Create schedule",
+      scenarioNotFound: "Scenario not found",
     },
     upcoming: {
       title: "Upcoming events",

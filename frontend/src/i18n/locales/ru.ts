@@ -176,6 +176,7 @@ export const ru = {
       autoStart: "Запускать расписание автоматически",
       saveChanges: "Сохранить изменения",
       create: "Создать расписание",
+      scenarioNotFound: "Сценарий не найден",
     },
     upcoming: {
       title: "Ближайшие события",

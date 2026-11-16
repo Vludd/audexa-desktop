@@ -123,17 +123,27 @@ export default function ScheduleDialog({
                 })
               }}
             >
-              <SelectTrigger>
-                <SelectValue placeholder={t("schedule.dialog.chooseScenario")} />
+              <SelectTrigger className="w-full min-w-0">
+                <SelectValue
+                  className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                  placeholder={t("schedule.dialog.chooseScenario")}
+                >
+                  {scenarios.find(
+                    (scenario) => String(scenario.id) === String(form.scenarioId),
+                  )?.name ?? t("schedule.dialog.scenarioNotFound")}
+                </SelectValue>
               </SelectTrigger>
 
-              <SelectContent>
+              <SelectContent className="w-(--anchor-width) min-w-0">
                 {scenarios.map((scenario) => (
                   <SelectItem
                     key={scenario.id}
                     value={String(scenario.id)}
+                    className="min-w-0"
                   >
-                    {scenario.name}
+                    <span className="block max-w-[400px] truncate">
+                      {scenario.name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -192,7 +202,9 @@ export default function ScheduleDialog({
               }}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>
+                  {t(`schedule.repeat.${form.repeat}`)}
+                </SelectValue>
               </SelectTrigger>
 
               <SelectContent>
