@@ -31,7 +31,7 @@ export default function RoomToolbar({
       
 
       <Button type="button" disabled={disabled} onClick={onAddRoom}>
-        <Plus className="size-4" />
+        <Plus className="size-3.5" />
         {t("rooms.toolbar.add")}
       </Button>
 

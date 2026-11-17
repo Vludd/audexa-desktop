@@ -21,7 +21,7 @@ import {
 import type { AudioFile, Room, ScenarioStep } from "@/types"
 import { t } from "@/i18n"
 import { formatTime } from "@/lib/audio"
-import { Slider } from "../ui/slider"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
 
 interface Props {
@@ -32,6 +32,49 @@ interface Props {
   onUpdateStep: (stepId: string, patch: Partial<ScenarioStep>) => void
   onRemoveStep: (stepId: string) => void
   onMoveStep: (fromIndex: number, toIndex: number) => void
+}
+
+function StepDelayInput({
+  delay,
+  onCommit,
+}: {
+  delay: number
+  onCommit: (delay: number) => void
+}) {
+  const [draft, setDraft] = useState({ delay, value: String(delay) })
+  const value = draft.delay === delay ? draft.value : String(delay)
+
+  const commit = () => {
+    const nextDelay = Number(value)
+
+    if (
+      value.trim() === "" ||
+      !Number.isFinite(nextDelay) ||
+      nextDelay < 0
+    ) {
+      setDraft({ delay, value: String(delay) })
+      return
+    }
+
+    if (nextDelay !== delay) {
+      onCommit(nextDelay)
+    }
+  }
+
+  return (
+    <Input
+      type="number"
+      min={0}
+      step={1}
+      value={value}
+      onChange={(event) =>
+        setDraft({ delay, value: event.currentTarget.value })
+      }
+      onBlur={commit}
+      aria-label={t("scenarios.steps.delayBeforeStartSeconds")}
+      className="h-8 w-20 text-right text-xs tabular-nums"
+    />
+  )
 }
 
 export default function ScenarioStepsTable({
@@ -100,7 +143,7 @@ export default function ScenarioStepsTable({
               <TableHead>{t("scenarios.steps.room")}</TableHead>
               <TableHead>{t("scenarios.steps.audioFile")}</TableHead>
               <TableHead>{t("scenarios.steps.translationAudio")}</TableHead>
-              <TableHead className="w-[100px]">
+              <TableHead className="w-[120px]">
                 {t("scenarios.steps.delayBeforeStartSeconds")}
               </TableHead>
               <TableHead className="w-[100px]">
@@ -268,25 +311,14 @@ export default function ScenarioStepsTable({
                   </TableCell>
 
                   <TableCell>
-                    <div className="flex min-w-[140px] items-center gap-3">
-                      <Slider
-                        min={0}
-                        max={30}
-                        step={1}
-                        value={[step.delay]}
-                        onValueChange={(value) =>
-                          onUpdateStep(step.id, {
-                            delay: Array.isArray(value) ? value[0] : value,
-                          })
+                    <div className="flex min-w-[100px] items-center gap-2">
+                      <StepDelayInput
+                        delay={step.delay}
+                        onCommit={(delay) =>
+                          onUpdateStep(step.id, { delay })
                         }
-                        aria-label={t("scenarios.steps.delayBeforeStartSeconds")}
-                        className="flex-1"
-                        trackClassName="bg-muted-foreground/25"
                       />
-
-                      <span className="w-12 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                        {step.delay.toFixed(1)} с
-                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">с</span>
                     </div>
                   </TableCell>
 

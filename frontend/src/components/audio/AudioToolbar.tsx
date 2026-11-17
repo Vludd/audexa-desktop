@@ -48,7 +48,7 @@ export default function AudioToolbar({
   disabled = false,
 }: Props) {
   return (
-    <div className="flex min-h-11 flex-wrap items-center gap-2 border-b bg-card px-4 py-2">
+    <div className="flex min-h-[49px] flex-wrap items-center gap-2 border-b bg-card px-4 py-2">
       <Button
         size="sm"
         onClick={onAdd}
@@ -56,9 +56,9 @@ export default function AudioToolbar({
         aria-busy={isAddPending}
       >
         {isAddPending ? (
-          <Loader2 className="size-4 animate-spin" />
+          <Loader2 className="size-3.5 animate-spin" />
         ) : (
-          <Plus className="size-4" />
+          <Plus className="size-3.5" />
         )}
 
         {isAddPending ? t("audio.toolbar.opening") : t("audio.toolbar.add")}
@@ -120,7 +120,7 @@ export default function AudioToolbar({
           type="button"
           size="icon"
           variant={viewGrid ? "secondary" : "ghost"}
-          className="size-8"
+          className="size-7"
           disabled={disabled}
           onClick={() => onViewChange(true)}
           aria-label={t("audio.toolbar.showGrid")}
@@ -133,7 +133,7 @@ export default function AudioToolbar({
           type="button"
           size="icon"
           variant={!viewGrid ? "secondary" : "ghost"}
-          className="size-8"
+          className="size-7"
           disabled={disabled}
           onClick={() => onViewChange(false)}
           aria-label={t("audio.toolbar.showList")}
@@ -160,7 +160,7 @@ export default function AudioToolbar({
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={t("audio.toolbar.search")}
-          className="h-8 pl-8 text-xs"
+          className="h-7 pl-8 text-xs"
           disabled={disabled}
         />
       </div>

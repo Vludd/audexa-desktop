@@ -9,7 +9,6 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -70,7 +69,7 @@ export default function RoomTable({
   const hideMediaControls = true
 
   return (
-    <Card className="overflow-hidden">
+    <div className="flex flex-col bg-card border rounded-lg shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
@@ -291,7 +290,7 @@ export default function RoomTable({
           })}
         </TableBody>
       </Table>
-    </Card>
+    </div>
   )
 }
 

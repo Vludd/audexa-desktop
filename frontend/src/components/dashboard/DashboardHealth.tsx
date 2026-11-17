@@ -6,7 +6,6 @@ import {
   XCircle,
 } from "lucide-react"
 
-import { Card } from "@/components/ui/card"
 import type { LogEntry, Room, SystemStatus } from "@/types"
 import type { BackendConnectionState } from "@/api/client"
 import { t } from "@/i18n"
@@ -110,7 +109,7 @@ function HealthCard({
           : "bg-primary/10 text-primary"
 
   return (
-    <Card className="flex-row items-center gap-3 px-4 py-3.5">
+    <div className="flex flex-row items-center gap-3 px-4 py-4 rounded-lg border bg-card text-card-foreground shadow-sm xl:flex-1">
       <div
         className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${iconClass}`}
       >
@@ -132,6 +131,6 @@ function HealthCard({
           </div>
         )}
       </div>
-    </Card>
+    </div>
   )
 }

@@ -69,8 +69,8 @@ export default function Dashboard({
               logs={logs}
             />
 
-            <div className="grid min-w-0 grid-cols-1 gap-4 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_288px]">
-              <div className="flex min-w-0 flex-col gap-3">
+            <div className="grid min-w-0 grid-cols-1 gap-4 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_348px]">
+              <div className="flex min-w-0 flex-col gap-4">
                 <DashboardPlaybackSessions
                   sessions={playbackSessions}
                   onSkipStep={onSkipStep}
@@ -97,7 +97,7 @@ export default function Dashboard({
                 />
               </div>
 
-              <div className="flex min-w-0 flex-col gap-3 self-start">
+              <div className="flex min-w-0 flex-col gap-4 self-start">
                 <DashboardSchedule
                   schedule={schedule}
                   onNavigate={onNavigate}

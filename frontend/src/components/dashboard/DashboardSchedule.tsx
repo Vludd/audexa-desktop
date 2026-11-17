@@ -42,13 +42,13 @@ export default function DashboardSchedule({
               {t("dashboard.schedule.empty")}
             </div>
 
-            <Button
+            {/* <Button
               variant="link"
               className="mt-1 h-auto p-0 text-xs"
               onClick={() => onNavigate("schedule")}
             >
               {t("dashboard.schedule.open")}
-            </Button>
+            </Button> */}
           </div>
         ) : (
           <div className="flex flex-col">

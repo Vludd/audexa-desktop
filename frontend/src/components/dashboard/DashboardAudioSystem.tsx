@@ -28,7 +28,7 @@ export default function DashboardAudioSystem({ system, connectionState }: Dashbo
         <h3 className="text-sm font-semibold">{t("dashboard.audioSystem.title")}</h3>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-3.5">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
         <InfoRow label={t("dashboard.audioSystem.backend")} value={connectionState.toUpperCase()} />
 
         <InfoRow label={t("dashboard.audioSystem.device")} value={system.device ?? "—"} />

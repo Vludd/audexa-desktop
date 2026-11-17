@@ -292,7 +292,7 @@ export const en: Widen<typeof ru> = {
     },
     dashboard: {
       title: "Room status",
-      all: "All rooms →",
+      all: "All rooms",
       empty: "No active rooms",
       showMoreOne: "Show {count} more room",
       showMoreFew: "Show {count} more rooms",
@@ -577,13 +577,13 @@ export const en: Widen<typeof ru> = {
       stop: "Stop",
       openRoom: "Open room",
       empty: "Nothing is playing",
-      openRooms: "Open rooms →",
+      openRooms: "Open rooms",
     },
     schedule: {
       title: "Upcoming schedule",
-      all: "Full schedule →",
+      all: "Full schedule",
       empty: "No scheduled events",
-      open: "Open schedule →",
+      open: "Open schedule",
     },
     quickActions: {
       title: "Quick actions",
