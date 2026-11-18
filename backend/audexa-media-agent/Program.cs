@@ -24,6 +24,7 @@ builder.Services.Configure<MediaAgentOptions>(
 );
 
 builder.Services.AddSingleton<DisplayEnumerator>();
+builder.Services.AddSingleton<DisplayWindowManager>();
 builder.Services.AddSingleton<PlaybackUiThread>();
 builder.Services.AddSingleton<LibVlcPlayerManager>();
 builder.Services.AddHostedService<MediaAgentWorker>();

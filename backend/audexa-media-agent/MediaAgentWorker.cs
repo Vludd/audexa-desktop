@@ -174,6 +174,8 @@ public sealed class MediaAgentWorker : BackgroundService
         await ReportDisplaysAsync(displays, cancellationToken);
 
         _lastDisplays = displays;
+        await _playerManager.ReconcileDisplaysAsync(
+            displays.Select(display => display.DeviceId).ToArray(), cancellationToken);
 
         _logger.LogInformation(
             "Registered Media Host {HostId} ({HostName}), displays: {Count}",
@@ -197,6 +199,8 @@ public sealed class MediaAgentWorker : BackgroundService
         await ReportDisplaysAsync(current, cancellationToken);
 
         _lastDisplays = current;
+        await _playerManager.ReconcileDisplaysAsync(
+            current.Select(display => display.DeviceId).ToArray(), cancellationToken);
 
         _logger.LogInformation(
             "Display configuration changed. Updated {Count} display(s).",

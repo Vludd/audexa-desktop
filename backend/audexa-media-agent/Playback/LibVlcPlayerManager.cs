@@ -1,25 +1,29 @@
 using System.Windows.Forms;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WinForms;
+using Audexa.MediaAgent.Display;
 using Microsoft.Extensions.Logging;
 
 namespace Audexa.MediaAgent.Playback;
 
-/// <summary>Runs one independent LibVLC MediaPlayer and output window per physical display.</summary>
+/// <summary>Runs one independent LibVLC MediaPlayer per physical display.</summary>
 public sealed class LibVlcPlayerManager : IAsyncDisposable
 {
     private readonly ILogger<LibVlcPlayerManager> _logger;
     private readonly PlaybackUiThread _uiThread;
+    private readonly DisplayWindowManager _windowManager;
     private readonly LibVLC _libVlc;
     private readonly Dictionary<string, PlayerSession> _players = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
 
     public LibVlcPlayerManager(
         ILogger<LibVlcPlayerManager> logger,
-        PlaybackUiThread uiThread)
+        PlaybackUiThread uiThread,
+        DisplayWindowManager windowManager)
     {
         _logger = logger;
         _uiThread = uiThread;
+        _windowManager = windowManager;
 
         // Match the known-good VLC test configuration: software decoding and GDI output.
         _libVlc = new LibVLC(
@@ -36,10 +40,7 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
         _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.SetPause(true), ct);
 
     public Task ResumeAsync(string displayKey, CancellationToken ct) =>
-        _uiThread.InvokeAsync(() =>
-        {
-            GetPlayer(displayKey).MediaPlayer.SetPause(false);
-        }, ct);
+        _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.SetPause(false), ct);
 
     public Task StopPlaybackAsync(string displayKey, CancellationToken ct) =>
         _uiThread.InvokeAsync(() =>
@@ -50,6 +51,36 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
 
     public Task CloseAsync(string displayKey, CancellationToken ct) =>
         _uiThread.InvokeAsync(() => CloseCore(displayKey), ct);
+
+    /// <summary>Closes output sessions for displays that are no longer present.</summary>
+    public Task ReconcileDisplaysAsync(
+        IReadOnlyCollection<string> availableDisplayKeys,
+        CancellationToken ct) =>
+        _uiThread.InvokeAsync(() =>
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var available = new HashSet<string>(
+                availableDisplayKeys,
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var displayKey in _players.Keys
+                         .Where(key => !available.Contains(key))
+                         .ToArray())
+            {
+                CloseCore(displayKey);
+            }
+
+            var availableScreens = Screen.AllScreens
+                .Where(screen => available.Contains(screen.DeviceName))
+                .ToArray();
+
+            _windowManager.ReconcileDisplays(availableScreens);
+
+            _logger.LogInformation(
+                "Reconciled display output windows. Available displays: {Count}",
+                availableScreens.Length);
+        }, ct);
 
     private void PlayCore(string displayKey, string filePath)
     {
@@ -68,55 +99,22 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
 
         if (!_players.TryGetValue(displayKey, out var session))
         {
-            session = CreateSession(displayKey, screen);
+            var view = _windowManager.GetOrCreate(displayKey, screen);
+            var mediaPlayer = new MediaPlayer(_libVlc);
+            view.MediaPlayer = mediaPlayer;
+            session = new PlayerSession(view, mediaPlayer);
             _players.Add(displayKey, session);
-        }
-        else if (!session.Form.Visible)
-        {
-            session.Form.Show();
         }
 
         session.MediaPlayer.Media = null;
         session.Media?.Dispose();
         session.Media = new Media(_libVlc, new Uri(fullPath));
         session.MediaPlayer.Media = session.Media;
+
         if (!session.MediaPlayer.Play())
             throw new InvalidOperationException($"LibVLC refused to start playback on '{displayKey}'.");
 
         _logger.LogInformation("LibVLC playback started on {DisplayKey}: {FilePath}", displayKey, fullPath);
-    }
-
-    private PlayerSession CreateSession(string displayKey, Screen screen)
-    {
-        var form = new Form
-        {
-            Name = $"Audexa-{Sanitize(displayKey)}",
-            Text = "Audexa Media Output",
-            FormBorderStyle = FormBorderStyle.None,
-            StartPosition = FormStartPosition.Manual,
-            Bounds = screen.Bounds,
-            WindowState = FormWindowState.Normal,
-            ShowInTaskbar = false,
-            TopMost = true,
-            BackColor = System.Drawing.Color.Black
-        };
-
-        var view = new VideoView
-        {
-            Dock = DockStyle.Fill,
-            BackColor = System.Drawing.Color.Black
-        };
-
-        var mediaPlayer = new MediaPlayer(_libVlc);
-        view.MediaPlayer = mediaPlayer;
-        form.Controls.Add(view);
-        form.Show();
-
-        _logger.LogInformation(
-            "Created LibVLC output window for {DisplayKey} at {Bounds}",
-            displayKey, screen.Bounds);
-
-        return new PlayerSession(form, view, mediaPlayer);
     }
 
     private PlayerSession GetPlayer(string displayKey) =>
@@ -131,16 +129,12 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
 
         session.MediaPlayer.Stop();
         session.MediaPlayer.Media = null;
+        session.View.MediaPlayer = null;
         session.Media?.Dispose();
         session.MediaPlayer.Dispose();
-        session.Form.Close();
-        session.View.Dispose();
-        session.Form.Dispose();
-        _logger.LogInformation("Closed LibVLC output for {DisplayKey}", displayKey);
+        _windowManager.Close(displayKey);
+        _logger.LogInformation("Closed playback session for {DisplayKey}", displayKey);
     }
-
-    private static string Sanitize(string value) =>
-        string.Concat(value.Select(c => char.IsLetterOrDigit(c) ? c : '_'));
 
     public async ValueTask DisposeAsync()
     {
@@ -156,6 +150,7 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
                 {
                     foreach (var key in _players.Keys.ToArray())
                         CloseCore(key);
+                    _windowManager.CloseAll();
                 });
             }
         }
@@ -165,9 +160,8 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
         }
     }
 
-    private sealed class PlayerSession(Form form, VideoView view, MediaPlayer mediaPlayer)
+    private sealed class PlayerSession(VideoView view, MediaPlayer mediaPlayer)
     {
-        public Form Form { get; } = form;
         public VideoView View { get; } = view;
         public MediaPlayer MediaPlayer { get; } = mediaPlayer;
         public Media? Media { get; set; }
