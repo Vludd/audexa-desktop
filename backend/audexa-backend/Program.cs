@@ -2,10 +2,15 @@ using audexa_backend.Data;
 using audexa_backend.Services;
 using Microsoft.EntityFrameworkCore;
 using audexa_backend.Logging;
+using audexa_backend.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.UseUrls("http://127.0.0.1:5081");
+var listenOnLan = builder.Configuration.GetValue<bool>("Network:ListenOnLan");
+var lanUrl = builder.Configuration["Network:LanUrl"] ?? "http://0.0.0.0:5081";
+builder.WebHost.UseUrls(listenOnLan
+    ? ["http://127.0.0.1:5081", lanUrl]
+    : ["http://127.0.0.1:5081"]);
 
 // Database Path
 
@@ -28,6 +33,10 @@ builder.Services.AddSingleton(fileLoggerProvider);
 // Services
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -39,7 +48,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins("http://localhost:5173", "https://appassets.audexa")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -53,6 +63,8 @@ builder.Services.AddScoped<IAudioDiagnosticsService, AudioDiagnosticsService>();
 builder.Services.AddScoped<RoomService>();
 builder.Services.AddScoped<ScenarioService>();
 builder.Services.AddScoped<ScheduleService>();
+builder.Services.AddScoped<MediaHostRegistry>();
+builder.Services.AddHostedService<MediaHostPresenceService>();
 builder.Services.AddSingleton<IPlaybackEngine, PlaybackEngine>();
 builder.Services.AddHostedService<ScenarioSchedulerService>();
 
@@ -81,5 +93,6 @@ app.UseCors("Frontend");
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<MediaHostHub>("/hubs/media-hosts");
 
 app.Run();

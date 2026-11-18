@@ -1,0 +1,295 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Diagnostics;
+
+using Audexa.MediaAgent.Configuration;
+using Audexa.MediaAgent.Display;
+using Audexa.MediaAgent.Infrastructure;
+
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace Audexa.MediaAgent;
+
+public sealed class MediaAgentWorker : BackgroundService
+{
+    private readonly ILogger<MediaAgentWorker> _logger;
+    private readonly MediaAgentOptions _options;
+    private readonly DisplayEnumerator _displayEnumerator;
+
+    private HubConnection? _connection;
+    private IReadOnlyList<MediaDisplayDto> _lastDisplays = Array.Empty<MediaDisplayDto>();
+
+    private readonly Guid _hostId = Guid.Parse(HostIdentity.GetOrCreate());
+
+    private readonly string _version =
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.1.0";
+
+    public MediaAgentWorker(
+        ILogger<MediaAgentWorker> logger,
+        IOptions<MediaAgentOptions> options,
+        DisplayEnumerator displayEnumerator)
+    {
+        _logger = logger;
+        _options = options.Value;
+        _displayEnumerator = displayEnumerator;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        ValidateOptions();
+        LogHostInformation();
+
+        var hubUrl = new Uri(
+            new Uri(_options.BackendUrl.TrimEnd('/') + "/"),
+            _options.HubPath.TrimStart('/'));
+
+        _connection = new HubConnectionBuilder()
+            .WithUrl(hubUrl, options =>
+                options.Headers.Add("X-Audexa-Agent-Token", _options.SharedToken))
+            .WithAutomaticReconnect(new[]
+            {
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromSeconds(20),
+                TimeSpan.FromSeconds(30)
+            })
+            .Build();
+
+        _connection.Reconnected += async connectionId =>
+        {
+            _logger.LogInformation(
+                "SignalR reconnected. ConnectionId={ConnectionId}",
+                connectionId);
+
+            await RegisterAsync(stoppingToken);
+        };
+
+        _connection.Closed += error =>
+        {
+            if (error is not null)
+                _logger.LogWarning(error, "SignalR connection closed.");
+
+            return Task.CompletedTask;
+        };
+
+        var heartbeat = Stopwatch.StartNew();
+        var displayRefresh = Stopwatch.StartNew();
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (_connection.State == HubConnectionState.Disconnected)
+                {
+                    _logger.LogInformation("Connecting to {HubUrl}...", hubUrl);
+
+                    await _connection.StartAsync(stoppingToken);
+
+                    _logger.LogInformation("Connected to Audexa Backend.");
+
+                    await RegisterAsync(stoppingToken);
+
+                    heartbeat.Restart();
+                    displayRefresh.Restart();
+                }
+
+                if (_connection.State == HubConnectionState.Connected)
+                {
+                    if (heartbeat.Elapsed >= TimeSpan.FromSeconds(
+                        Math.Max(5, _options.HeartbeatIntervalSeconds)))
+                    {
+                        await _connection.InvokeAsync(
+                            "Heartbeat",
+                            cancellationToken: stoppingToken);
+
+                        heartbeat.Restart();
+                    }
+
+                    if (displayRefresh.Elapsed >= TimeSpan.FromSeconds(
+                        Math.Max(5, _options.DisplayRefreshIntervalSeconds)))
+                    {
+                        await RefreshDisplaysIfChangedAsync(stoppingToken);
+                        displayRefresh.Restart();
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Media Agent communication failed. Will retry.");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+        }
+    }
+
+    private async Task RegisterAsync(CancellationToken cancellationToken)
+    {
+        var displays = _displayEnumerator.GetDisplays();
+
+        var request = new MediaHostRegistrationRequest(
+            _hostId,
+            Environment.MachineName,
+            Environment.MachineName,
+            _version);
+
+        await _connection!.InvokeAsync(
+            "RegisterHost",
+            request,
+            cancellationToken);
+
+        await ReportDisplaysAsync(displays, cancellationToken);
+
+        _lastDisplays = displays;
+
+        _logger.LogInformation(
+            "Registered Media Host {HostId} ({HostName}), displays: {Count}",
+            _hostId,
+            Environment.MachineName,
+            displays.Count);
+
+        LogDisplays(displays);
+    }
+
+    private async Task RefreshDisplaysIfChangedAsync(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var current = _displayEnumerator.GetDisplays();
+
+        if (_lastDisplays.SequenceEqual(current))
+            return;
+
+        await ReportDisplaysAsync(current, cancellationToken);
+
+        _lastDisplays = current;
+
+        _logger.LogInformation(
+            "Display configuration changed. Updated {Count} display(s).",
+            current.Count);
+
+        LogDisplays(current);
+    }
+
+    private async Task ReportDisplaysAsync(
+        IReadOnlyList<MediaDisplayDto> displays,
+        CancellationToken cancellationToken)
+    {
+        var reports = displays
+            .Select(display => new DisplayReportRequest(
+                display.DeviceId,
+                display.Name,
+                display.Name,
+                display.Width,
+                display.Height,
+                display.RefreshRate,
+                display.IsPrimary))
+            .ToArray();
+
+        await _connection!.InvokeAsync(
+            "ReportDisplays",
+            reports,
+            cancellationToken);
+    }
+
+    private void ValidateOptions()
+    {
+        if (!Uri.TryCreate(_options.BackendUrl, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException(
+                "MediaAgent:BackendUrl must be an absolute URL.");
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.SharedToken) ||
+            _options.SharedToken.StartsWith(
+                "REPLACE_",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Set MediaAgent:SharedToken in appsettings.json before starting the agent.");
+        }
+    }
+
+    private void LogHostInformation()
+    {
+        var addresses = Dns.GetHostAddresses(Dns.GetHostName())
+            .Where(x =>
+                x.AddressFamily == AddressFamily.InterNetwork &&
+                !IPAddress.IsLoopback(x))
+            .Select(x => x.ToString());
+
+        _logger.LogInformation(
+            "Host={Host}; OS={OS}; IPv4={Addresses}; HostId={HostId}",
+            Environment.MachineName,
+            Environment.OSVersion.VersionString,
+            string.Join(", ", addresses),
+            _hostId);
+    }
+
+    private void LogDisplays(IReadOnlyList<MediaDisplayDto> displays)
+    {
+        if (displays.Count == 0)
+        {
+            _logger.LogWarning(
+                "No active displays detected in the current interactive session.");
+
+            return;
+        }
+
+        foreach (var display in displays)
+        {
+            _logger.LogInformation(
+                "Display {DeviceId}: {Name}, {Width}x{Height}@{RefreshRate}Hz, Primary={IsPrimary}",
+                display.DeviceId,
+                display.Name,
+                display.Width,
+                display.Height,
+                display.RefreshRate,
+                display.IsPrimary);
+        }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        if (_connection is not null)
+        {
+            try
+            {
+                await _connection.StopAsync(cancellationToken);
+            }
+            finally
+            {
+                await _connection.DisposeAsync();
+            }
+        }
+
+        await base.StopAsync(cancellationToken);
+    }
+
+    private sealed record MediaHostRegistrationRequest(
+        Guid HostId,
+        string Name,
+        string MachineName,
+        string AgentVersion);
+
+    private sealed record DisplayReportRequest(
+        string DisplayKey,
+        string DeviceName,
+        string FriendlyName,
+        int Width,
+        int Height,
+        int RefreshRate,
+        bool IsPrimary);
+}

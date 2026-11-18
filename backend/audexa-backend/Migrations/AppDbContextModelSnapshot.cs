@@ -17,6 +17,37 @@ namespace audexa_backend.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.19");
 
+            modelBuilder.Entity("audexa_backend.Models.MediaHost", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<string>("AgentVersion").IsRequired().HasMaxLength(64).HasColumnType("TEXT");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("TEXT");
+                    b.Property<string>("IpAddress").HasColumnType("TEXT");
+                    b.Property<DateTime>("LastSeenAtUtc").HasColumnType("TEXT");
+                    b.Property<string>("MachineName").IsRequired().HasMaxLength(200).HasColumnType("TEXT");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(200).HasColumnType("TEXT");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(16).HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.ToTable("MediaHosts");
+                });
+
+            modelBuilder.Entity("audexa_backend.Models.DisplayDevice", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<string>("DeviceName").IsRequired().HasMaxLength(256).HasColumnType("TEXT");
+                    b.Property<string>("DisplayKey").IsRequired().HasMaxLength(256).HasColumnType("TEXT");
+                    b.Property<string>("FriendlyName").IsRequired().HasMaxLength(256).HasColumnType("TEXT");
+                    b.Property<int>("Height").HasColumnType("INTEGER");
+                    b.Property<bool>("IsPrimary").HasColumnType("INTEGER");
+                    b.Property<Guid>("MediaHostId").HasColumnType("TEXT");
+                    b.Property<int>("RefreshRate").HasColumnType("INTEGER");
+                    b.Property<DateTime>("UpdatedAtUtc").HasColumnType("TEXT");
+                    b.Property<int>("Width").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("MediaHostId", "DisplayKey").IsUnique();
+                    b.ToTable("DisplayDevices");
+                });
+
             modelBuilder.Entity("audexa_backend.Models.AudioConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -339,6 +370,37 @@ namespace audexa_backend.Migrations
                     b.Navigation("TranslationAudioFile");
                 });
 
+            modelBuilder.Entity("audexa_backend.Models.MediaHost", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<string>("AgentVersion").IsRequired().HasMaxLength(64).HasColumnType("TEXT");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("TEXT");
+                    b.Property<string>("IpAddress").HasColumnType("TEXT");
+                    b.Property<DateTime>("LastSeenAtUtc").HasColumnType("TEXT");
+                    b.Property<string>("MachineName").IsRequired().HasMaxLength(200).HasColumnType("TEXT");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(200).HasColumnType("TEXT");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(16).HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.ToTable("MediaHosts");
+                });
+
+            modelBuilder.Entity("audexa_backend.Models.DisplayDevice", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<string>("DeviceName").IsRequired().HasMaxLength(256).HasColumnType("TEXT");
+                    b.Property<string>("DisplayKey").IsRequired().HasMaxLength(256).HasColumnType("TEXT");
+                    b.Property<string>("FriendlyName").IsRequired().HasMaxLength(256).HasColumnType("TEXT");
+                    b.Property<int>("Height").HasColumnType("INTEGER");
+                    b.Property<bool>("IsPrimary").HasColumnType("INTEGER");
+                    b.Property<Guid>("MediaHostId").HasColumnType("TEXT");
+                    b.Property<int>("RefreshRate").HasColumnType("INTEGER");
+                    b.Property<DateTime>("UpdatedAtUtc").HasColumnType("TEXT");
+                    b.Property<int>("Width").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("MediaHostId", "DisplayKey").IsUnique();
+                    b.ToTable("DisplayDevices");
+                });
+
             modelBuilder.Entity("audexa_backend.Models.AudioConfiguration", b =>
                 {
                     b.Navigation("Mappings");
@@ -353,6 +415,21 @@ namespace audexa_backend.Migrations
                 {
                     b.Navigation("Steps");
                 });
+            modelBuilder.Entity("audexa_backend.Models.DisplayDevice", b =>
+                {
+                    b.HasOne("audexa_backend.Models.MediaHost", "MediaHost")
+                        .WithMany("Displays")
+                        .HasForeignKey("MediaHostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("MediaHost");
+                });
+
+            modelBuilder.Entity("audexa_backend.Models.MediaHost", b =>
+                {
+                    b.Navigation("Displays");
+                });
+
 #pragma warning restore 612, 618
         }
     }
