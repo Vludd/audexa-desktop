@@ -24,19 +24,27 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
+import welcomeImage from "@/assets/images/onboarding/welcome.jpg"
+import roomsImage from "@/assets/images/onboarding/rooms.jpg"
+import audioImage from "@/assets/images/onboarding/audio.jpg"
+import scenariosImage from "@/assets/images/onboarding/scenarios.jpg"
+import scenarioStepsImage from "@/assets/images/onboarding/scenario-steps.jpg"
+import scheduleImage from "@/assets/images/onboarding/schedule.jpg"
+import dashboardImage from "@/assets/images/onboarding/dashboard.jpg"
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
 const steps = [
-  { key: "welcome", icon: Headphones, imagePath: "/images/onboarding/welcome.jpg" },
-  { key: "rooms", icon: DoorOpen, imagePath: "/images/onboarding/rooms.jpg" },
-  { key: "audio", icon: Music2, imagePath: "/images/onboarding/audio.jpg" },
-  { key: "scenarios", icon: Workflow, imagePath: "/images/onboarding/scenarios.jpg" },
-  { key: "scenarioSteps", icon: ListOrdered, imagePath: "/images/onboarding/scenario-steps.jpg" },
-  { key: "schedule", icon: CalendarClock, imagePath: "/images/onboarding/schedule.jpg" },
-  { key: "dashboard", icon: Home, imagePath: "/images/onboarding/dashboard.jpg" },
+  { key: "welcome", icon: Headphones, imagePath: welcomeImage },
+  { key: "rooms", icon: DoorOpen, imagePath: roomsImage },
+  { key: "audio", icon: Music2, imagePath: audioImage },
+  { key: "scenarios", icon: Workflow, imagePath: scenariosImage },
+  { key: "scenarioSteps", icon: ListOrdered, imagePath: scenarioStepsImage },
+  { key: "schedule", icon: CalendarClock, imagePath: scheduleImage },
+  { key: "dashboard", icon: Home, imagePath: dashboardImage },
 ] as const
 
 export default function GettingStartedDialog({ open, onOpenChange }: Props) {
