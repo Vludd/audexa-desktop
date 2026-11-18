@@ -1,6 +1,7 @@
 using Audexa.MediaAgent;
 using Audexa.MediaAgent.Configuration;
 using Audexa.MediaAgent.Display;
+using Audexa.MediaAgent.Playback;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,11 +15,17 @@ builder.Configuration.AddJsonFile(
     reloadOnChange: true
 );
 
+// Environment variables must be added AFTER appsettings.json so that
+// MediaAgent__SharedToken overrides the JSON configuration value.
+builder.Configuration.AddEnvironmentVariables();
+
 builder.Services.Configure<MediaAgentOptions>(
     builder.Configuration.GetSection("MediaAgent")
 );
 
 builder.Services.AddSingleton<DisplayEnumerator>();
+builder.Services.AddSingleton<PlaybackUiThread>();
+builder.Services.AddSingleton<LibVlcPlayerManager>();
 builder.Services.AddHostedService<MediaAgentWorker>();
 
 var host = builder.Build();

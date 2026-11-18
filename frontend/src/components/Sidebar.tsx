@@ -4,6 +4,7 @@ import {
   Home,
   List,
   Music,
+  Monitor,
   ScrollText,
   Settings,
 } from "lucide-react"
@@ -23,6 +24,7 @@ const NAV: { page: Page; labelKey: TranslationKey; Icon: typeof Home }[] = [
   { page: "scenarios", labelKey: "nav.scenarios", Icon: List },
   { page: "schedule", labelKey: "nav.schedule", Icon: Calendar },
   { page: "audiofiles", labelKey: "nav.audioFiles", Icon: Music },
+  { page: "mediahosts", labelKey: "nav.mediaHosts", Icon: Monitor },
 ]
 
 const UTILITY_NAV: { page: Page; labelKey: TranslationKey; Icon: typeof Home }[] = [

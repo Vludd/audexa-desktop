@@ -71,6 +71,7 @@ export const en: Widen<typeof ru> = {
     scenarios: "Scenarios",
     schedule: "Schedule",
     audioFiles: "Audio files",
+    mediaHosts: "Media Hosts",
     settings: "Settings",
     logs: "Event log",
     description: "Centralized audio control and automation platform",
@@ -127,6 +128,10 @@ export const en: Widen<typeof ru> = {
       title: "Schedule",
       subtitle: "Automatically run scenarios at scheduled times",
     },
+    mediaHosts: {
+      title: "Media Hosts",
+      subtitle: "Playback computers and connected displays",
+    },
     audioFiles: {
       title: "Audio files",
       subtitle: "Manage the system's audio files",
@@ -142,6 +147,23 @@ export const en: Widen<typeof ru> = {
     },
   },
 
+  mediaHosts: {
+    ipAddress: "IP address",
+    agentVersion: "Agent version",
+    lastSeen: "Last seen",
+    displays: "Displays",
+    noDisplays: "No displays detected",
+    primary: "Primary",
+    totalHosts: "Total hosts",
+    onlineHosts: "Online",
+    totalDisplays: "Total displays",
+    searchPlaceholder: "Search by name or IP address...",
+    loading: "Loading media hosts...",
+    loadError: "Failed to load media hosts",
+    noSearchResults: "No results found",
+    empty: "No media hosts connected yet",
+    emptyDescription: "Start Audexa Media Agent on a playback computer. Connected hosts will appear here automatically.",
+  },
   schedule: {
     weekdays: {
       mon: "Mon",

@@ -94,5 +94,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<MediaHostHub>("/hubs/media-hosts");
+app.MapHub<MediaHostsUiHub>("/hubs/media-hosts-ui");
 
 app.Run();

@@ -6,6 +6,7 @@ using System.Diagnostics;
 using Audexa.MediaAgent.Configuration;
 using Audexa.MediaAgent.Display;
 using Audexa.MediaAgent.Infrastructure;
+using Audexa.MediaAgent.Playback;
 
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Options;
@@ -19,6 +20,8 @@ public sealed class MediaAgentWorker : BackgroundService
     private readonly ILogger<MediaAgentWorker> _logger;
     private readonly MediaAgentOptions _options;
     private readonly DisplayEnumerator _displayEnumerator;
+    private readonly LibVlcPlayerManager _playerManager;
+    private readonly PlaybackUiThread _playbackUiThread;
 
     private HubConnection? _connection;
     private IReadOnlyList<MediaDisplayDto> _lastDisplays = Array.Empty<MediaDisplayDto>();
@@ -31,17 +34,22 @@ public sealed class MediaAgentWorker : BackgroundService
     public MediaAgentWorker(
         ILogger<MediaAgentWorker> logger,
         IOptions<MediaAgentOptions> options,
-        DisplayEnumerator displayEnumerator)
+        DisplayEnumerator displayEnumerator,
+        LibVlcPlayerManager playerManager,
+        PlaybackUiThread playbackUiThread)
     {
         _logger = logger;
         _options = options.Value;
         _displayEnumerator = displayEnumerator;
+        _playerManager = playerManager;
+        _playbackUiThread = playbackUiThread;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         ValidateOptions();
         LogHostInformation();
+        await _playbackUiThread.StartAsync(stoppingToken);
 
         var hubUrl = new Uri(
             new Uri(_options.BackendUrl.TrimEnd('/') + "/"),
@@ -60,6 +68,20 @@ public sealed class MediaAgentWorker : BackgroundService
                 TimeSpan.FromSeconds(30)
             })
             .Build();
+
+        _connection.On<PlaybackCommand>("PlaybackCommand", async command =>
+        {
+            try
+            {
+                await HandlePlaybackCommandAsync(command, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Playback command {CommandId} ({Action}) failed on display {DisplayKey}.",
+                    command.CommandId, command.Action, command.DisplayKey);
+            }
+        });
 
         _connection.Reconnected += async connectionId =>
         {
@@ -204,6 +226,40 @@ public sealed class MediaAgentWorker : BackgroundService
             cancellationToken);
     }
 
+    private async Task HandlePlaybackCommandAsync(
+        PlaybackCommand command,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "Received playback command {CommandId}: {Action} on {DisplayKey}",
+            command.CommandId, command.Action, command.DisplayKey);
+
+        switch (command.Action.Trim().ToLowerInvariant())
+        {
+            case "play":
+                if (string.IsNullOrWhiteSpace(command.FilePath))
+                    throw new ArgumentException("FilePath is required for Play.");
+                await _playerManager.PlayAsync(
+                    command.DisplayKey, command.FilePath, cancellationToken);
+                break;
+            case "pause":
+                await _playerManager.PauseAsync(command.DisplayKey, cancellationToken);
+                break;
+            case "resume":
+                await _playerManager.ResumeAsync(command.DisplayKey, cancellationToken);
+                break;
+            case "stop":
+                await _playerManager.StopPlaybackAsync(command.DisplayKey, cancellationToken);
+                break;
+            case "close":
+                await _playerManager.CloseAsync(command.DisplayKey, cancellationToken);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(command.Action), command.Action, "Unsupported playback action.");
+        }
+    }
+
     private void ValidateOptions()
     {
         if (!Uri.TryCreate(_options.BackendUrl, UriKind.Absolute, out _))
@@ -218,7 +274,7 @@ public sealed class MediaAgentWorker : BackgroundService
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Set MediaAgent:SharedToken in appsettings.json before starting the agent.");
+                "Set MediaAgent:SharedToken in appsettings.json or the MediaAgent__SharedToken environment variable before starting the agent.");
         }
     }
 
@@ -275,6 +331,8 @@ public sealed class MediaAgentWorker : BackgroundService
             }
         }
 
+        await _playerManager.DisposeAsync();
+        await _playbackUiThread.DisposeAsync();
         await base.StopAsync(cancellationToken);
     }
 

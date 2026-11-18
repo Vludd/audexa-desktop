@@ -30,6 +30,7 @@ import Schedule from "./pages/Schedule"
 import AudioFiles from "./pages/AudioFiles"
 import Settings from "./pages/Settings"
 import Logs from "./pages/Logs"
+import MediaHosts from "./pages/MediaHosts"
 
 const ONBOARDING_SEEN_KEY = "audexa.onboarding.seen.v1"
 
@@ -350,6 +351,8 @@ export default function App() {
               }}
             />
           )}
+
+          {page === "mediahosts" && <MediaHosts />}
 
           {page === "settings" && (
             <Settings rooms={rooms} onOpenOnboarding={() => setIsOnboardingOpen(true)} />

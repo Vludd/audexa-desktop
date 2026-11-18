@@ -4,5 +4,6 @@ export type Page =
   | "scenarios"
   | "schedule"
   | "audiofiles"
+  | "mediahosts"
   | "settings"
   | "logs"

@@ -112,17 +112,34 @@ public sealed class MediaHostRegistry(AppDbContext db)
         return true;
     }
 
+    public async Task<MediaHost?> GetByIdAsync(Guid hostId, CancellationToken ct) =>
+        await db.MediaHosts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == hostId, ct);
+
     public async Task<IReadOnlyList<MediaHostDto>> GetAllAsync(CancellationToken ct) => await db.MediaHosts
         .AsNoTracking().Include(x => x.Displays).OrderBy(x => x.Name)
         .Select(x => new MediaHostDto(x.Id, x.Name, x.MachineName, x.AgentVersion, x.Status, x.IpAddress, x.LastSeenAtUtc,
             x.Displays.OrderBy(d => d.DisplayKey).Select(d => new DisplayDeviceDto(d.Id, d.DisplayKey, d.DeviceName, d.FriendlyName, d.Width, d.Height, d.RefreshRate, d.IsPrimary)).ToList()))
         .ToListAsync(ct);
 
-    public async Task MarkStaleOfflineAsync(DateTime thresholdUtc, CancellationToken ct)
+    public async Task<IReadOnlyList<Guid>> MarkStaleOfflineAsync(
+        DateTime thresholdUtc,
+        CancellationToken ct)
     {
-        var stale = await db.MediaHosts.Where(x => x.Status == "Online" && x.LastSeenAtUtc < thresholdUtc).ToListAsync(ct);
-        foreach (var host in stale) host.Status = "Offline";
-        if (stale.Count > 0) await db.SaveChangesAsync(ct);
+        var stale = await db.MediaHosts
+            .Where(x => x.Status == "Online" && x.LastSeenAtUtc < thresholdUtc)
+            .ToListAsync(ct);
+
+        foreach (var host in stale)
+        {
+            host.Status = "Offline";
+        }
+
+        if (stale.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        return stale.Select(x => x.Id).ToList();
     }
 
     private static string Required(string? value, int maxLength, string field)

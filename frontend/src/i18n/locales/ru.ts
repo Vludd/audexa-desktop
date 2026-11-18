@@ -62,6 +62,7 @@ export const ru = {
     scenarios: "Сценарии",
     schedule: "Расписание",
     audioFiles: "Аудиофайлы",
+    mediaHosts: "Медиа-хосты",
     settings: "Настройки",
     logs: "Журнал событий",
     description: "Платформа центрального управления и автоматизации звука",
@@ -114,6 +115,10 @@ export const ru = {
       title: "Расписание",
       subtitle: "Автоматический запуск сценариев по времени",
     },
+    mediaHosts: {
+      title: "Медиа-хосты",
+      subtitle: "Компьютеры воспроизведения и подключённые дисплеи",
+    },
     audioFiles: {
       title: "Аудиофайлы",
       subtitle: "Управление звуковыми файлами системы",
@@ -127,6 +132,23 @@ export const ru = {
       subtitle: "Frontend: действия интерфейса, API, сеть и ошибки выполнения",
       records: "Записей",
     },
+  },
+  mediaHosts: {
+    ipAddress: "IP-адрес",
+    agentVersion: "Версия агента",
+    lastSeen: "Последняя активность",
+    displays: "Дисплеи",
+    noDisplays: "Дисплеи не обнаружены",
+    primary: "Основной",
+    totalHosts: "Всего хостов",
+    onlineHosts: "В сети",
+    totalDisplays: "Всего дисплеев",
+    searchPlaceholder: "Поиск по имени или IP-адресу...",
+    loading: "Загрузка медиа-хостов...",
+    loadError: "Не удалось загрузить список медиа-хостов",
+    noSearchResults: "Ничего не найдено",
+    empty: "Медиа-хосты пока не подключены",
+    emptyDescription: "Запустите Audexa Media Agent на компьютере воспроизведения. Подключённые хосты появятся здесь автоматически.",
   },
   schedule: {
     weekdays: {
