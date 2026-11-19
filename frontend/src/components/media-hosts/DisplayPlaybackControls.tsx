@@ -3,7 +3,6 @@ import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr"
 import {
   Pause,
   Play,
-  RotateCcw,
   Square,
   Volume2,
   VolumeX,
@@ -22,7 +21,6 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { t } from "@/i18n"
 
-type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "disconnected"
 type PlaybackCommandInput = Omit<PlaybackCommandPayload, "displayKey">
 
 function formatTime(ms: number) {
@@ -102,8 +100,6 @@ export default function DisplayPlaybackControls({
   const [videosError, setVideosError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [commandError, setCommandError] = useState<string | null>(null)
-  const [connectionStatus, setConnectionStatus] =
-    useState<ConnectionStatus>("connecting")
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [seekDraft, setSeekDraft] = useState<number | null>(null)
   const [volumeDraft, setVolumeDraft] = useState<number | null>(null)
@@ -172,19 +168,16 @@ export default function DisplayPlaybackControls({
 
     connection.onreconnecting(() => {
       if (!active) return
-      setConnectionStatus("reconnecting")
       setConnectionError(t("mediaHosts.playback.connectionError"))
     })
 
     connection.onreconnected(() => {
       if (!active) return
-      setConnectionStatus("connected")
       setConnectionError(null)
     })
 
     connection.onclose(() => {
       if (!active) return
-      setConnectionStatus("disconnected")
       setConnectionError(t("mediaHosts.playback.connectionError"))
     })
 
@@ -192,12 +185,10 @@ export default function DisplayPlaybackControls({
       .start()
       .then(() => {
         if (!active) return
-        setConnectionStatus("connected")
         setConnectionError(null)
       })
       .catch(() => {
         if (!active) return
-        setConnectionStatus("disconnected")
         setConnectionError(t("mediaHosts.playback.connectionError"))
       })
 
@@ -242,19 +233,6 @@ export default function DisplayPlaybackControls({
   const canStop =
     state != null &&
     !["idle", "stopped", "ended"].includes(normalizedState ?? "")
-  const connectionLabel = {
-    connecting: t("mediaHosts.playback.connecting"),
-    connected: t("mediaHosts.playback.connected"),
-    reconnecting: t("mediaHosts.playback.reconnecting"),
-    disconnected: t("mediaHosts.playback.disconnected"),
-  }[connectionStatus]
-  const connectionVariant =
-    connectionStatus === "connected"
-      ? "success"
-      : connectionStatus === "connecting" ||
-          connectionStatus === "reconnecting"
-        ? "warning"
-        : "secondary"
   const errorMessage = commandError ?? state?.error
 
   function handleSeekChange(value: number | readonly number[]) {
@@ -309,7 +287,6 @@ export default function DisplayPlaybackControls({
           <Badge variant={getPlaybackVariant(state?.state)}>
             {getPlaybackLabel(state?.state)}
           </Badge>
-          <Badge variant={connectionVariant}>{connectionLabel}</Badge>
         </div>
       </div>
 
@@ -338,23 +315,20 @@ export default function DisplayPlaybackControls({
             type="button"
             variant="outline"
             size="icon-sm"
-            disabled={!isPlaying || busy}
-            onClick={() => void command({ action: "pause" })}
-            aria-label={t("mediaHosts.playback.pause")}
-            title={t("mediaHosts.playback.pause")}
+            disabled={!selectedVideoId || videosLoading || busy || ["opening", "buffering"].includes(normalizedState ?? "")}
+            onClick={() => {
+              if (isPlaying) {
+                void command({ action: "pause" })
+              } else if (isPaused) {
+                void command({ action: "resume" })
+              } else {
+                void command({ action: "play", videoFileId: selectedVideoId })
+              }
+            }}
+            aria-label={isPlaying ? t("mediaHosts.playback.pause") : isPaused ? t("mediaHosts.playback.resume") : "Запустить"}
+            title={isPlaying ? t("mediaHosts.playback.pause") : isPaused ? t("mediaHosts.playback.resume") : "Запустить выбранное видео"}
           >
-            <Pause />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            disabled={!isPaused || busy}
-            onClick={() => void command({ action: "resume" })}
-            aria-label={t("mediaHosts.playback.resume")}
-            title={t("mediaHosts.playback.resume")}
-          >
-            <RotateCcw />
+            {isPlaying ? <Pause /> : <Play />}
           </Button>
           <Button
             type="button"
@@ -427,15 +401,6 @@ export default function DisplayPlaybackControls({
               </option>
             ))}
           </select>
-          <Button
-            type="button"
-            className="shrink-0"
-            disabled={!selectedVideoId || videosLoading || busy}
-            onClick={() => void command({ action: "play", videoFileId: selectedVideoId })}
-          >
-            <Play />
-            Воспроизвести
-          </Button>
         </div>
         <p className="text-[11px] text-muted-foreground">
           Перед запуском Agent загрузит видео в локальный кеш и проверит контрольную сумму.

@@ -115,11 +115,32 @@ public sealed class MediaHostRegistry(AppDbContext db)
     public async Task<MediaHost?> GetByIdAsync(Guid hostId, CancellationToken ct) =>
         await db.MediaHosts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == hostId, ct);
 
-    public async Task<IReadOnlyList<MediaHostDto>> GetAllAsync(CancellationToken ct) => await db.MediaHosts
-        .AsNoTracking().Include(x => x.Displays).OrderBy(x => x.Name)
-        .Select(x => new MediaHostDto(x.Id, x.Name, x.MachineName, x.AgentVersion, x.Status, x.IpAddress, x.LastSeenAtUtc,
-            x.Displays.OrderBy(d => d.DisplayKey).Select(d => new DisplayDeviceDto(d.Id, d.DisplayKey, d.DeviceName, d.FriendlyName, d.Width, d.Height, d.RefreshRate, d.IsPrimary)).ToList()))
-        .ToListAsync(ct);
+    public async Task<IReadOnlyList<MediaHostDto>> GetAllAsync(CancellationToken ct)
+    {
+        // SQLite does not preserve DateTime.Kind. Mark persisted UTC timestamps
+        // explicitly before JSON serialization so browsers parse them as UTC.
+        var hosts = await db.MediaHosts
+            .AsNoTracking()
+            .Include(x => x.Displays)
+            .OrderBy(x => x.Name)
+            .ToListAsync(ct);
+
+        return hosts.Select(x => new MediaHostDto(
+            x.Id,
+            x.Name,
+            x.MachineName,
+            x.AgentVersion,
+            x.Status,
+            x.IpAddress,
+            DateTime.SpecifyKind(x.LastSeenAtUtc, DateTimeKind.Utc),
+            x.Displays
+                .OrderBy(d => d.DisplayKey)
+                .Select(d => new DisplayDeviceDto(
+                    d.Id, d.DisplayKey, d.DeviceName, d.FriendlyName,
+                    d.Width, d.Height, d.RefreshRate, d.IsPrimary))
+                .ToList()))
+            .ToList();
+    }
 
     public async Task<IReadOnlyList<Guid>> MarkStaleOfflineAsync(
         DateTime thresholdUtc,

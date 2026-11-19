@@ -6,6 +6,7 @@ namespace Audexa.MediaAgent.Display;
 public sealed class DisplayEnumerator
 {
     private const int EnumCurrentSettings = -1;
+    private const uint DmDisplayFrequency = 0x00400000;
 
     public IReadOnlyList<MediaDisplayDto> GetDisplays()
     {
@@ -42,7 +43,10 @@ public sealed class DisplayEnumerator
                 EnumCurrentSettings,
                 ref display))
         {
-            refreshRate = display.DisplayFrequency > 1
+            // DEVMODE can contain a default/placeholder value when the driver
+            // does not mark dmDisplayFrequency as valid. Do not report that as Hz.
+            refreshRate = (display.Fields & DmDisplayFrequency) != 0 &&
+                          display.DisplayFrequency > 1
                 ? checked((int)display.DisplayFrequency)
                 : 0;
         }
