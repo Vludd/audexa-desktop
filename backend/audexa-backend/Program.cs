@@ -1,4 +1,4 @@
-﻿using audexa_backend.Data;
+using audexa_backend.Data;
 using audexa_backend.Services;
 using Microsoft.EntityFrameworkCore;
 using audexa_backend.Logging;
@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var listenOnLan = builder.Configuration.GetValue<bool>("Network:ListenOnLan");
 var lanUrl = builder.Configuration["Network:LanUrl"] ?? "http://0.0.0.0:5081";
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 4L * 1024 * 1024 * 1024);
 builder.WebHost.UseUrls(listenOnLan
     ? ["http://127.0.0.1:5081", lanUrl]
     : ["http://127.0.0.1:5081"]);
@@ -57,6 +58,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={databasePath}"));
 
 builder.Services.AddScoped<IAudioFileService, AudioFileService>();
+builder.Services.AddScoped<VideoFileService>();
 builder.Services.AddSingleton<IAudioDeviceService, AudioDeviceService>();
 builder.Services.AddScoped<IAudioSettingsService, AudioSettingsService>();
 builder.Services.AddScoped<IAudioDiagnosticsService, AudioDiagnosticsService>();

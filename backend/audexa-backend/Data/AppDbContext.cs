@@ -12,6 +12,8 @@ public class AppDbContext : DbContext
 
     public DbSet<AudioFile> AudioFiles => Set<AudioFile>();
 
+    public DbSet<VideoFile> VideoFiles => Set<VideoFile>();
+
     public DbSet<AudioConfiguration> AudioConfigurations => Set<AudioConfiguration>();
 
     public DbSet<OutputMapping> OutputMappings => Set<OutputMapping>();
@@ -69,6 +71,17 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<OutputMapping>()
             .HasIndex(x => new { x.AudioConfigurationId, x.OutputId })
             .IsUnique();
+
+        modelBuilder.Entity<VideoFile>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(255);
+            entity.Property(x => x.FileName).IsRequired().HasMaxLength(255);
+            entity.Property(x => x.StorageFileName).IsRequired().HasMaxLength(80);
+            entity.Property(x => x.Format).IsRequired().HasMaxLength(16);
+            entity.Property(x => x.Sha256).IsRequired().HasMaxLength(64);
+            entity.HasIndex(x => x.CreatedAt);
+        });
 
         modelBuilder.Entity<AudioFile>()
             .Property(x => x.Volume)

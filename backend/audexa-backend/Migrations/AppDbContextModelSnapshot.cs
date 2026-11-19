@@ -48,6 +48,24 @@ namespace audexa_backend.Migrations
                     b.ToTable("DisplayDevices");
                 });
 
+            modelBuilder.Entity("audexa_backend.Models.VideoFile", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("TEXT");
+                    b.Property<long?>("DurationMs").HasColumnType("INTEGER");
+                    b.Property<string>("FileName").IsRequired().HasMaxLength(255).HasColumnType("TEXT");
+                    b.Property<string>("Format").IsRequired().HasMaxLength(16).HasColumnType("TEXT");
+                    b.Property<int?>("Height").HasColumnType("INTEGER");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(255).HasColumnType("TEXT");
+                    b.Property<string>("Sha256").IsRequired().HasMaxLength(64).HasColumnType("TEXT");
+                    b.Property<long>("Size").HasColumnType("INTEGER");
+                    b.Property<string>("StorageFileName").IsRequired().HasMaxLength(80).HasColumnType("TEXT");
+                    b.Property<int?>("Width").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("CreatedAt");
+                    b.ToTable("VideoFiles");
+                });
+
             modelBuilder.Entity("audexa_backend.Models.AudioConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -399,6 +417,24 @@ namespace audexa_backend.Migrations
                     b.HasKey("Id");
                     b.HasIndex("MediaHostId", "DisplayKey").IsUnique();
                     b.ToTable("DisplayDevices");
+                });
+
+            modelBuilder.Entity("audexa_backend.Models.VideoFile", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("TEXT");
+                    b.Property<long?>("DurationMs").HasColumnType("INTEGER");
+                    b.Property<string>("FileName").IsRequired().HasMaxLength(255).HasColumnType("TEXT");
+                    b.Property<string>("Format").IsRequired().HasMaxLength(16).HasColumnType("TEXT");
+                    b.Property<int?>("Height").HasColumnType("INTEGER");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(255).HasColumnType("TEXT");
+                    b.Property<string>("Sha256").IsRequired().HasMaxLength(64).HasColumnType("TEXT");
+                    b.Property<long>("Size").HasColumnType("INTEGER");
+                    b.Property<string>("StorageFileName").IsRequired().HasMaxLength(80).HasColumnType("TEXT");
+                    b.Property<int?>("Width").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("CreatedAt");
+                    b.ToTable("VideoFiles");
                 });
 
             modelBuilder.Entity("audexa_backend.Models.AudioConfiguration", b =>
