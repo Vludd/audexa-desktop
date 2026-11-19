@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState } from "react"
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr"
 import {
   Pause,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 
 import { API_BASE_URL } from "@/api/client"
+import { videoApi, type VideoFile } from "@/api/video"
 import {
   playbackApi,
   type PlaybackCommandPayload,
@@ -18,7 +19,6 @@ import {
 } from "@/api/mediaHosts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { t } from "@/i18n"
 
@@ -96,7 +96,10 @@ export default function DisplayPlaybackControls({
   displayKey: string
 }) {
   const [state, setState] = useState<PlaybackState | null>(null)
-  const [filePath, setFilePath] = useState("")
+  const [videos, setVideos] = useState<VideoFile[]>([])
+  const [selectedVideoId, setSelectedVideoId] = useState("")
+  const [videosLoading, setVideosLoading] = useState(true)
+  const [videosError, setVideosError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [commandError, setCommandError] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] =
@@ -106,6 +109,22 @@ export default function DisplayPlaybackControls({
   const [volumeDraft, setVolumeDraft] = useState<number | null>(null)
   const isSeeking = useRef(false)
   const isAdjustingVolume = useRef(false)
+
+  useEffect(() => {
+    let active = true
+    videoApi.getAll()
+      .then((items) => {
+        if (!active) return
+        setVideos(items)
+        setVideosError(null)
+      })
+      .catch((error) => {
+        if (!active) return
+        setVideosError(error instanceof Error ? error.message : "Не удалось загрузить видеотеку")
+      })
+      .finally(() => { if (active) setVideosLoading(false) })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -271,13 +290,6 @@ export default function DisplayPlaybackControls({
     void command({ action: "volume", volume: nextVolume })
   }
 
-  function handlePlayFile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const path = filePath.trim()
-    if (!path) return
-    void command({ action: "play", filePath: path })
-  }
-
   function handleMute() {
     const muted = !(state?.isMuted ?? false)
     setState((current) => (current ? { ...current, isMuted: muted } : current))
@@ -394,27 +406,42 @@ export default function DisplayPlaybackControls({
         </div>
       </div>
 
-      <form
-        className="flex min-w-0 flex-col gap-2 sm:flex-row"
-        onSubmit={handlePlayFile}
-      >
-        <Input
-          value={filePath}
-          onChange={(event) => setFilePath(event.currentTarget.value)}
-          placeholder={t("mediaHosts.playback.filePathPlaceholder")}
-          aria-label={t("mediaHosts.playback.filePathPlaceholder")}
-          autoComplete="off"
-          disabled={busy}
-        />
-        <Button
-          type="submit"
-          className="shrink-0"
-          disabled={busy || !filePath.trim()}
-        >
-          <Play />
-          {t("mediaHosts.playback.playFile")}
-        </Button>
-      </form>
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-muted-foreground" htmlFor={`video-library-${hostId}-${displayKey}`}>
+          Видеофайл из медиатеки
+        </label>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+          <select
+            id={`video-library-${hostId}-${displayKey}`}
+            value={selectedVideoId}
+            onChange={(event) => setSelectedVideoId(event.currentTarget.value)}
+            disabled={videosLoading || videos.length === 0 || busy}
+            className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">
+              {videosLoading ? "Загрузка медиатеки..." : videos.length ? "Выберите видео..." : "Видеотека пуста"}
+            </option>
+            {videos.map((video) => (
+              <option key={video.id} value={video.id}>
+                {video.name} · {video.format} · {(video.size / 1024 / 1024).toFixed(1)} MB
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            className="shrink-0"
+            disabled={!selectedVideoId || videosLoading || busy}
+            onClick={() => void command({ action: "play", videoFileId: selectedVideoId })}
+          >
+            <Play />
+            Воспроизвести
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Перед запуском Agent загрузит видео в локальный кеш и проверит контрольную сумму.
+        </p>
+        {videosError && <p role="alert" className="text-xs text-destructive">{videosError}</p>}
+      </div>
 
       {(errorMessage || connectionError) && (
         <div

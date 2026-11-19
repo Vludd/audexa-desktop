@@ -52,7 +52,7 @@ export type PlaybackAction =
 export interface PlaybackCommandPayload {
   action: PlaybackAction
   displayKey: string
-  filePath?: string
+  videoFileId?: string
   positionMs?: number
   volume?: number
   muted?: boolean

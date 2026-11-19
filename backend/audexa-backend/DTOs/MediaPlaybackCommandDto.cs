@@ -3,7 +3,7 @@ namespace audexa_backend.DTOs;
 public sealed record MediaPlaybackCommandDto(
     string Action,
     string DisplayKey,
-    string? FilePath = null, long? PositionMs = null, int? Volume = null, bool? Muted = null);
+    long? PositionMs = null, int? Volume = null, bool? Muted = null, Guid? VideoFileId = null);
 
 public sealed record PlaybackCommandResultDto(
     string CommandId,

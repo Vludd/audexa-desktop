@@ -11,6 +11,7 @@ namespace audexa_backend.Controllers;
 public sealed class MediaHostsController(
     MediaHostRegistry registry,
     PlaybackCommandRegistry commands,
+    VideoFileService videoFiles,
     IHubContext<MediaHostHub> agentHub,
     IHubContext<MediaHostsUiHub> uiHub) : ControllerBase
 {
@@ -33,8 +34,11 @@ public sealed class MediaHostsController(
         if (string.IsNullOrWhiteSpace(request.DisplayKey))
             return BadRequest(new { message = "DisplayKey is required." });
 
-        if (action == "play" && string.IsNullOrWhiteSpace(request.FilePath))
-            return BadRequest(new { message = "FilePath is required for Play." });
+        if (action == "play" && request.VideoFileId is null)
+            return BadRequest(new { message = "VideoFileId is required for Play." });
+
+        if (action != "play" && request.VideoFileId is not null)
+            return BadRequest(new { message = "VideoFileId is only valid for Play." });
 
         var host = await registry.GetByIdAsync(hostId, ct);
         if (host is null)
@@ -42,6 +46,13 @@ public sealed class MediaHostsController(
 
         if (!string.Equals(host.Status, "Online", StringComparison.OrdinalIgnoreCase))
             return Conflict(new { message = "Media Host is offline." });
+
+        var video = action == "play"
+            ? await videoFiles.GetByIdAsync(request.VideoFileId!.Value, ct)
+            : null;
+
+        if (action == "play" && video is null)
+            return NotFound(new { message = "Video file was not found in the media library." });
 
         var command = commands.Create(hostId, request.DisplayKey.Trim(), action);
         await uiHub.Clients.All.SendAsync("PlaybackCommandUpdated", command, ct);
@@ -55,7 +66,10 @@ public sealed class MediaHostsController(
                     CommandId = command.CommandId,
                     Action = action,
                     DisplayKey = command.DisplayKey,
-                    request.FilePath,
+                    VideoFileId = video?.Id,
+                    VideoSha256 = video?.Sha256,
+                    VideoSize = video?.Size,
+                    VideoFileName = video?.FileName,
                     request.PositionMs,
                     request.Volume,
                     request.Muted

@@ -1,6 +1,8 @@
 using audexa_backend.DTOs.VideoFiles;
 using audexa_backend.Models;
 using audexa_backend.Services;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 
 namespace audexa_backend.Controllers;
@@ -59,6 +61,33 @@ public sealed class VideoFilesController : ControllerBase
         var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
             1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
         return new FileStreamResult(stream, contentType) { EnableRangeProcessing = true };
+    }
+
+    // Agent-only endpoint. The shared Agent token is never exposed to the frontend.
+    [HttpGet("{id:guid}/agent-download")]
+    public async Task<IActionResult> AgentDownload(Guid id, [FromServices] IConfiguration configuration, CancellationToken ct)
+    {
+        var expected = configuration["MediaHosts:AgentToken"];
+        var supplied = Request.Headers["X-Audexa-Agent-Token"].ToString();
+
+        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(supplied))
+            return Unauthorized();
+
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        var suppliedBytes = Encoding.UTF8.GetBytes(supplied);
+        if (expectedBytes.Length != suppliedBytes.Length ||
+            !CryptographicOperations.FixedTimeEquals(expectedBytes, suppliedBytes))
+            return Unauthorized();
+
+        var result = await _service.GetStreamAsync(id, ct);
+        if (result is null) return NotFound();
+
+        var (item, path) = result.Value;
+        var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        Response.ContentLength = item.Size;
+        Response.Headers["X-Audexa-SHA256"] = item.Sha256;
+        return File(stream, "application/octet-stream", item.FileName, enableRangeProcessing: true);
     }
 
     [HttpPut("{id:guid}")]

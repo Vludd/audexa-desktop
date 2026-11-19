@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 using Audexa.MediaAgent.Configuration;
 using Audexa.MediaAgent.Display;
@@ -22,6 +23,10 @@ public sealed class MediaAgentWorker : BackgroundService
     private readonly DisplayEnumerator _displayEnumerator;
     private readonly LibVlcPlayerManager _playerManager;
     private readonly PlaybackUiThread _playbackUiThread;
+    private readonly HttpClient _downloadClient = new()
+    {
+        Timeout = Timeout.InfiniteTimeSpan
+    };
 
     private HubConnection? _connection;
     private IReadOnlyList<MediaDisplayDto> _lastDisplays = Array.Empty<MediaDisplayDto>();
@@ -239,10 +244,12 @@ public sealed class MediaAgentWorker : BackgroundService
             switch (command.Action.Trim().ToLowerInvariant())
             {
                 case "play":
-                    if (string.IsNullOrWhiteSpace(command.FilePath))
-                        throw new ArgumentException("FilePath is required for Play.");
+                    if (command.VideoFileId is null)
+                        throw new ArgumentException("VideoFileId is required for Play.");
+
+                    var localVideoPath = await DownloadVideoAsync(command, cancellationToken);
                     await _playerManager.PlayAsync(
-                        command.DisplayKey, command.FilePath, cancellationToken);
+                        command.DisplayKey, localVideoPath, cancellationToken);
                     break;
                 case "pause":
                     await _playerManager.PauseAsync(command.DisplayKey, cancellationToken);
@@ -287,6 +294,111 @@ public sealed class MediaAgentWorker : BackgroundService
 
         await TryReportPlaybackCommandResultAsync(
             command.CommandId, "Completed", null, cancellationToken);
+    }
+
+    private async Task<string> DownloadVideoAsync(
+        PlaybackCommand command,
+        CancellationToken cancellationToken)
+    {
+        var videoId = command.VideoFileId
+            ?? throw new ArgumentException("VideoFileId is required.");
+
+        if (string.IsNullOrWhiteSpace(command.VideoSha256) ||
+            command.VideoSha256.Length != 64 ||
+            command.VideoSha256.Any(c => !Uri.IsHexDigit(c)))
+            throw new InvalidOperationException("Backend supplied an invalid video SHA-256.");
+
+        if (command.VideoSize is null || command.VideoSize <= 0 ||
+            command.VideoSize > 4L * 1024 * 1024 * 1024)
+            throw new InvalidOperationException("Backend supplied an invalid video size.");
+
+        var extension = Path.GetExtension(command.VideoFileName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(extension) ||
+            extension.Length > 12 ||
+            extension.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '.'))
+            extension = ".media";
+
+        var cacheDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Audexa", "MediaCache");
+        Directory.CreateDirectory(cacheDirectory);
+
+        var destinationPath = Path.Combine(cacheDirectory, $"{videoId:N}{extension}");
+        var temporaryPath = destinationPath + $".{Guid.NewGuid():N}.part";
+
+        if (File.Exists(destinationPath))
+        {
+            var existingHash = await ComputeSha256Async(destinationPath, cancellationToken);
+            var existingInfo = new FileInfo(destinationPath);
+            if (existingInfo.Length == command.VideoSize &&
+                string.Equals(existingHash, command.VideoSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Using cached video {VideoId} ({Path})", videoId, destinationPath);
+                return destinationPath;
+            }
+
+            File.Delete(destinationPath);
+        }
+
+        var downloadUri = new Uri(
+            new Uri(_options.BackendUrl.TrimEnd('/') + "/"),
+            $"api/video/{videoId:D}/agent-download");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);
+        request.Headers.Add("X-Audexa-Agent-Token", _options.SharedToken);
+
+        _logger.LogInformation("Downloading video {VideoId} from Backend.", videoId);
+
+        try
+        {
+            using var response = await _downloadClient.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            if (response.Content.Headers.ContentLength is long contentLength &&
+                contentLength != command.VideoSize.Value)
+                throw new InvalidDataException(
+                    $"Video size mismatch. Expected {command.VideoSize}, received {contentLength}.");
+
+            await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken))
+            await using (var target = new FileStream(
+                temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None,
+                1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await source.CopyToAsync(target, 1024 * 1024, cancellationToken);
+            }
+
+            var downloadedInfo = new FileInfo(temporaryPath);
+            if (downloadedInfo.Length != command.VideoSize.Value)
+                throw new InvalidDataException(
+                    $"Downloaded video size mismatch. Expected {command.VideoSize}, received {downloadedInfo.Length}.");
+
+            var actualHash = await ComputeSha256Async(temporaryPath, cancellationToken);
+            if (!string.Equals(actualHash, command.VideoSha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Downloaded video SHA-256 verification failed.");
+
+            File.Move(temporaryPath, destinationPath, overwrite: true);
+            _logger.LogInformation("Video {VideoId} downloaded and verified ({Bytes} bytes).",
+                videoId, downloadedInfo.Length);
+            return destinationPath;
+        }
+        catch
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+            throw;
+        }
+    }
+
+    private static async Task<string> ComputeSha256Async(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private async Task TryReportPlaybackCommandResultAsync(
@@ -391,6 +503,7 @@ public sealed class MediaAgentWorker : BackgroundService
         }
 
         await _playerManager.DisposeAsync();
+        _downloadClient.Dispose();
         await _playbackUiThread.DisposeAsync();
         await base.StopAsync(cancellationToken);
     }
