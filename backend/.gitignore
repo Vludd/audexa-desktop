@@ -71,8 +71,16 @@ logs/
 # Local configuration
 # =========================
 
+appsettings.json
 appsettings.Local.json
 appsettings.*.Local.json
+
+# =========================
+# Environment-specific configuration
+# =========================
+appsettings.*.json
+!appsettings.Development.json
+!appsettings.example.json
 
 # User-specific launch settings
 launchSettings.local.json

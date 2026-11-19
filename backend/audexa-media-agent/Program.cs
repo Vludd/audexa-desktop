@@ -15,8 +15,7 @@ builder.Configuration.AddJsonFile(
     reloadOnChange: true
 );
 
-// Environment variables must be added AFTER appsettings.json so that
-// MediaAgent__SharedToken overrides the JSON configuration value.
+// Environment variables remain supported as optional configuration overrides.
 builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.Configure<MediaAgentOptions>(
