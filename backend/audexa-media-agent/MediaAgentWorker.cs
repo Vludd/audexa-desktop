@@ -114,6 +114,8 @@ public sealed class MediaAgentWorker : BackgroundService
 
                 if (_connection.State == HubConnectionState.Connected)
                 {
+                    var states = await _playerManager.GetStatesAsync(stoppingToken);
+                    await _connection.InvokeAsync("ReportPlaybackStates", states, stoppingToken);
                     if (heartbeat.Elapsed >= TimeSpan.FromSeconds(
                         Math.Max(5, _options.HeartbeatIntervalSeconds)))
                     {
@@ -253,6 +255,15 @@ public sealed class MediaAgentWorker : BackgroundService
                     break;
                 case "close":
                     await _playerManager.CloseAsync(command.DisplayKey, cancellationToken);
+                    break;
+                case "seek":
+                    await _playerManager.SeekAsync(command.DisplayKey, command.PositionMs ?? 0, cancellationToken);
+                    break;
+                case "volume":
+                    await _playerManager.SetVolumeAsync(command.DisplayKey, command.Volume ?? 100, cancellationToken);
+                    break;
+                case "mute":
+                    await _playerManager.SetMuteAsync(command.DisplayKey, command.Muted ?? true, cancellationToken);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(

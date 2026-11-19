@@ -73,6 +73,14 @@ public sealed class MediaHostHub(
             Context.ConnectionAborted);
     }
 
+    public async Task ReportPlaybackStates(IReadOnlyCollection<AgentPlaybackStateDto> states)
+    {
+        var hostId = GetHostId();
+        var payload = states.Select(state => new PlaybackStateDto(hostId, state.DisplayKey, state.State, state.Media,
+            state.PositionMs, state.DurationMs, state.Volume, state.IsMuted, state.Error, DateTime.UtcNow)).ToArray();
+        await uiHub.Clients.All.SendAsync("PlaybackStatesUpdated", payload, Context.ConnectionAborted);
+    }
+
     public async Task Heartbeat()
     {
         var hostId = GetHostId();

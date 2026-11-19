@@ -52,6 +52,32 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
     public Task CloseAsync(string displayKey, CancellationToken ct) =>
         _uiThread.InvokeAsync(() => CloseCore(displayKey), ct);
 
+
+    public Task SeekAsync(string displayKey, long positionMs, CancellationToken ct) =>
+        _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.Time = Math.Max(0, positionMs), ct);
+
+    public Task SetVolumeAsync(string displayKey, int volume, CancellationToken ct) =>
+        _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.Volume = Math.Clamp(volume, 0, 100), ct);
+
+    public Task SetMuteAsync(string displayKey, bool muted, CancellationToken ct) =>
+        _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.Mute = muted, ct);
+
+    public Task<IReadOnlyList<PlaybackStateReport>> GetStatesAsync(CancellationToken ct) =>
+        _uiThread.InvokeAsync<IReadOnlyList<PlaybackStateReport>>(() => _players.Select(pair =>
+        {
+            var player = pair.Value.MediaPlayer;
+            var state = player.State switch
+            {
+                VLCState.Opening => "Opening", VLCState.Buffering => "Buffering",
+                VLCState.Playing => "Playing", VLCState.Paused => "Paused",
+                VLCState.Stopped => "Stopped", VLCState.Ended => "Ended",
+                VLCState.Error => "Error", _ => "Idle"
+            };
+            return new PlaybackStateReport(pair.Key, state, pair.Value.Media?.Mrl,
+                Math.Max(0, player.Time), Math.Max(0, player.Length),
+                Math.Clamp(player.Volume, 0, 100), player.Mute, null);
+        }).ToArray(), ct);
+
     /// <summary>Closes output sessions for displays that are no longer present.</summary>
     public Task ReconcileDisplaysAsync(
         IReadOnlyCollection<string> availableDisplayKeys,
@@ -167,3 +193,5 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
         public Media? Media { get; set; }
     }
 }
+
+public sealed record PlaybackStateReport(string DisplayKey, string State, string? Media, long PositionMs, long DurationMs, int Volume, bool IsMuted, string? Error);

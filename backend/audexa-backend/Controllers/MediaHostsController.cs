@@ -25,7 +25,7 @@ public sealed class MediaHostsController(
         CancellationToken ct)
     {
         var action = request.Action?.Trim().ToLowerInvariant();
-        var allowedActions = new[] { "play", "pause", "resume", "stop", "close" };
+        var allowedActions = new[] { "play", "pause", "resume", "stop", "close", "seek", "volume", "mute" };
 
         if (string.IsNullOrWhiteSpace(action) || !allowedActions.Contains(action))
             return BadRequest(new { message = "Unsupported playback action." });
@@ -55,7 +55,10 @@ public sealed class MediaHostsController(
                     CommandId = command.CommandId,
                     Action = action,
                     DisplayKey = command.DisplayKey,
-                    request.FilePath
+                    request.FilePath,
+                    request.PositionMs,
+                    request.Volume,
+                    request.Muted
                 }, ct);
         }
         catch

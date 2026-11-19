@@ -4,7 +4,7 @@ public sealed record PlaybackCommand(
     string CommandId,
     string Action,
     string DisplayKey,
-    string? FilePath = null);
+    string? FilePath = null, long? PositionMs = null, int? Volume = null, bool? Muted = null);
 
 public sealed record PlaybackCommandResult(
     string CommandId,

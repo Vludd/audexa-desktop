@@ -3,7 +3,7 @@ namespace audexa_backend.DTOs;
 public sealed record MediaPlaybackCommandDto(
     string Action,
     string DisplayKey,
-    string? FilePath = null);
+    string? FilePath = null, long? PositionMs = null, int? Volume = null, bool? Muted = null);
 
 public sealed record PlaybackCommandResultDto(
     string CommandId,
@@ -19,3 +19,6 @@ public sealed record PlaybackCommandStatusDto(
     string? Error,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
+
+public sealed record PlaybackStateDto(Guid HostId, string DisplayKey, string State, string? Media, long PositionMs, long DurationMs, int Volume, bool IsMuted, string? Error, DateTime UpdatedAtUtc);
+public sealed record AgentPlaybackStateDto(string DisplayKey, string State, string? Media, long PositionMs, long DurationMs, int Volume, bool IsMuted, string? Error);
