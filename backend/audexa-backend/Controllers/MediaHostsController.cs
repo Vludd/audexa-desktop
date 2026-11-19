@@ -10,7 +10,9 @@ namespace audexa_backend.Controllers;
 [Route("api/media-hosts")]
 public sealed class MediaHostsController(
     MediaHostRegistry registry,
-    IHubContext<MediaHostHub> agentHub) : ControllerBase
+    PlaybackCommandRegistry commands,
+    IHubContext<MediaHostHub> agentHub,
+    IHubContext<MediaHostsUiHub> uiHub) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
@@ -41,17 +43,37 @@ public sealed class MediaHostsController(
         if (!string.Equals(host.Status, "Online", StringComparison.OrdinalIgnoreCase))
             return Conflict(new { message = "Media Host is offline." });
 
-        var commandId = Guid.NewGuid().ToString("N");
-        await agentHub.Clients
-            .Group($"media-host:{hostId:D}")
-            .SendAsync("PlaybackCommand", new
-            {
-                CommandId = commandId,
-                Action = action,
-                request.DisplayKey,
-                request.FilePath
-            }, ct);
+        var command = commands.Create(hostId, request.DisplayKey.Trim(), action);
+        await uiHub.Clients.All.SendAsync("PlaybackCommandUpdated", command, ct);
 
-        return Accepted(new { commandId, status = "Dispatched" });
+        try
+        {
+            await agentHub.Clients
+                .Group($"media-host:{hostId:D}")
+                .SendAsync("PlaybackCommand", new
+                {
+                    CommandId = command.CommandId,
+                    Action = action,
+                    DisplayKey = command.DisplayKey,
+                    request.FilePath
+                }, ct);
+        }
+        catch
+        {
+            var failed = commands.Update(hostId,
+                new PlaybackCommandResultDto(command.CommandId, "Failed", "Backend could not dispatch the command to the Media Agent."));
+            if (failed is not null)
+                await uiHub.Clients.All.SendAsync("PlaybackCommandUpdated", failed, CancellationToken.None);
+            throw;
+        }
+
+        return Accepted(command);
+    }
+
+    [HttpGet("playback-commands/{commandId}")]
+    public IActionResult GetPlaybackCommand(string commandId)
+    {
+        var command = commands.Get(commandId);
+        return command is null ? NotFound() : Ok(command);
     }
 }

@@ -1,4 +1,4 @@
-using audexa_backend.Data;
+﻿using audexa_backend.Data;
 using audexa_backend.Services;
 using Microsoft.EntityFrameworkCore;
 using audexa_backend.Logging;
@@ -64,6 +64,7 @@ builder.Services.AddScoped<RoomService>();
 builder.Services.AddScoped<ScenarioService>();
 builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<MediaHostRegistry>();
+builder.Services.AddSingleton<PlaybackCommandRegistry>();
 builder.Services.AddHostedService<MediaHostPresenceService>();
 builder.Services.AddSingleton<IPlaybackEngine, PlaybackEngine>();
 builder.Services.AddHostedService<ScenarioSchedulerService>();

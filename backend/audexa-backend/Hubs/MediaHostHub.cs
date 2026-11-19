@@ -8,7 +8,8 @@ public sealed class MediaHostHub(
     MediaHostRegistry registry,
     IConfiguration configuration,
     ILogger<MediaHostHub> logger,
-    IHubContext<MediaHostsUiHub> uiHub) : Hub
+    IHubContext<MediaHostsUiHub> uiHub,
+    PlaybackCommandRegistry playbackCommands) : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -49,6 +50,26 @@ public sealed class MediaHostHub(
             "MediaHostUpdated",
             host.Id,
             "Online",
+            Context.ConnectionAborted);
+    }
+
+    public async Task ReportPlaybackCommandResult(PlaybackCommandResultDto result)
+    {
+        var hostId = GetHostId();
+        var updated = playbackCommands.Update(hostId, result);
+
+        if (updated is null)
+        {
+            logger.LogWarning(
+                "Ignoring playback command result for unknown command {CommandId} from host {HostId}.",
+                result.CommandId,
+                hostId);
+            return;
+        }
+
+        await uiHub.Clients.All.SendAsync(
+            "PlaybackCommandUpdated",
+            updated,
             Context.ConnectionAborted);
     }
 

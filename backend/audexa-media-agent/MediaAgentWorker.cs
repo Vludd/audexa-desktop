@@ -71,16 +71,7 @@ public sealed class MediaAgentWorker : BackgroundService
 
         _connection.On<PlaybackCommand>("PlaybackCommand", async command =>
         {
-            try
-            {
-                await HandlePlaybackCommandAsync(command, stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Playback command {CommandId} ({Action}) failed on display {DisplayKey}.",
-                    command.CommandId, command.Action, command.DisplayKey);
-            }
+            await HandlePlaybackCommandAsync(command, stoppingToken);
         });
 
         _connection.Reconnected += async connectionId =>
@@ -238,29 +229,82 @@ public sealed class MediaAgentWorker : BackgroundService
             "Received playback command {CommandId}: {Action} on {DisplayKey}",
             command.CommandId, command.Action, command.DisplayKey);
 
-        switch (command.Action.Trim().ToLowerInvariant())
+        await TryReportPlaybackCommandResultAsync(
+            command.CommandId, "Accepted", null, cancellationToken);
+
+        try
         {
-            case "play":
-                if (string.IsNullOrWhiteSpace(command.FilePath))
-                    throw new ArgumentException("FilePath is required for Play.");
-                await _playerManager.PlayAsync(
-                    command.DisplayKey, command.FilePath, cancellationToken);
-                break;
-            case "pause":
-                await _playerManager.PauseAsync(command.DisplayKey, cancellationToken);
-                break;
-            case "resume":
-                await _playerManager.ResumeAsync(command.DisplayKey, cancellationToken);
-                break;
-            case "stop":
-                await _playerManager.StopPlaybackAsync(command.DisplayKey, cancellationToken);
-                break;
-            case "close":
-                await _playerManager.CloseAsync(command.DisplayKey, cancellationToken);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(command.Action), command.Action, "Unsupported playback action.");
+            switch (command.Action.Trim().ToLowerInvariant())
+            {
+                case "play":
+                    if (string.IsNullOrWhiteSpace(command.FilePath))
+                        throw new ArgumentException("FilePath is required for Play.");
+                    await _playerManager.PlayAsync(
+                        command.DisplayKey, command.FilePath, cancellationToken);
+                    break;
+                case "pause":
+                    await _playerManager.PauseAsync(command.DisplayKey, cancellationToken);
+                    break;
+                case "resume":
+                    await _playerManager.ResumeAsync(command.DisplayKey, cancellationToken);
+                    break;
+                case "stop":
+                    await _playerManager.StopPlaybackAsync(command.DisplayKey, cancellationToken);
+                    break;
+                case "close":
+                    await _playerManager.CloseAsync(command.DisplayKey, cancellationToken);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(command.Action), command.Action, "Unsupported playback action.");
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Playback command {CommandId} ({Action}) failed on display {DisplayKey}.",
+                command.CommandId, command.Action, command.DisplayKey);
+
+            await TryReportPlaybackCommandResultAsync(
+                command.CommandId, "Failed", ex.Message, cancellationToken);
+            return;
+        }
+
+        await TryReportPlaybackCommandResultAsync(
+            command.CommandId, "Completed", null, cancellationToken);
+    }
+
+    private async Task TryReportPlaybackCommandResultAsync(
+        string commandId,
+        string status,
+        string? error,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var connection = _connection;
+            if (connection?.State != HubConnectionState.Connected)
+                throw new InvalidOperationException(
+                    "Cannot report playback command result while SignalR is disconnected.");
+
+            await connection.InvokeAsync(
+                "ReportPlaybackCommandResult",
+                new PlaybackCommandResult(commandId, status, error),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Could not report {Status} for playback command {CommandId}.",
+                status, commandId);
         }
     }
 
