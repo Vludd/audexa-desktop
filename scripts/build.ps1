@@ -1,10 +1,14 @@
-param(
-    [Parameter()]
+﻿param(
+    [Parameter(Mandatory)]
     [ValidatePattern('^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = "1.0.0"
+    [string]$Version
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+    throw "Invalid version '$Version'. Expected MAJOR.MINOR.PATCH (optionally with a prerelease suffix)."
+}
 
 $AssemblyVersion = "$(($Version -split '-')[0]).0"
 

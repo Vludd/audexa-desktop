@@ -1,4 +1,4 @@
-[English](README.md) | [Русский](README.ru.md)
+﻿[English](README.md) | [Русский](README.ru.md)
 
 # Audexa
 
@@ -237,10 +237,11 @@ Run any test projects included in the checked-out revision before submitting cha
 The repository includes a PowerShell build script:
 
 ```powershell
-.\scripts\build.ps1
+.\scripts\build.ps1 -Version 1.0.16
+iscc /DAppVersion=1.0.16 installer\Audexa.iss
 ```
 
-Run it from the repository root. Check the script in the current revision for supported parameters and build outputs. The GitHub Actions release workflow is the reference for producing official release artifacts.
+Run both commands from the repository root. The version must be supplied explicitly to both the application build and installer compiler so the binaries and installer metadata stay in sync. The GitHub Actions release workflow passes the same version to both steps.
 
 ## Local data storage
 

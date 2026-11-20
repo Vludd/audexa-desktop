@@ -41,7 +41,7 @@ export function installRuntimeLogging() {
   window.addEventListener("offline", handleOffline)
 
   logger.info("APP", "app.started", t("logs.messages.appStarted"), {
-    apiBaseUrl: import.meta.env.VITE_API_URL ?? "http://localhost:5081",
+    apiBaseUrl: import.meta.env.VITE_API_URL ?? "http://localhost:18080",
     userAgent: navigator.userAgent,
   })
 

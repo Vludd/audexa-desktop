@@ -6,12 +6,21 @@ using audexa_backend.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var listenOnLan = builder.Configuration.GetValue<bool>("Network:ListenOnLan");
-var lanUrl = builder.Configuration["Network:LanUrl"] ?? "http://0.0.0.0:5081";
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 4L * 1024 * 1024 * 1024);
-builder.WebHost.UseUrls(listenOnLan
-    ? ["http://127.0.0.1:5081", lanUrl]
-    : ["http://127.0.0.1:5081"]);
+// Audexa Backend listens on all network interfaces so Media Agents can
+// connect from other machines on the local network. The port is configurable.
+var backendPort = builder.Configuration.GetValue<int?>("Network:Port") ?? 18080;
+
+if (backendPort is < 1 or > 65535)
+{
+    throw new InvalidOperationException(
+        "Network:Port must be between 1 and 65535.");
+}
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 4L * 1024 * 1024 * 1024;
+    options.ListenAnyIP(backendPort);
+});
 
 // Database Path
 
@@ -68,6 +77,7 @@ builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<MediaHostRegistry>();
 builder.Services.AddSingleton<PlaybackCommandRegistry>();
 builder.Services.AddHostedService<MediaHostPresenceService>();
+builder.Services.AddHostedService<BackendDiscoveryService>();
 builder.Services.AddSingleton<IPlaybackEngine, PlaybackEngine>();
 builder.Services.AddHostedService<ScenarioSchedulerService>();
 

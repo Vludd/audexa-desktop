@@ -1,7 +1,7 @@
-
+﻿
 #define AppName "Audexa"
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #error "AppVersion must be supplied, e.g. /DAppVersion=1.0.16"
 #endif
 
 [Setup]

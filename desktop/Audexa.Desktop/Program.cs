@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
@@ -102,9 +102,9 @@ internal sealed class MainForm : Form
                 CreateNoWindow = true,
             };
 
-            // Keep the local API inaccessible from the LAN.
+            // Allow Media Hosts to reach the Backend over the LAN.
             start.Environment["ASPNETCORE_URLS"] =
-                "http://127.0.0.1:5081";
+                "http://0.0.0.0:18080";
             start.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";
 
             _backend = Process.Start(start)
@@ -129,7 +129,7 @@ internal sealed class MainForm : Form
                 try
                 {
                     using var response = await client.GetAsync(
-                        "http://127.0.0.1:5081/api/health");
+                        "http://127.0.0.1:18080/api/health");
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -178,7 +178,7 @@ internal sealed class MainForm : Form
                 bool isLocalApi =
                     uri.Scheme == Uri.UriSchemeHttp &&
                     uri.Host == "127.0.0.1" &&
-                    uri.Port == 5081;
+                    uri.Port == 18080;
 
                 if (!isAppAsset && !isLocalApi)
                 {

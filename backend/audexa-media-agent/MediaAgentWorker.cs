@@ -56,46 +56,6 @@ public sealed class MediaAgentWorker : BackgroundService
         LogHostInformation();
         await _playbackUiThread.StartAsync(stoppingToken);
 
-        var hubUrl = new Uri(
-            new Uri(_options.BackendUrl.TrimEnd('/') + "/"),
-            _options.HubPath.TrimStart('/'));
-
-        _connection = new HubConnectionBuilder()
-            .WithUrl(hubUrl, options =>
-                options.Headers.Add("X-Audexa-Agent-Token", _options.SharedToken))
-            .WithAutomaticReconnect(new[]
-            {
-                TimeSpan.Zero,
-                TimeSpan.FromSeconds(2),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(10),
-                TimeSpan.FromSeconds(20),
-                TimeSpan.FromSeconds(30)
-            })
-            .Build();
-
-        _connection.On<PlaybackCommand>("PlaybackCommand", async command =>
-        {
-            await HandlePlaybackCommandAsync(command, stoppingToken);
-        });
-
-        _connection.Reconnected += async connectionId =>
-        {
-            _logger.LogInformation(
-                "SignalR reconnected. ConnectionId={ConnectionId}",
-                connectionId);
-
-            await RegisterAsync(stoppingToken);
-        };
-
-        _connection.Closed += error =>
-        {
-            if (error is not null)
-                _logger.LogWarning(error, "SignalR connection closed.");
-
-            return Task.CompletedTask;
-        };
-
         var heartbeat = Stopwatch.StartNew();
         var displayRefresh = Stopwatch.StartNew();
 
@@ -103,16 +63,33 @@ public sealed class MediaAgentWorker : BackgroundService
         {
             try
             {
-                if (_connection.State == HubConnectionState.Disconnected)
+                if (_connection is null || _connection.State == HubConnectionState.Disconnected)
                 {
+                    if (_connection is not null)
+                    {
+                        await _connection.DisposeAsync();
+                        _connection = null;
+                    }
+
+                    var backendUrl = await ResolveBackendUrlAsync(stoppingToken);
+                    if (backendUrl is null)
+                    {
+                        await Task.Delay(
+                            TimeSpan.FromSeconds(Math.Max(3, _options.DiscoveryRetryIntervalSeconds)),
+                            stoppingToken);
+                        continue;
+                    }
+
+                    var hubUrl = new Uri(
+                        new Uri(backendUrl.TrimEnd('/') + "/"),
+                        _options.HubPath.TrimStart('/'));
+
                     _logger.LogInformation("Connecting to {HubUrl}...", hubUrl);
-
+                    _connection = CreateHubConnection(hubUrl, stoppingToken);
                     await _connection.StartAsync(stoppingToken);
-
-                    _logger.LogInformation("Connected to Audexa Backend.");
+                    _logger.LogInformation("Connected to Audexa Backend at {BackendUrl}.", backendUrl);
 
                     await RegisterAsync(stoppingToken);
-
                     heartbeat.Restart();
                     displayRefresh.Restart();
                 }
@@ -152,6 +129,84 @@ public sealed class MediaAgentWorker : BackgroundService
 
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
         }
+    }
+
+    private HubConnection CreateHubConnection(Uri hubUrl, CancellationToken stoppingToken)
+    {
+        var connection = new HubConnectionBuilder()
+            .WithUrl(hubUrl, options =>
+                options.Headers.Add("X-Audexa-Agent-Token", _options.SharedToken))
+            .WithAutomaticReconnect(new[]
+            {
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromSeconds(20),
+                TimeSpan.FromSeconds(30)
+            })
+            .Build();
+
+        connection.On<PlaybackCommand>("PlaybackCommand", async command =>
+        {
+            await HandlePlaybackCommandAsync(command, stoppingToken);
+        });
+
+        connection.Reconnected += async connectionId =>
+        {
+            _logger.LogInformation(
+                "SignalR reconnected. ConnectionId={ConnectionId}",
+                connectionId);
+
+            await RegisterAsync(stoppingToken);
+        };
+
+        connection.Closed += error =>
+        {
+            if (error is not null)
+                _logger.LogWarning(error, "SignalR connection closed. Backend will be discovered again.");
+
+            return Task.CompletedTask;
+        };
+
+        return connection;
+    }
+
+    private async Task<string?> ResolveBackendUrlAsync(CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(_options.BackendUrl))
+            return _options.BackendUrl.TrimEnd('/');
+
+        if (!_options.DiscoveryEnabled)
+        {
+            _logger.LogError(
+                "BackendUrl is empty and Backend Discovery is disabled. Set MediaAgent:BackendUrl or enable Discovery.");
+            return null;
+        }
+
+        _logger.LogInformation(
+            "Searching for Audexa Backend via UDP broadcast on port {Port}...",
+            _options.DiscoveryPort);
+
+        var discovered = await BackendDiscoveryClient.DiscoverAsync(
+            _options.DiscoveryPort,
+            _options.DiscoveryTimeoutSeconds,
+            _options.SharedToken,
+            _logger,
+            cancellationToken);
+
+        if (discovered is null)
+        {
+            _logger.LogWarning("Audexa Backend was not discovered. Will retry.");
+            return null;
+        }
+
+        _logger.LogInformation(
+            "Discovered Audexa Backend {MachineName} at {BackendUrl}.",
+            discovered.MachineName,
+            discovered.BaseUri);
+
+        return discovered.BaseUri.ToString().TrimEnd('/');
     }
 
     private async Task RegisterAsync(CancellationToken cancellationToken)
@@ -433,11 +488,16 @@ public sealed class MediaAgentWorker : BackgroundService
 
     private void ValidateOptions()
     {
-        if (!Uri.TryCreate(_options.BackendUrl, UriKind.Absolute, out _))
+        if (!string.IsNullOrWhiteSpace(_options.BackendUrl) &&
+            (!Uri.TryCreate(_options.BackendUrl, UriKind.Absolute, out var backendUri) ||
+             (backendUri.Scheme != Uri.UriSchemeHttp && backendUri.Scheme != Uri.UriSchemeHttps)))
         {
             throw new InvalidOperationException(
-                "MediaAgent:BackendUrl must be an absolute URL.");
+                "MediaAgent:BackendUrl must be an absolute HTTP or HTTPS URL when specified.");
         }
+
+        if (_options.DiscoveryPort is < 1 or > 65535)
+            throw new InvalidOperationException("MediaAgent:DiscoveryPort must be between 1 and 65535.");
 
         if (string.IsNullOrWhiteSpace(_options.SharedToken) ||
             _options.SharedToken.StartsWith(
@@ -499,6 +559,7 @@ public sealed class MediaAgentWorker : BackgroundService
             finally
             {
                 await _connection.DisposeAsync();
+                _connection = null;
             }
         }
 

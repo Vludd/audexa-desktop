@@ -1,4 +1,4 @@
-# Audexa Desktop + OTA starter
+﻿# Audexa Desktop + OTA starter
 
 This starter includes the supplied frontend/backend sources plus a first-pass Windows Desktop Shell, updater, Inno Setup script and GitHub Actions release workflow.
 
@@ -20,8 +20,11 @@ This starter includes the supplied frontend/backend sources plus a first-pass Wi
 Prerequisites: .NET 8 SDK, Node.js 22+, Inno Setup 6, WebView2 Runtime (typically present on current Windows 10/11; bundle/validate if needed).
 
 ```powershell
-./scripts/build.ps1
-iscc installer/Audexa.iss
+./scripts/build.ps1 -Version 1.0.16
+
+iscc /DAppVersion=1.0.16 installer/Audexa.iss
+# ===== OR =====
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.16 "installer\Audexa.iss"
 ```
 
 The current script prepares payloads; it is a scaffold, not a verified production installer. Run and test on a clean Windows VM.

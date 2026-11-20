@@ -24,7 +24,7 @@ public sealed class MediaHostHub(
         {
             logger.LogWarning(
                 "Rejected Media Agent SignalR connection from {RemoteIp}.",
-                Context.GetHttpContext()?.Connection.RemoteIpAddress);
+                GetRemoteIpAddress(Context.GetHttpContext()));
 
             Context.Abort();
             return;
@@ -37,7 +37,7 @@ public sealed class MediaHostHub(
     {
         var host = await registry.RegisterAsync(
             request,
-            Context.GetHttpContext()?.Connection.RemoteIpAddress?.ToString(),
+            GetRemoteIpAddress(Context.GetHttpContext()),
             Context.ConnectionAborted);
 
         Context.Items["MediaHostId"] = host.Id;
@@ -87,7 +87,7 @@ public sealed class MediaHostHub(
 
         if (!await registry.HeartbeatAsync(
                 hostId,
-                Context.GetHttpContext()?.Connection.RemoteIpAddress?.ToString(),
+                GetRemoteIpAddress(Context.GetHttpContext()),
                 Context.ConnectionAborted))
         {
             throw new HubException(
@@ -134,6 +134,18 @@ public sealed class MediaHostHub(
             ? id
             : throw new HubException(
                 "Call RegisterHost before sending agent events.");
+
+    private static string? GetRemoteIpAddress(HttpContext? httpContext)
+    {
+        var remoteIp = httpContext?.Connection.RemoteIpAddress;
+
+        if (remoteIp is null)
+            return null;
+
+        return remoteIp.IsIPv4MappedToIPv6
+            ? remoteIp.MapToIPv4().ToString()
+            : remoteIp.ToString();
+    }
 
     private static string GroupName(Guid hostId) =>
         $"media-host:{hostId:D}";
