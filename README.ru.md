@@ -238,7 +238,10 @@ dotnet build
 
 ```powershell
 .\scripts\build.ps1 -Version 1.0.16
+
 iscc /DAppVersion=1.0.16 installer\Audexa.iss
+# ===== ИЛИ =====
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.16 "installer\Audexa.iss"
 ```
 
 Запускайте обе команды из корня репозитория. Версию необходимо явно передавать и сборке приложения, и компилятору установщика, чтобы версия бинарных файлов и метаданные установщика совпадали. GitHub Actions передаёт одну и ту же версию в оба этапа.

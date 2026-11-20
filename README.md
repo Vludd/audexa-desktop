@@ -238,7 +238,10 @@ The repository includes a PowerShell build script:
 
 ```powershell
 .\scripts\build.ps1 -Version 1.0.16
+
 iscc /DAppVersion=1.0.16 installer\Audexa.iss
+# ===== OR =====
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.16 "installer\Audexa.iss"
 ```
 
 Run both commands from the repository root. The version must be supplied explicitly to both the application build and installer compiler so the binaries and installer metadata stay in sync. The GitHub Actions release workflow passes the same version to both steps.
