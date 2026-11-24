@@ -6,35 +6,38 @@ namespace audexa_backend.Hubs;
 
 public sealed class MediaHostHub(
     MediaHostRegistry registry,
-    IConfiguration configuration,
+    MediaHostPairingService pairingService,
     ILogger<MediaHostHub> logger,
     IHubContext<MediaHostsUiHub> uiHub,
     PlaybackCommandRegistry playbackCommands) : Hub
 {
     public override async Task OnConnectedAsync()
     {
-        var expected = configuration["MediaHosts:AgentToken"];
-        var supplied = Context.GetHttpContext()?.Request.Headers["X-Audexa-Agent-Token"].ToString();
+        var httpContext = Context.GetHttpContext();
+        var suppliedSecret = httpContext?.Request.Headers["X-Audexa-Agent-Token"].ToString();
+        var suppliedHostId = httpContext?.Request.Headers["X-Audexa-MediaHost-Id"].ToString();
 
-        if (string.IsNullOrWhiteSpace(expected) ||
-            string.IsNullOrWhiteSpace(supplied) ||
-            !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                System.Text.Encoding.UTF8.GetBytes(expected),
-                System.Text.Encoding.UTF8.GetBytes(supplied)))
+        if (!Guid.TryParse(suppliedHostId, out var hostId) ||
+            !await pairingService.ValidateCredentialAsync(
+                hostId, suppliedSecret, Context.ConnectionAborted))
         {
             logger.LogWarning(
                 "Rejected Media Agent SignalR connection from {RemoteIp}.",
-                GetRemoteIpAddress(Context.GetHttpContext()));
-
+                GetRemoteIpAddress(httpContext));
             Context.Abort();
             return;
         }
 
+        Context.Items["AuthenticatedMediaHostId"] = hostId;
         await base.OnConnectedAsync();
     }
 
     public async Task RegisterHost(MediaHostRegistrationDto request)
     {
+        var authenticatedHostId = GetAuthenticatedHostId();
+        if (request.HostId != authenticatedHostId)
+            throw new HubException("The registered host ID does not match the authenticated device.");
+
         var host = await registry.RegisterAsync(
             request,
             GetRemoteIpAddress(Context.GetHttpContext()),
@@ -127,6 +130,12 @@ public sealed class MediaHostHub(
 
         await base.OnDisconnectedAsync(exception);
     }
+
+    private Guid GetAuthenticatedHostId() =>
+        Context.Items.TryGetValue("AuthenticatedMediaHostId", out var value) &&
+        value is Guid id
+            ? id
+            : throw new HubException("Media Agent is not authenticated.");
 
     private Guid GetHostId() =>
         Context.Items.TryGetValue("MediaHostId", out var value) &&

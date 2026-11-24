@@ -1,8 +1,6 @@
 using audexa_backend.DTOs.VideoFiles;
 using audexa_backend.Models;
 using audexa_backend.Services;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
 
 namespace audexa_backend.Controllers;
@@ -12,7 +10,13 @@ namespace audexa_backend.Controllers;
 public sealed class VideoFilesController : ControllerBase
 {
     private readonly VideoFileService _service;
-    public VideoFilesController(VideoFileService service) => _service = service;
+    private readonly MediaHostPairingService _pairingService;
+
+    public VideoFilesController(VideoFileService service, MediaHostPairingService pairingService)
+    {
+        _service = service;
+        _pairingService = pairingService;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<VideoFile>>> GetAll(CancellationToken ct) =>
@@ -63,20 +67,15 @@ public sealed class VideoFilesController : ControllerBase
         return new FileStreamResult(stream, contentType) { EnableRangeProcessing = true };
     }
 
-    // Agent-only endpoint. The shared Agent token is never exposed to the frontend.
+    // Agent-only endpoint. Each paired Media Host uses its own device credential.
     [HttpGet("{id:guid}/agent-download")]
-    public async Task<IActionResult> AgentDownload(Guid id, [FromServices] IConfiguration configuration, CancellationToken ct)
+    public async Task<IActionResult> AgentDownload(Guid id, CancellationToken ct)
     {
-        var expected = configuration["MediaHosts:AgentToken"];
         var supplied = Request.Headers["X-Audexa-Agent-Token"].ToString();
+        var suppliedHostId = Request.Headers["X-Audexa-MediaHost-Id"].ToString();
 
-        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(supplied))
-            return Unauthorized();
-
-        var expectedBytes = Encoding.UTF8.GetBytes(expected);
-        var suppliedBytes = Encoding.UTF8.GetBytes(supplied);
-        if (expectedBytes.Length != suppliedBytes.Length ||
-            !CryptographicOperations.FixedTimeEquals(expectedBytes, suppliedBytes))
+        if (!Guid.TryParse(suppliedHostId, out var hostId) ||
+            !await _pairingService.ValidateCredentialAsync(hostId, supplied, ct))
             return Unauthorized();
 
         var result = await _service.GetStreamAsync(id, ct);

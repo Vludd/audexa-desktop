@@ -31,6 +31,36 @@ namespace audexa_backend.Migrations
                     b.ToTable("MediaHosts");
                 });
 
+            modelBuilder.Entity("audexa_backend.Models.MediaHostPairing", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<string>("CodeHash").IsRequired().HasMaxLength(64).HasColumnType("TEXT");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("TEXT");
+                    b.Property<string>("Description").HasMaxLength(1000).HasColumnType("TEXT");
+                    b.Property<DateTime>("ExpiresAtUtc").HasColumnType("TEXT");
+                    b.Property<string>("HostName").IsRequired().HasMaxLength(200).HasColumnType("TEXT");
+                    b.Property<DateTime?>("RevokedAtUtc").HasColumnType("TEXT");
+                    b.Property<DateTime?>("UsedAtUtc").HasColumnType("TEXT");
+                    b.Property<int>("FailedAttempts").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("CodeHash").IsUnique();
+                    b.ToTable("MediaHostPairings");
+                });
+
+            modelBuilder.Entity("audexa_backend.Models.MediaHostCredential", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("TEXT");
+                    b.Property<DateTime?>("LastUsedAtUtc").HasColumnType("TEXT");
+                    b.Property<Guid>("MediaHostId").HasColumnType("TEXT");
+                    b.Property<DateTime?>("RevokedAtUtc").HasColumnType("TEXT");
+                    b.Property<string>("SecretHash").IsRequired().HasMaxLength(64).HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.HasIndex("MediaHostId", "RevokedAtUtc");
+                    b.HasIndex("SecretHash").IsUnique();
+                    b.ToTable("MediaHostCredentials");
+                });
+
             modelBuilder.Entity("audexa_backend.Models.DisplayDevice", b =>
                 {
                     b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
@@ -464,6 +494,17 @@ namespace audexa_backend.Migrations
             modelBuilder.Entity("audexa_backend.Models.MediaHost", b =>
                 {
                     b.Navigation("Displays");
+                    b.Navigation("Credentials");
+                });
+
+            modelBuilder.Entity("audexa_backend.Models.MediaHostCredential", b =>
+                {
+                    b.HasOne("audexa_backend.Models.MediaHost", "MediaHost")
+                        .WithMany("Credentials")
+                        .HasForeignKey("MediaHostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("MediaHost");
                 });
 
 #pragma warning restore 612, 618

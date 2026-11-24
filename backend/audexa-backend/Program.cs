@@ -1,6 +1,8 @@
 using audexa_backend.Data;
 using audexa_backend.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using audexa_backend.Logging;
 using audexa_backend.Hubs;
 
@@ -43,6 +45,19 @@ builder.Services.AddSingleton(fileLoggerProvider);
 // Services
 
 builder.Services.AddControllers();
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("media-host-pair", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
@@ -75,6 +90,7 @@ builder.Services.AddScoped<RoomService>();
 builder.Services.AddScoped<ScenarioService>();
 builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<MediaHostRegistry>();
+builder.Services.AddScoped<MediaHostPairingService>();
 builder.Services.AddSingleton<PlaybackCommandRegistry>();
 builder.Services.AddHostedService<MediaHostPresenceService>();
 builder.Services.AddHostedService<BackendDiscoveryService>();
@@ -102,6 +118,7 @@ if (app.Environment.IsDevelopment())
 // Audexa runs as a local desktop backend.
 // The React frontend connects to the loopback HTTP endpoint.
 app.UseCors("Frontend");
+app.UseRateLimiter();
 
 app.UseAuthorization();
 

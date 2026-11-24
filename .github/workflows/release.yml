@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -90,18 +91,25 @@ jobs:
           $Tag = "v$Version"
           $ArchiveName = "Audexa-Update-$Version-win-x64.zip"
           $InstallerName = "Audexa-Setup-$Version-x64.exe"
+          $AgentArchiveName = "Audexa-MediaAgent-$Version-win-x64.zip"
 
           $RequiredFiles = @(
             "publish\desktop\Audexa.Desktop.exe",
             "publish\backend\audexa-backend.exe",
             "publish\updater\Audexa.Updater.exe",
-            "publish\frontend\index.html"
+            "publish\frontend\index.html",
+            "publish\media-agent\Audexa.MediaAgent.exe",
+            "publish\media-agent\appsettings.example.json"
           )
 
           foreach ($File in $RequiredFiles) {
             if (-not (Test-Path $File -PathType Leaf)) {
               throw "Required build file is missing: $File"
             }
+          }
+
+          if (Test-Path "publish\backend\appsettings.json") {
+            throw "Refusing to package a developer-local Backend appsettings.json."
           }
 
           if (Test-Path "update-payload") {
@@ -157,12 +165,56 @@ jobs:
               }
             }
 
+            if ($Entries -contains "backend/appsettings.json") {
+              throw "The update ZIP must not contain Backend secrets."
+            }
+
             if ($Entries | Where-Object { $_ -like "update-payload/*" }) {
               throw "Unexpected update-payload directory inside ZIP."
             }
           }
           finally {
             $Zip.Dispose()
+          }
+
+          # Package Media Agent separately for installation on remote Media Hosts.
+          # Do not include a machine-specific appsettings.json or SharedToken.
+          if (Test-Path "media-agent-package") {
+            Remove-Item "media-agent-package" -Recurse -Force
+          }
+          if (Test-Path $AgentArchiveName) {
+            Remove-Item $AgentArchiveName -Force
+          }
+          New-Item -ItemType Directory -Force "media-agent-package" | Out-Null
+          Copy-Item "publish\media-agent\*" "media-agent-package\" -Recurse -Force
+
+          if (Test-Path "media-agent-package\appsettings.json") {
+            throw "Media Agent package must not contain a machine-specific appsettings.json."
+          }
+
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            (Join-Path $PWD "media-agent-package"),
+            (Join-Path $PWD $AgentArchiveName),
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false
+          )
+
+          $AgentZip = [System.IO.Compression.ZipFile]::OpenRead(
+            (Join-Path $PWD $AgentArchiveName)
+          )
+          try {
+            $AgentEntries = @($AgentZip.Entries | ForEach-Object { $_.FullName })
+            foreach ($Entry in @("Audexa.MediaAgent.exe", "appsettings.example.json")) {
+              if ($AgentEntries -notcontains $Entry) {
+                throw "Required Media Agent package entry is missing: $Entry"
+              }
+            }
+            if ($AgentEntries -contains "appsettings.json") {
+              throw "Media Agent package must not contain appsettings.json."
+            }
+          }
+          finally {
+            $AgentZip.Dispose()
           }
 
           # Compile the installer using the same release version.
@@ -196,6 +248,7 @@ jobs:
           Write-Host "Archive:   $ArchiveName"
           Write-Host "SHA256:    $Hash"
           Write-Host "Installer: $InstallerPath"
+          Write-Host "Media Agent: $AgentArchiveName"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -208,4 +261,5 @@ jobs:
           files: |
             Audexa-Update-${{ inputs.version }}-win-x64.zip
             artifacts/installer/Audexa-Setup-${{ inputs.version }}-x64.exe
+            Audexa-MediaAgent-${{ inputs.version }}-win-x64.zip
             latest.json

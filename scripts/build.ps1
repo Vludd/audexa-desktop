@@ -68,6 +68,13 @@ if (-not (Test-Path $Lockfile)) {
     throw "pnpm-lock.yaml was not found in the frontend directory."
 }
 
+# Run updater transaction regression tests before producing release artifacts.
+Invoke-Checked "dotnet" @(
+    "test",
+    (Join-Path $Root "tests\Audexa.Updater.Tests\Audexa.Updater.Tests.csproj"),
+    "-c", "Release"
+)
+
 # Clean previous publish output
 Remove-Item $Publish -Recurse -Force -ErrorAction SilentlyContinue
 New-Item $Publish -ItemType Directory -Force | Out-Null
@@ -96,6 +103,16 @@ Publish-DotNetProject `
     -ProjectPath (Join-Path $Root "backend\audexa-backend\audexa-backend.csproj") `
     -OutputPath (Join-Path $Publish "backend")
 
+# Never ship a developer-local appsettings.json (it may contain production secrets).
+# Runtime configuration is generated/migrated into %AppData%\Audexa.
+$BackendLocalSettings = Join-Path $Publish "backend\appsettings.json"
+if (Test-Path $BackendLocalSettings) {
+    Remove-Item $BackendLocalSettings -Force
+}
+if (Test-Path $BackendLocalSettings) {
+    throw "A local Backend appsettings.json must never be included in release payloads."
+}
+
 # Publish desktop shell
 Publish-DotNetProject `
     -ProjectPath (Join-Path $Root "desktop\Audexa.Desktop\Audexa.Desktop.csproj") `
@@ -106,12 +123,43 @@ Publish-DotNetProject `
     -ProjectPath (Join-Path $Root "desktop\Audexa.Updater\Audexa.Updater.csproj") `
     -OutputPath (Join-Path $Publish "updater")
 
+# Publish Media Agent as a separate self-contained folder.
+# Keep PublishSingleFile disabled: LibVLC native libraries and plugins must remain
+# available as files next to the Agent executable.
+$MediaAgentOutput = Join-Path $Publish "media-agent"
+Invoke-Checked "dotnet" @(
+    "publish",
+    (Join-Path $Root "backend\audexa-media-agent\Audexa.MediaAgent.csproj"),
+    "-c", "Release",
+    "-r", "win-x64",
+    "--self-contained", "true",
+    "-p:PublishSingleFile=false",
+    "-p:Version=$Version",
+    "-p:AssemblyVersion=$AssemblyVersion",
+    "-p:FileVersion=$AssemblyVersion",
+    "-p:InformationalVersion=$Version",
+    "-o", $MediaAgentOutput
+)
+
+$AgentExampleConfig = Join-Path $Root "backend\audexa-media-agent\appsettings.example.json"
+if (-not (Test-Path $AgentExampleConfig -PathType Leaf)) {
+    throw "Media Agent example configuration is missing: $AgentExampleConfig"
+}
+Copy-Item $AgentExampleConfig (Join-Path $MediaAgentOutput "appsettings.example.json") -Force
+
+$AgentReadme = Join-Path $Root "backend\audexa-media-agent\README.md"
+if (Test-Path $AgentReadme -PathType Leaf) {
+    Copy-Item $AgentReadme (Join-Path $MediaAgentOutput "README.md") -Force
+}
+
 # Verify essential output files
 $RequiredFiles = @(
     "frontend\index.html",
     "backend\audexa-backend.exe",
     "desktop\Audexa.Desktop.exe",
-    "updater\Audexa.Updater.exe"
+    "updater\Audexa.Updater.exe",
+    "media-agent\Audexa.MediaAgent.exe",
+    "media-agent\appsettings.example.json"
 )
 
 foreach ($RelativePath in $RequiredFiles) {

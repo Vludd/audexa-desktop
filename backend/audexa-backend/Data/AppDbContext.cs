@@ -29,6 +29,8 @@ public class AppDbContext : DbContext
     public DbSet<MediaHost> MediaHosts => Set<MediaHost>();
 
     public DbSet<DisplayDevice> DisplayDevices => Set<DisplayDevice>();
+    public DbSet<MediaHostPairing> MediaHostPairings => Set<MediaHostPairing>();
+    public DbSet<MediaHostCredential> MediaHostCredentials => Set<MediaHostCredential>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +45,25 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Status).IsRequired().HasMaxLength(16);
             entity.HasMany(x => x.Displays).WithOne(x => x.MediaHost)
                 .HasForeignKey(x => x.MediaHostId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(x => x.Credentials).WithOne(x => x.MediaHost)
+                .HasForeignKey(x => x.MediaHostId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MediaHostPairing>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CodeHash).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.HostName).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => x.CodeHash).IsUnique();
+        });
+
+        modelBuilder.Entity<MediaHostCredential>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SecretHash).IsRequired().HasMaxLength(64);
+            entity.HasIndex(x => x.SecretHash).IsUnique();
+            entity.HasIndex(x => new { x.MediaHostId, x.RevokedAtUtc });
         });
 
         modelBuilder.Entity<DisplayDevice>(entity =>

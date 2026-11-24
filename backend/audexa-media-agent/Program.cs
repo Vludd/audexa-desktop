@@ -11,7 +11,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Configuration.AddJsonFile(
     "appsettings.json",
-    optional: false,
+    optional: true,
     reloadOnChange: true
 );
 

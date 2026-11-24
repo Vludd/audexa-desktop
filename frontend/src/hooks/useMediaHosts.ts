@@ -31,6 +31,7 @@ export function useMediaHosts() {
     connection.on("MediaHostUpdated", refresh)
     connection.on("MediaHostDisplaysUpdated", refresh)
     connection.on("MediaHostConnectionLost", refresh)
+    connection.on("MediaHostRemoved", refresh)
     connection.onreconnected(refresh)
 
     let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -51,6 +52,7 @@ export function useMediaHosts() {
       connection.off("MediaHostUpdated", refresh)
       connection.off("MediaHostDisplaysUpdated", refresh)
       connection.off("MediaHostConnectionLost", refresh)
+      connection.off("MediaHostRemoved", refresh)
       void connection.stop()
     }
   }, [queryClient])

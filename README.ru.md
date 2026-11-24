@@ -170,10 +170,10 @@ dotnet run
 В конфигурации разработки API использует адрес:
 
 ```text
-http://localhost:5081
+http://localhost:18080
 ```
 
-Если бэкенд запущен в окружении Development, Swagger UI доступен по адресу `http://localhost:5081/swagger`.
+Если бэкенд запущен в окружении Development, Swagger UI доступен по адресу `http://localhost:18080/swagger`.
 
 Если миграции базы данных нужно применить вручную, установите инструмент EF Core CLI и выполните команду из каталога проекта бэкенда:
 
@@ -193,10 +193,10 @@ pnpm dev
 
 Vite выведет локальный адрес в терминал.
 
-По умолчанию фронтенд обращается к API по адресу `http://localhost:5081`. Чтобы изменить адрес, создайте файл `frontend/.env.local`:
+По умолчанию фронтенд обращается к API по адресу `http://localhost:18080`. Чтобы изменить адрес, создайте файл `frontend/.env.local`:
 
 ```dotenv
-VITE_API_URL=http://localhost:5081
+VITE_API_URL=http://localhost:18080
 ```
 
 После изменения переменных окружения перезапустите Vite. Настройки CORS бэкенда должны разрешать запросы с адреса разработки фронтенда.
@@ -237,11 +237,11 @@ dotnet build
 В репозитории предусмотрен PowerShell-скрипт сборки:
 
 ```powershell
-.\scripts\build.ps1 -Version 1.0.16
+.\scripts\build.ps1 -Version 1.1.0
 
-iscc /DAppVersion=1.0.16 installer\Audexa.iss
+iscc /DAppVersion=1.1.0 installer\Audexa.iss
 # ===== ИЛИ =====
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.16 "installer\Audexa.iss"
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.1.0 "installer\Audexa.iss"
 ```
 
 Запускайте обе команды из корня репозитория. Версию необходимо явно передавать и сборке приложения, и компилятору установщика, чтобы версия бинарных файлов и метаданные установщика совпадали. GitHub Actions передаёт одну и ту же версию в оба этапа.

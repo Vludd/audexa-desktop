@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Security.Cryptography;
 using System.Text;
 
 using Microsoft.Extensions.Logging;
@@ -18,14 +17,12 @@ public static class BackendDiscoveryClient
     public static async Task<DiscoveredBackend?> DiscoverAsync(
         int discoveryPort,
         int timeoutSeconds,
-        string sharedToken,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var tokenBytes = Encoding.UTF8.GetBytes(sharedToken);
         var nonce = Guid.NewGuid().ToString("N");
         var request = Encoding.UTF8.GetBytes(
-            string.Join('|', ProtocolMagic, ProtocolVersion, "REQUEST", nonce));
+            string.Join('|', ProtocolMagic, ProtocolVersion, "PAIR_REQUEST", nonce));
 
         using var udp = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
         udp.EnableBroadcast = true;
@@ -71,7 +68,7 @@ public static class BackendDiscoveryClient
                 break;
             }
 
-            if (!TryParseResponse(received.Buffer, nonce, tokenBytes, out var port, out var machineName))
+            if (!TryParseResponse(received.Buffer, nonce, out var port, out var machineName))
                 continue;
 
             var identity = $"{machineName}:{port}";
@@ -101,7 +98,6 @@ public static class BackendDiscoveryClient
     private static bool TryParseResponse(
         byte[] buffer,
         string expectedNonce,
-        byte[] tokenBytes,
         out int port,
         out string machineName)
     {
@@ -109,10 +105,10 @@ public static class BackendDiscoveryClient
         machineName = string.Empty;
 
         var fields = Encoding.UTF8.GetString(buffer).Split('|');
-        if (fields.Length != 7 ||
+        if (fields.Length != 6 ||
             fields[0] != ProtocolMagic ||
             fields[1] != ProtocolVersion ||
-            fields[2] != "RESPONSE" ||
+            fields[2] != "PAIR_RESPONSE" ||
             !string.Equals(fields[3], expectedNonce, StringComparison.Ordinal) ||
             !int.TryParse(fields[4], out port) || port is < 1 or > 65535)
         {
@@ -122,15 +118,7 @@ public static class BackendDiscoveryClient
         try
         {
             machineName = Encoding.UTF8.GetString(Convert.FromBase64String(fields[5]));
-            var signedPayload = $"{expectedNonce}|{port}|{machineName}";
-            var expectedSignature = HMACSHA256.HashData(
-                tokenBytes,
-                Encoding.UTF8.GetBytes(signedPayload));
-            var suppliedSignature = Convert.FromHexString(fields[6]);
-
-            return suppliedSignature.Length == expectedSignature.Length &&
-                   CryptographicOperations.FixedTimeEquals(expectedSignature, suppliedSignature) &&
-                   !string.IsNullOrWhiteSpace(machineName);
+            return !string.IsNullOrWhiteSpace(machineName);
         }
         catch (FormatException)
         {

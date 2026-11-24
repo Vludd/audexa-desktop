@@ -16,7 +16,8 @@ public sealed class MediaHostRegistry(AppDbContext db)
             host = new MediaHost { Id = request.HostId, CreatedAtUtc = DateTime.UtcNow };
             db.MediaHosts.Add(host);
         }
-        host.Name = Required(request.Name, 200, nameof(request.Name));
+        if (string.IsNullOrWhiteSpace(host.Name))
+            host.Name = Required(request.Name, 200, nameof(request.Name));
         host.MachineName = Required(request.MachineName, 200, nameof(request.MachineName));
         host.AgentVersion = Required(request.AgentVersion, 64, nameof(request.AgentVersion));
         host.IpAddress = ipAddress;
@@ -29,7 +30,8 @@ public sealed class MediaHostRegistry(AppDbContext db)
     public async Task<bool> HeartbeatAsync(Guid hostId, string? ipAddress, CancellationToken ct)
     {
         var host = await db.MediaHosts.FindAsync([hostId], ct);
-        if (host is null) return false;
+        if (host is null || string.Equals(host.Status, "Disabled", StringComparison.OrdinalIgnoreCase))
+            return false;
         host.Status = "Online"; host.LastSeenAtUtc = DateTime.UtcNow; host.IpAddress = ipAddress;
         await db.SaveChangesAsync(ct); return true;
     }
@@ -46,7 +48,8 @@ public sealed class MediaHostRegistry(AppDbContext db)
             .Include(x => x.Displays)
             .SingleOrDefaultAsync(x => x.Id == hostId, ct);
 
-        if (host is null)
+        if (host is null ||
+            string.Equals(host.Status, "Disabled", StringComparison.OrdinalIgnoreCase))
             return false;
 
         var normalizedReports = new Dictionary<string, DisplayReportDto>(
@@ -110,6 +113,18 @@ public sealed class MediaHostRegistry(AppDbContext db)
         await db.SaveChangesAsync(ct);
 
         return true;
+    }
+
+    public async Task<MediaHost?> RenameAsync(Guid hostId, string name, CancellationToken ct)
+    {
+        var normalizedName = Required(name, 200, nameof(name));
+        var host = await db.MediaHosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        if (host is null)
+            return null;
+
+        host.Name = normalizedName;
+        await db.SaveChangesAsync(ct);
+        return host;
     }
 
     public async Task<MediaHost?> GetByIdAsync(Guid hostId, CancellationToken ct) =>

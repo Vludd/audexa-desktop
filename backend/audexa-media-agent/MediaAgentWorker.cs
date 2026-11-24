@@ -23,6 +23,7 @@ public sealed class MediaAgentWorker : BackgroundService
     private readonly DisplayEnumerator _displayEnumerator;
     private readonly LibVlcPlayerManager _playerManager;
     private readonly PlaybackUiThread _playbackUiThread;
+    private readonly IHostApplicationLifetime _applicationLifetime;
     private readonly HttpClient _downloadClient = new()
     {
         Timeout = Timeout.InfiniteTimeSpan
@@ -31,7 +32,8 @@ public sealed class MediaAgentWorker : BackgroundService
     private HubConnection? _connection;
     private IReadOnlyList<MediaDisplayDto> _lastDisplays = Array.Empty<MediaDisplayDto>();
 
-    private readonly Guid _hostId = Guid.Parse(HostIdentity.GetOrCreate());
+    private Guid _hostId;
+    private volatile bool _revoked;
 
     private readonly string _version =
         Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.1.0";
@@ -41,17 +43,22 @@ public sealed class MediaAgentWorker : BackgroundService
         IOptions<MediaAgentOptions> options,
         DisplayEnumerator displayEnumerator,
         LibVlcPlayerManager playerManager,
-        PlaybackUiThread playbackUiThread)
+        PlaybackUiThread playbackUiThread,
+        IHostApplicationLifetime applicationLifetime)
     {
         _logger = logger;
         _options = options.Value;
         _displayEnumerator = displayEnumerator;
         _playerManager = playerManager;
         _playbackUiThread = playbackUiThread;
+        _applicationLifetime = applicationLifetime;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!await EnsurePairedAsync(stoppingToken))
+            return;
+
         ValidateOptions();
         LogHostInformation();
         await _playbackUiThread.StartAsync(stoppingToken);
@@ -94,6 +101,14 @@ public sealed class MediaAgentWorker : BackgroundService
                     displayRefresh.Restart();
                 }
 
+                if (_revoked)
+                {
+                    _logger.LogCritical("This Media Agent registration was revoked by an administrator.");
+                    FirstRunDialog.ShowError("Доступ этого устройства отозван администратором. Обратитесь к администратору Audexa.");
+                    _applicationLifetime.StopApplication();
+                    return;
+                }
+
                 if (_connection.State == HubConnectionState.Connected)
                 {
                     var states = await _playerManager.GetStatesAsync(stoppingToken);
@@ -131,11 +146,142 @@ public sealed class MediaAgentWorker : BackgroundService
         }
     }
 
+    private async Task<bool> EnsurePairedAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var saved = AgentConfigurationStore.Load();
+            if (saved is not null)
+            {
+                var token = CredentialStore.Load();
+                if (!string.IsNullOrWhiteSpace(token) &&
+                    Guid.TryParse(saved.MediaHostId, out var savedHostId))
+                {
+                    bool credentialIsValid;
+                    try
+                    {
+                        credentialIsValid = await PairingClient.ValidateSavedCredentialAsync(
+                            saved.BackendUrl,
+                            savedHostId,
+                            token,
+                            cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        // A network/backend outage must not erase a valid local pairing.
+                        _logger.LogWarning(ex,
+                            "Could not validate saved Media Agent credentials. Will retry without clearing them.");
+                        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                        continue;
+                    }
+
+                    if (credentialIsValid)
+                    {
+                        _options.MediaHostId = saved.MediaHostId;
+                        _options.BackendUrl = saved.BackendUrl;
+                        _options.HubPath = saved.HubPath;
+                        _options.AccessToken = token;
+                        return true;
+                    }
+
+                    _logger.LogWarning(
+                        "Saved Media Agent credentials were revoked or the host record was deleted. Returning to first-run pairing.");
+                    AgentConfigurationStore.Clear();
+                }
+            }
+
+            // Keep the last known Backend URL as a fallback in the pairing dialog.
+            string discoveredUrl = saved?.BackendUrl ?? string.Empty;
+            if (_options.DiscoveryEnabled)
+            {
+                try
+                {
+                    var discovered = await BackendDiscoveryClient.DiscoverAsync(
+                        _options.DiscoveryPort,
+                        _options.DiscoveryTimeoutSeconds,
+                        _logger,
+                        cancellationToken);
+                    if (discovered is not null)
+                        discoveredUrl = discovered.BaseUri.ToString().TrimEnd('/');
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Automatic Backend discovery failed.");
+                }
+            }
+
+            FirstRunInput? input;
+            try
+            {
+                input = FirstRunDialog.Show(discoveredUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not show the first-run pairing window.");
+                await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+                continue;
+            }
+
+            if (input is null)
+            {
+                _logger.LogInformation("Initial pairing was cancelled. The setup window will be shown again.");
+                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+                continue;
+            }
+
+            try
+            {
+                var response = await PairingClient.PairAsync(
+                    input.BackendUrl,
+                    input.PairingCode,
+                    _version,
+                    cancellationToken);
+
+                CredentialStore.Save(response.AccessToken);
+                AgentConfigurationStore.Save(new AgentConfiguration(
+                    response.MediaHostId.ToString("D"),
+                    response.BackendUrl,
+                    response.HubPath));
+
+                _options.MediaHostId = response.MediaHostId.ToString("D");
+                _options.BackendUrl = response.BackendUrl;
+                _options.HubPath = response.HubPath;
+                _options.AccessToken = response.AccessToken;
+
+                _logger.LogInformation("Media Agent successfully paired with Media Host {MediaHostId}.",
+                    response.MediaHostId);
+                return true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Media Agent pairing failed.");
+                FirstRunDialog.ShowError(ex.Message);
+            }
+        }
+
+        return false;
+    }
+
     private HubConnection CreateHubConnection(Uri hubUrl, CancellationToken stoppingToken)
     {
         var connection = new HubConnectionBuilder()
             .WithUrl(hubUrl, options =>
-                options.Headers.Add("X-Audexa-Agent-Token", _options.SharedToken))
+            {
+                options.Headers.Add("X-Audexa-Agent-Token", _options.AccessToken);
+                options.Headers.Add("X-Audexa-MediaHost-Id", _hostId.ToString("D"));
+            })
             .WithAutomaticReconnect(new[]
             {
                 TimeSpan.Zero,
@@ -150,6 +296,22 @@ public sealed class MediaAgentWorker : BackgroundService
         connection.On<PlaybackCommand>("PlaybackCommand", async command =>
         {
             await HandlePlaybackCommandAsync(command, stoppingToken);
+        });
+
+        connection.On("MediaHostRevoked", () =>
+        {
+            _revoked = true;
+            try
+            {
+                AgentConfigurationStore.Clear();
+                _logger.LogWarning("Local pairing credentials were cleared after administrator revocation.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not clear revoked Media Agent credentials from local storage.");
+            }
+
+            return Task.CompletedTask;
         });
 
         connection.Reconnected += async connectionId =>
@@ -191,7 +353,6 @@ public sealed class MediaAgentWorker : BackgroundService
         var discovered = await BackendDiscoveryClient.DiscoverAsync(
             _options.DiscoveryPort,
             _options.DiscoveryTimeoutSeconds,
-            _options.SharedToken,
             _logger,
             cancellationToken);
 
@@ -400,7 +561,8 @@ public sealed class MediaAgentWorker : BackgroundService
             $"api/video/{videoId:D}/agent-download");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);
-        request.Headers.Add("X-Audexa-Agent-Token", _options.SharedToken);
+        request.Headers.Add("X-Audexa-Agent-Token", _options.AccessToken);
+        request.Headers.Add("X-Audexa-MediaHost-Id", _hostId.ToString("D"));
 
         _logger.LogInformation("Downloading video {VideoId} from Backend.", videoId);
 
@@ -499,13 +661,11 @@ public sealed class MediaAgentWorker : BackgroundService
         if (_options.DiscoveryPort is < 1 or > 65535)
             throw new InvalidOperationException("MediaAgent:DiscoveryPort must be between 1 and 65535.");
 
-        if (string.IsNullOrWhiteSpace(_options.SharedToken) ||
-            _options.SharedToken.StartsWith(
-                "REPLACE_",
-                StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(_options.AccessToken) ||
+            !Guid.TryParse(_options.MediaHostId, out _hostId))
         {
             throw new InvalidOperationException(
-                "Set MediaAgent:SharedToken in appsettings.json or the MediaAgent__SharedToken environment variable before starting the agent.");
+                "Media Agent has no valid paired credentials. Run the Agent again to pair it with Audexa.");
         }
     }
 

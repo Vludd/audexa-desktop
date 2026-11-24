@@ -170,10 +170,10 @@ dotnet run
 The development API is configured to use:
 
 ```text
-http://localhost:5081
+http://localhost:18080
 ```
 
-Swagger UI is available at `http://localhost:5081/swagger` when the backend runs in the Development environment.
+Swagger UI is available at `http://localhost:18080/swagger` when the backend runs in the Development environment.
 
 If database migrations need to be applied manually, install the EF Core CLI tool and run this from the backend project directory:
 
@@ -193,10 +193,10 @@ pnpm dev
 
 Vite prints the local development URL in the terminal.
 
-The frontend uses `http://localhost:5081` by default. To override the API address, create `frontend/.env.local`:
+The frontend uses `http://localhost:18080` by default. To override the API address, create `frontend/.env.local`:
 
 ```dotenv
-VITE_API_URL=http://localhost:5081
+VITE_API_URL=http://localhost:18080
 ```
 
 Restart Vite after changing environment variables. The backend CORS configuration must allow the frontend development origin.
@@ -237,11 +237,11 @@ Run any test projects included in the checked-out revision before submitting cha
 The repository includes a PowerShell build script:
 
 ```powershell
-.\scripts\build.ps1 -Version 1.0.16
+.\scripts\build.ps1 -Version 1.1.0
 
-iscc /DAppVersion=1.0.16 installer\Audexa.iss
+iscc /DAppVersion=1.1.0 installer\Audexa.iss
 # ===== OR =====
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.16 "installer\Audexa.iss"
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.1.0 "installer\Audexa.iss"
 ```
 
 Run both commands from the repository root. The version must be supplied explicitly to both the application build and installer compiler so the binaries and installer metadata stay in sync. The GitHub Actions release workflow passes the same version to both steps.
