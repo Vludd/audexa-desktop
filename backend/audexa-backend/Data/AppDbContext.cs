@@ -101,6 +101,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.StorageFileName).IsRequired().HasMaxLength(80);
             entity.Property(x => x.Format).IsRequired().HasMaxLength(16);
             entity.Property(x => x.Sha256).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.GainDb).IsRequired().HasDefaultValue(0);
             entity.HasIndex(x => x.CreatedAt);
         });
 

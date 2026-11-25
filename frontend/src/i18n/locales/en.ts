@@ -227,6 +227,8 @@ export const en: Widen<typeof ru> = {
       videoLibrarySelect: "Select a video...",
       videoLibraryEmpty: "The video library is empty",
       videoLibraryCacheHint: "Before playback, the Agent will download the video to the local cache and verify its checksum.",
+      videoGain: "Video audio gain: {gain} dB",
+      videoGainControl: "Video audio gain for {name}",
     },
   },
   schedule: {
@@ -581,7 +583,6 @@ export const en: Widen<typeof ru> = {
       roomNotRequired: "Room is not required",
       mediaStepRequired: "select an audio or video file.",
       exclusiveMedia: "audio and video cannot be used in the same step.",
-      roomOutputNotReady: "Routing the embedded video soundtrack through the Audio Engine is not connected yet.",
       roomRequiredVideo: "select a room for RoomOutput.",
       hostRequired: "select a Media Host.",
       hostOffline: "Media Host “{name}” is offline.",

@@ -213,6 +213,8 @@ export const ru = {
       videoLibrarySelect: "Выберите видео...",
       videoLibraryEmpty: "Видеотека пуста",
       videoLibraryCacheHint: "Перед запуском Agent загрузит видео в локальный кеш и проверит контрольную сумму.",
+      videoGain: "Усиление звука видео: {gain} дБ",
+      videoGainControl: "Усиление звука видео «{name}»",
     },
   },
   schedule: {
@@ -569,7 +571,6 @@ export const ru = {
       roomNotRequired: "Комната не требуется",
       mediaStepRequired: "выберите аудио- или видеофайл.",
       exclusiveMedia: "в одном шаге нельзя одновременно использовать аудио и видео.",
-      roomOutputNotReady: "Маршрутизация звуковой дорожки видео через Audio Engine пока не подключена.",
       roomRequiredVideo: "для RoomOutput необходимо выбрать комнату.",
       hostRequired: "выберите Media Host.",
       hostOffline: "Media Host «{name}» не в сети.",

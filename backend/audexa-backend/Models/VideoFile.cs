@@ -11,6 +11,7 @@ public class VideoFile
     public long? DurationMs { get; set; }
     public int? Width { get; set; }
     public int? Height { get; set; }
+    public int GainDb { get; set; }
     public string Sha256 { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }

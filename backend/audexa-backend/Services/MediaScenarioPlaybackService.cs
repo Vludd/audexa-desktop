@@ -25,12 +25,20 @@ public sealed class MediaScenarioPlaybackService(
         Action<double, double> reportProgress,
         CancellationToken cancellationToken)
     {
-        var muted = string.Equals(audioMode, "Muted", StringComparison.OrdinalIgnoreCase);
+        var muted = !string.Equals(audioMode, "HostOutput", StringComparison.OrdinalIgnoreCase);
         var started = false;
         var pauseCommandSent = false;
         try
         {
-            await DispatchAsync(hostId, displayKey, "play", video, muted, cancellationToken, isSkipRequested);
+            await DispatchAsync(
+                hostId,
+                displayKey,
+                "play",
+                video,
+                muted,
+                cancellationToken,
+                isSkipRequested,
+                GetHostOutputVolume(video.GainDb));
             var startedAt = DateTime.UtcNow;
             var lastStateAt = startedAt;
 
@@ -135,7 +143,8 @@ public sealed class MediaScenarioPlaybackService(
         VideoFile? video,
         bool? muted,
         CancellationToken cancellationToken,
-        Func<bool>? abortRequested = null)
+        Func<bool>? abortRequested = null,
+        int? volume = null)
     {
         var command = commands.Create(hostId, displayKey, action);
         try
@@ -150,7 +159,7 @@ public sealed class MediaScenarioPlaybackService(
                 VideoSize = video?.Size,
                 VideoFileName = video?.FileName,
                 Muted = muted,
-                Volume = 100
+                Volume = volume ?? 100
             }, cancellationToken);
         }
         catch
@@ -187,5 +196,9 @@ public sealed class MediaScenarioPlaybackService(
             await Task.Delay(100, cancellationToken);
         }
     }
+
+    private static int GetHostOutputVolume(int gainDb) =>
+        Math.Clamp((int)Math.Round(100d * Math.Pow(10d, Math.Clamp(gainDb, -24, 24) / 20d)), 0, 200);
+
     private sealed class MediaPlaybackSkippedException : Exception { }
 }

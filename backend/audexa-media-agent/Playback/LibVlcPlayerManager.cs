@@ -57,7 +57,7 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
         _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.Time = Math.Max(0, positionMs), ct);
 
     public Task SetVolumeAsync(string displayKey, int volume, CancellationToken ct) =>
-        _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.Volume = Math.Clamp(volume, 0, 100), ct);
+        _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.Volume = Math.Clamp(volume, 0, 200), ct);
 
     public Task SetMuteAsync(string displayKey, bool muted, CancellationToken ct) =>
         _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.Mute = muted, ct);
@@ -75,7 +75,7 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
             };
             return new PlaybackStateReport(pair.Key, state, pair.Value.Media?.Mrl,
                 Math.Max(0, player.Time), Math.Max(0, player.Length),
-                Math.Clamp(player.Volume, 0, 100), player.Mute, null);
+                Math.Clamp(player.Volume, 0, 200), player.Mute, null);
         }).ToArray(), ct);
 
     /// <summary>Closes output sessions for displays that are no longer present.</summary>
@@ -141,7 +141,7 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
         // first decoded audio frames cannot leak to the Media Host speakers.
         session.MediaPlayer.Mute = muted ?? false;
         if (volume.HasValue)
-            session.MediaPlayer.Volume = Math.Clamp(volume.Value, 0, 100);
+            session.MediaPlayer.Volume = Math.Clamp(volume.Value, 0, 200);
 
         if (!session.MediaPlayer.Play())
             throw new InvalidOperationException($"LibVLC refused to start playback on '{displayKey}'.");

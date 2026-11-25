@@ -97,12 +97,15 @@ public sealed class VideoFileService
     public async Task<VideoFile?> UpdateAsync(Guid id, UpdateVideoFileRequest request, CancellationToken ct = default)
     {
         var name = request.Name?.Trim();
-        if (string.IsNullOrWhiteSpace(name))
+        if (request.Name is not null && string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Video name cannot be empty.", nameof(request));
+        if (request.Name is null && request.GainDb is null)
+            throw new ArgumentException("At least one video property must be provided.", nameof(request));
 
         var entity = await _db.VideoFiles.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (entity is null) return null;
-        entity.Name = name;
+        if (name is not null) entity.Name = name;
+        if (request.GainDb is int gainDb) entity.GainDb = Math.Clamp(gainDb, -24, 24);
         await _db.SaveChangesAsync(ct);
         return entity;
     }

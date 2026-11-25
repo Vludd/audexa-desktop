@@ -17,7 +17,8 @@ Audexa is designed for museums, exhibitions, visitor centers, interactive instal
 - **Playback control** — control playback and monitor active sessions.
 - **Media Hosts** — register and manage remote playback computers.
 - **Media Agent** — run playback on remote Windows hosts and report their displays and playback state.
-- **Video library** — store and distribute video files to Media Agents.
+- **Video library** — store, adjust soundtrack gain, and distribute video files to Media Agents.
+- **Video room audio** — decode embedded soundtracks with FFmpeg and route them through mapped outputs with synchronized Pause / Resume / Stop.
 - **Settings and diagnostics** — configure audio devices and inspect diagnostics and logs.
 - **In-app updates** — check for and install published Audexa releases.
 

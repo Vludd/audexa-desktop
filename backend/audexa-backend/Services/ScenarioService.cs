@@ -298,8 +298,6 @@ public sealed class ScenarioService
 
             if (step.VideoFileId.HasValue)
             {
-                if (mode == "RoomOutput")
-                    errors.Add($"Step {number}: RoomOutput for embedded video audio is not connected to the ASIO Audio Engine yet. Use Muted or HostOutput.");
                 if (step.VideoFile is null) errors.Add($"Step {number}: video file '{step.VideoFileId}' was not found.");
                 else
                 {

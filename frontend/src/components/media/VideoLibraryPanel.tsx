@@ -7,6 +7,8 @@ import {
 import { videoApi, type VideoFile } from "@/api/video"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Slider } from "@/components/ui/slider"
+import { t } from "@/i18n"
 
 const ACCEPTED = ".mp4,.m4v,.mkv,.mov,.avi,.webm,.mpeg,.mpg"
 
@@ -19,6 +21,68 @@ function formatBytes(bytes: number) {
 
 function getLoadErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Не удалось загрузить видеотеку"
+}
+
+function VideoGainControl({
+  item,
+  disabled,
+  onSave,
+}: {
+  item: VideoFile
+  disabled: boolean
+  onSave: (gainDb: number) => Promise<boolean>
+}) {
+  const [gainDb, setGainDb] = useState(item.gainDb)
+  const gainDbRef = useRef(gainDb)
+  const committedGainDbRef = useRef(gainDb)
+  const draggingRef = useRef(false)
+
+  useEffect(() => {
+    if (draggingRef.current) return
+    setGainDb(item.gainDb)
+    gainDbRef.current = item.gainDb
+    committedGainDbRef.current = item.gainDb
+  }, [item.gainDb])
+
+  const commit = async () => {
+    const nextGainDb = gainDbRef.current
+    draggingRef.current = false
+    if (nextGainDb === committedGainDbRef.current) return
+    if (await onSave(nextGainDb)) {
+      committedGainDbRef.current = nextGainDb
+      return
+    }
+
+    gainDbRef.current = committedGainDbRef.current
+    setGainDb(committedGainDbRef.current)
+  }
+
+  return (
+    <div className="mt-2 flex max-w-sm items-center gap-3">
+      <span className="shrink-0 text-[11px] text-muted-foreground" aria-live="polite">
+        {t("media.videoGain", { gain: `${gainDb > 0 ? "+" : ""}${gainDb}` })}
+      </span>
+      <Slider
+        aria-label={t("media.videoGainControl", { name: item.name })}
+        value={[gainDb]}
+        min={-24}
+        max={24}
+        step={1}
+        disabled={disabled}
+        onValueChange={(value) => {
+          const nextGainDb = typeof value === "number" ? value : value[0]
+          if (nextGainDb !== undefined) {
+            gainDbRef.current = nextGainDb
+            setGainDb(nextGainDb)
+          }
+        }}
+        onPointerDown={() => { draggingRef.current = true }}
+        onPointerUp={() => { void commit() }}
+        onKeyDown={() => { draggingRef.current = true }}
+        onKeyUp={() => { void commit() }}
+      />
+    </div>
+  )
 }
 
 export default function VideoLibraryPanel() {
@@ -106,6 +170,22 @@ export default function VideoLibraryPanel() {
       setEditingName("")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось переименовать видео")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const saveGain = async (item: VideoFile, gainDb: number): Promise<boolean> => {
+    if (gainDb === item.gainDb) return true
+    setBusyId(item.id)
+    setError(null)
+    try {
+      const updated = await videoApi.update(item.id, { name: item.name, gainDb })
+      setFiles((current) => current.map((file) => file.id === item.id ? updated : file))
+      return true
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось изменить усиление видео")
+      return false
     } finally {
       setBusyId(null)
     }
@@ -237,6 +317,7 @@ export default function VideoLibraryPanel() {
                       <>
                         <div className="truncate text-sm font-medium">{item.name}</div>
                         <div className="mt-0.5 truncate text-xs text-muted-foreground">{item.fileName} · {item.format}</div>
+                        <VideoGainControl item={item} disabled={busyId === item.id} onSave={(gainDb) => saveGain(item, gainDb)} />
                       </>
                     )}
                   </div>

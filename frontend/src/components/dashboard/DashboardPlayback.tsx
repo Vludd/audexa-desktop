@@ -206,27 +206,28 @@ export default function DashboardPlayback({
                       onKeyUp={commitRoomVolume}
                     />
                   </label>
-                  <label className="block">
-                    <span className="mb-1 text-[11px] text-muted-foreground">{t("dashboard.playback.fileGain", { gain: `${audioGainDb > 0 ? "+" : ""}${audioGainDb}` })}</span>
-                    <Slider
-                      value={[audioGainDb]}
-                      min={-24}
-                      max={24}
-                      step={1}
-                      onValueChange={(value) => {
-                        const gain = typeof value === "number" ? value : value[0]
-                        if (gain !== undefined) {
-                          audioGainRef.current = gain
-                          setAudioGainDb(gain)
-                        }
-                      }}
-                      onPointerDown={() => { audioGainDraggingRef.current = true }}
-                      onPointerUp={commitAudioGain}
-                      onKeyDown={() => { audioGainDraggingRef.current = true }}
-                      onKeyUp={commitAudioGain}
-                      disabled={!activeRoomState.audioFileId}
-                    />
-                  </label>
+                  {activeRoomAudioFileId && (
+                    <label className="block">
+                      <span className="mb-1 text-[11px] text-muted-foreground">{t("dashboard.playback.fileGain", { gain: `${audioGainDb > 0 ? "+" : ""}${audioGainDb}` })}</span>
+                      <Slider
+                        value={[audioGainDb]}
+                        min={-24}
+                        max={24}
+                        step={1}
+                        onValueChange={(value) => {
+                          const gain = typeof value === "number" ? value : value[0]
+                          if (gain !== undefined) {
+                            audioGainRef.current = gain
+                            setAudioGainDb(gain)
+                          }
+                        }}
+                        onPointerDown={() => { audioGainDraggingRef.current = true }}
+                        onPointerUp={commitAudioGain}
+                        onKeyDown={() => { audioGainDraggingRef.current = true }}
+                        onKeyUp={commitAudioGain}
+                      />
+                    </label>
+                  )}
                 </div>
               )}
             </div>

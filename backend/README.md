@@ -9,6 +9,7 @@ The Backend is the local ASP.NET Core service used by Audexa Desktop and remote 
 - SQLite
 - SignalR
 - NAudio
+- FFmpeg LGPL runtime for decoding embedded video soundtracks
 - Swashbuckle / Swagger
 
 ## Project layout
@@ -86,7 +87,7 @@ The controllers expose the following API groups:
 |---|---|
 | `/api/health` | Backend health |
 | `/api/audio` | Audio library: metadata, upload, stream, rename, delete |
-| `/api/video` | Video library: metadata, upload, stream, Agent download, rename, delete |
+| `/api/video` | Video library: metadata, upload, stream, Agent download, rename, gain, delete |
 | `/api/rooms` | Room management |
 | `/api/scenarios` | Scenario management and validation |
 | `/api/schedules` | Schedule management |
@@ -140,6 +141,7 @@ Media files are stored on disk; SQLite stores their metadata and storage file na
 - The solution file is `backend/audexa-backend.sln`.
 - The Backend project is `backend/audexa-backend/audexa-backend.csproj`.
 - The Media Agent is a separate project and is published separately from the Backend.
+- Video `RoomOutput` decodes the first embedded soundtrack with the bundled FFmpeg runtime and routes it through the same mapped NAudio outputs as regular audio. FFmpeg's LGPL third-party notice is copied beside the Backend publish output.
 - Keep API DTOs, Frontend API clients, and SignalR event contracts in sync.
 - Add and commit EF Core migrations when changing the persistence model.
 - Never commit local databases, uploaded media, pairing codes, credentials, or machine-specific `appsettings.json` files.

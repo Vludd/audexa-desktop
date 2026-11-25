@@ -90,13 +90,10 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             throw new PlaybackException("SCENARIO_EMPTY", "Scenario has no steps.");
 
         var steps = scenario.Steps.OrderBy(x => x.Order).ToList();
-        if (steps.Any(x => x.VideoFileId.HasValue &&
-            string.Equals(x.VideoAudioMode, "RoomOutput", StringComparison.OrdinalIgnoreCase)))
-            throw new PlaybackException(
-                "VIDEO_ROOM_OUTPUT_NOT_READY",
-                "RoomOutput для видеодорожки пока не подключён к ASIO Audio Engine. Используйте Muted или HostOutput.");
-
-        var requiresAudioEngine = steps.Any(x => x.AudioFileId.HasValue || x.TranslationAudioFileId.HasValue);
+        var requiresAudioEngine = steps.Any(x =>
+            x.AudioFileId.HasValue ||
+            x.TranslationAudioFileId.HasValue ||
+            (x.VideoFileId.HasValue && string.Equals(x.VideoAudioMode, "RoomOutput", StringComparison.OrdinalIgnoreCase)));
         var settings = requiresAudioEngine
             ? await db.AudioConfigurations.AsNoTracking()
                 .Include(x => x.Mappings)
@@ -161,6 +158,17 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                 var path = GetAudioPath(step.AudioFile.StorageFileName);
                 if (!File.Exists(path))
                     throw new PlaybackException("AUDIO_FILE_MISSING", $"Audio file '{step.AudioFile.FileName}' is missing.");
+            }
+            if (step.VideoFileId.HasValue &&
+                string.Equals(step.VideoAudioMode, "RoomOutput", StringComparison.OrdinalIgnoreCase))
+            {
+                if (step.RoomId is null || step.Room is null)
+                    throw new PlaybackException("ROOM_NOT_FOUND", $"Room '{step.RoomId}' was not found.");
+                if (!mappings.TryGetValue(step.RoomId.Value, out var outputIds) || outputIds.Count == 0)
+                    throw new PlaybackException("OUTPUT_NOT_MAPPED", $"Room '{step.Room.Name}' has no audio output mapping.");
+                foreach (var outputId in outputIds)
+                    if (!_devices.HasOutput(deviceId!, outputId))
+                        throw new PlaybackException("OUTPUT_UNAVAILABLE", $"Output '{outputId}' is not available.");
             }
 
             if (step.TranslationAudioFile is not null)
@@ -319,20 +327,21 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         {
             if (pause)
             {
-                if (session.State.Status == "playing" && session.Active is not null)
-                {
-                    session.Active.Pause();
-                    session.State = session.State with { Status = "paused" };
-                    return Task.CompletedTask;
-                }
-
                 if (session.State.Status == "playing" && session.ActiveVideo is not null)
                 {
                     session.PauseRequested = true;
+                    session.Active?.Pause();
                     var pausedSteps = session.State.Steps.ToList();
                     var pausedIndex = pausedSteps.FindIndex(x => x.Step == session.State.CurrentStep);
                     if (pausedIndex >= 0) pausedSteps[pausedIndex] = pausedSteps[pausedIndex] with { Status = "paused" };
                     session.State = session.State with { Status = "paused", Steps = pausedSteps };
+                    return Task.CompletedTask;
+                }
+
+                if (session.State.Status == "playing" && session.Active is not null)
+                {
+                    session.Active.Pause();
+                    session.State = session.State with { Status = "paused" };
                     return Task.CompletedTask;
                 }
 
@@ -350,18 +359,19 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             }
 
             if (session.State.Status != "paused") return Task.CompletedTask;
-            if (session.Active is not null)
-            {
-                session.Active.Resume();
-                session.State = session.State with { Status = "playing" };
-            }
-            else if (session.ActiveVideo is not null)
+            if (session.ActiveVideo is not null)
             {
                 session.PauseRequested = false;
+                session.Active?.Resume();
                 var resumedSteps = session.State.Steps.ToList();
                 var resumedIndex = resumedSteps.FindIndex(x => x.Step == session.State.CurrentStep);
                 if (resumedIndex >= 0) resumedSteps[resumedIndex] = resumedSteps[resumedIndex] with { Status = "playing" };
                 session.State = session.State with { Status = "playing", Steps = resumedSteps };
+            }
+            else if (session.Active is not null)
+            {
+                session.Active.Resume();
+                session.State = session.State with { Status = "playing" };
             }
             else
             {
@@ -661,9 +671,13 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                     var stepNumber = i + 1;
                     var roomReserved = false;
 
-                    if (step.AudioFileId.HasValue)
+                    var videoRoomOutput = step.VideoFileId.HasValue &&
+                        string.Equals(step.VideoAudioMode, "RoomOutput", StringComparison.OrdinalIgnoreCase);
+                    if (step.AudioFileId.HasValue || videoRoomOutput)
                     {
-                        roomReserved = await ReserveRoomAsync(session, step.RoomId!.Value, stepNumber, cancellationToken);
+                        if (step.RoomId is not Guid roomId)
+                            throw new PlaybackException("ROOM_NOT_FOUND", $"Room '{step.RoomId}' was not found.");
+                        roomReserved = await ReserveRoomAsync(session, roomId, stepNumber, cancellationToken);
                         if (!roomReserved)
                         {
                             SetStepState(stepNumber, "stopped", 0, 0);
@@ -683,6 +697,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                         if (!displayReserved)
                         {
                             SetStepState(stepNumber, "stopped", 0, 0);
+                            if (roomReserved) ReleaseRoom(step.RoomId!.Value, session.Id);
                             continue;
                         }
                     }
@@ -698,6 +713,16 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                             step.AudioFile!.VolumeDb,
                             step.TranslationAudioFileId,
                             step.TranslationAudioFile?.VolumeDb ?? 0);
+                        lock (_sync) _active = runtime;
+                    }
+                    else if (videoRoomOutput)
+                    {
+                        runtime = new PlaybackRuntime(
+                            deviceId!,
+                            step.RoomId!.Value,
+                            null,
+                            step.Room!.Volume,
+                            step.VideoFile!.GainDb);
                         lock (_sync) _active = runtime;
                     }
 
@@ -737,10 +762,14 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                     {
                         var videoRuntime = new VideoPlaybackRuntime(stepNumber);
                         lock (_sync) session.ActiveVideo = videoRuntime;
+                        using var roomAudioCts = runtime is null
+                            ? null
+                            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        Task? roomAudioTask = null;
                         try
                         {
                             var mode = step.VideoAudioMode ?? "Muted";
-                            await _mediaPlayback.PlayAsync(
+                            var videoTask = _mediaPlayback.PlayAsync(
                                 step.MediaHostId!.Value,
                                 step.DisplayKey!,
                                 step.VideoFile!,
@@ -753,13 +782,44 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                                     position,
                                     0,
                                     duration),
-                                cancellationToken);
+                                roomAudioCts?.Token ?? cancellationToken);
+                            if (runtime is not null)
+                            {
+                                roomAudioTask = PlayVideoAudioAsync(
+                                    deviceId!,
+                                    mappings[step.RoomId!.Value],
+                                    step.VideoFile!,
+                                    runtime,
+                                    () => session.PauseRequested,
+                                    roomAudioCts!.Token);
+                            }
+                            if (roomAudioTask is not null &&
+                                await Task.WhenAny(videoTask, roomAudioTask) == roomAudioTask)
+                                await roomAudioTask;
+                            await videoTask;
+                        }
+                        catch
+                        {
+                            roomAudioCts?.Cancel();
+                            throw;
                         }
                         finally
                         {
+                            roomAudioCts?.Cancel();
+                            if (roomAudioTask is not null)
+                            {
+                                try
+                                {
+                                    await roomAudioTask;
+                                }
+                                catch (OperationCanceledException) when (roomAudioCts?.IsCancellationRequested == true)
+                                {
+                                }
+                            }
                             lock (_sync)
                             {
                                 if (session.ActiveVideo == videoRuntime) session.ActiveVideo = null;
+                                if (_active == runtime) _active = null;
                                 if (session.SkipRequestedStep == stepNumber) session.SkipRequestedStep = null;
                             }
                         }
@@ -769,6 +829,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                         else
                             SetStepState(stepNumber, "finished", step.VideoFile?.DurationMs is long duration ? duration / 1000d : 0, 0);
                         if (displayReserved) ReleaseDisplay(step.MediaHostId!.Value, step.DisplayKey!, session.Id);
+                        if (roomReserved) ReleaseRoom(step.RoomId!.Value, session.Id);
                         continue;
                     }
 
@@ -863,8 +924,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         if (!OperatingSystem.IsWindows())
             throw new PlaybackException("UNSUPPORTED_PLATFORM", "Audio playback is supported on Windows only.");
 
-        var mainPath = GetAudioPath(audio.StorageFileName);
-        using var source = OpenSource(mainPath);
+        using var source = OpenSource(GetAudioPath(audio.StorageFileName));
         WaveStream? translationSource = null;
 
         try
@@ -888,49 +948,137 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             if (translationChannels.Intersect(mainChannels).Any())
                 throw new PlaybackException("OUTPUT_CHANNEL_COLLISION", "Translation output overlaps a room output.");
 
-            var channels = mainChannels.Concat(translationChannels).Distinct().ToArray();
-            using var output = CreateOutput(deviceId, channels, out var targetFormat);
-            using var provider = new RoutedWaveProvider(
+            await PlayRoutedSourceAsync(
+                deviceId,
                 source,
-                targetFormat,
                 mainChannels,
                 runtime,
+                Math.Max(0.001, Math.Max(
+                    audio.Duration.TotalSeconds,
+                    translationAudio?.Duration.TotalSeconds ?? 0)),
+                () => runtime.PauseRequested,
+                (status, position) => SetStepState(stepNumber, status, position, 0),
+                cancellationToken,
                 translationSource,
                 translationChannels);
+        }
+        finally
+        {
+            translationSource?.Dispose();
+        }
+    }
 
-            runtime.Attach(output, provider);
-            output.PlaybackStopped += (_, args) =>
+    private async Task PlayVideoAudioAsync(
+        string deviceId,
+        IReadOnlyList<string> outputIds,
+        VideoFile video,
+        PlaybackRuntime runtime,
+        Func<bool> isPauseRequested,
+        CancellationToken cancellationToken)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlaybackException("UNSUPPORTED_PLATFORM", "Audio playback is supported on Windows only.");
+
+        var path = GetVideoPath(video.StorageFileName);
+        using var decoder = FfmpegAudioDecoder.Open(path);
+        var channels = outputIds.Select(ParseOutputIndex).Distinct().ToArray();
+        if (channels.Length == 0)
+            throw new PlaybackException("OUTPUT_NOT_MAPPED", "No audio output is assigned to this room.");
+
+        await PlayRoutedSourceAsync(
+            deviceId,
+            decoder.Source,
+            channels,
+            runtime,
+            Math.Max(0.001, (video.DurationMs ?? 1) / 1000d),
+            isPauseRequested,
+            null,
+            cancellationToken);
+        await decoder.EnsureSuccessfulAsync(cancellationToken);
+    }
+
+    private async Task PlayRoutedSourceAsync(
+        string deviceId,
+        WaveStream mainSource,
+        IReadOnlyCollection<int> mainChannels,
+        PlaybackRuntime runtime,
+        double duration,
+        Func<bool> isPauseRequested,
+        Action<string, double>? reportProgress,
+        CancellationToken cancellationToken,
+        WaveStream? translationSource = null,
+        IReadOnlyCollection<int>? translationChannels = null)
+    {
+        var allChannels = mainChannels.Concat(translationChannels ?? Array.Empty<int>()).Distinct().ToArray();
+        using var output = CreateOutput(deviceId, allChannels, out var targetFormat);
+        using var provider = new RoutedWaveProvider(
+            mainSource,
+            targetFormat,
+            mainChannels,
+            runtime,
+            translationSource,
+            translationChannels);
+
+        runtime.Attach(output, provider);
+        output.PlaybackStopped += (_, args) =>
+        {
+            if (args.Exception is not null)
+                runtime.MarkOutputError(args.Exception);
+        };
+
+        var started = DateTime.UtcNow;
+        var lastDeviceCheck = DateTime.MinValue;
+
+        try
+        {
+            output.Init(provider);
+            output.Play();
+
+            while (output.PlaybackState != PlaybackState.Stopped)
             {
-                if (args.Exception is not null)
-                    runtime.MarkOutputError(args.Exception);
-            };
+                cancellationToken.ThrowIfCancellationRequested();
 
-            var started = DateTime.UtcNow;
-            var lastDeviceCheck = DateTime.MinValue;
-            var duration = Math.Max(0.001, Math.Max(
-                audio.Duration.TotalSeconds,
-                translationAudio?.Duration.TotalSeconds ?? 0));
+                if (runtime.OutputError is { } outputError)
+                    throw CreateOutputFailure(outputError);
 
-            try
-            {
-                output.Init(provider);
-                output.Play();
-
-                while (output.PlaybackState != PlaybackState.Stopped)
+                var now = DateTime.UtcNow;
+                if (now - lastDeviceCheck >= TimeSpan.FromMilliseconds(300))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    lastDeviceCheck = now;
+                    if (!_devices.IsDeviceAvailable(deviceId))
+                        throw new PlaybackException(
+                            "DEVICE_UNAVAILABLE",
+                            "Аудиоустройство отключено или недоступно. Подключите устройство и запустите сценарий повторно.");
+                }
 
-                    if (runtime.OutputError is { } outputError)
-                        throw CreateOutputFailure(outputError);
+                if (runtime.SkipRequested)
+                {
+                    output.Stop();
+                    break;
+                }
 
-                    var now = DateTime.UtcNow;
-                    if (now - lastDeviceCheck >= TimeSpan.FromMilliseconds(300))
+                if (isPauseRequested() && output.PlaybackState == PlaybackState.Playing)
+                {
+                    output.Pause();
+                    reportProgress?.Invoke("paused", runtime.PausedPosition);
+                    while (isPauseRequested() && !runtime.SkipRequested)
                     {
-                        lastDeviceCheck = now;
-                        if (!_devices.IsDeviceAvailable(deviceId))
-                            throw new PlaybackException(
-                                "DEVICE_UNAVAILABLE",
-                                "Аудиоустройство отключено или недоступно. Подключите устройство и запустите сценарий повторно.");
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        if (runtime.OutputError is { } pausedOutputError)
+                            throw CreateOutputFailure(pausedOutputError);
+
+                        var pausedNow = DateTime.UtcNow;
+                        if (pausedNow - lastDeviceCheck >= TimeSpan.FromMilliseconds(300))
+                        {
+                            lastDeviceCheck = pausedNow;
+                            if (!_devices.IsDeviceAvailable(deviceId))
+                                throw new PlaybackException(
+                                    "DEVICE_UNAVAILABLE",
+                                    "Аудиоустройство отключено или недоступно. Подключите устройство и запустите сценарий повторно.");
+                        }
+
+                        await Task.Delay(100, cancellationToken);
                     }
 
                     if (runtime.SkipRequested)
@@ -939,86 +1087,51 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                         break;
                     }
 
-                    if (runtime.PauseRequested && output.PlaybackState == PlaybackState.Playing)
-                    {
-                        output.Pause();
-                        SetStepState(stepNumber, "paused", runtime.PausedPosition, 0);
-                        while (runtime.PauseRequested && !runtime.SkipRequested)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-
-                            if (runtime.OutputError is { } pausedOutputError)
-                                throw CreateOutputFailure(pausedOutputError);
-
-                            var pausedNow = DateTime.UtcNow;
-                            if (pausedNow - lastDeviceCheck >= TimeSpan.FromMilliseconds(300))
-                            {
-                                lastDeviceCheck = pausedNow;
-                                if (!_devices.IsDeviceAvailable(deviceId))
-                                    throw new PlaybackException(
-                                        "DEVICE_UNAVAILABLE",
-                                        "Аудиоустройство отключено или недоступно. Подключите устройство и запустите сценарий повторно.");
-                            }
-
-                            await Task.Delay(100, cancellationToken);
-                        }
-
-                        if (runtime.SkipRequested)
-                        {
-                            output.Stop();
-                            break;
-                        }
-
-                        output.Play();
-                        started = DateTime.UtcNow - TimeSpan.FromSeconds(runtime.PausedPosition);
-                    }
-
-                    var position = Math.Min(duration, (DateTime.UtcNow - started).TotalSeconds);
-                    if (output.PlaybackState == PlaybackState.Playing)
-                    {
-                        runtime.PausedPosition = position;
-                        SetStepState(stepNumber, "playing", position, 0);
-                    }
-
-                    if (runtime.EndOfStream)
-                    {
-                        output.Stop();
-                        break;
-                    }
-
-                    await Task.Delay(100, cancellationToken);
-                    if (output.PlaybackState == PlaybackState.Stopped)
-                        break;
+                    output.Play();
+                    started = DateTime.UtcNow - TimeSpan.FromSeconds(runtime.PausedPosition);
                 }
 
-                if (!cancellationToken.IsCancellationRequested)
+                var position = Math.Min(duration, (DateTime.UtcNow - started).TotalSeconds);
+                if (output.PlaybackState == PlaybackState.Playing)
                 {
-                    if (runtime.OutputError is { } stoppedOutputError)
-                        throw CreateOutputFailure(stoppedOutputError);
-
-                    if (!_devices.IsDeviceAvailable(deviceId))
-                        throw new PlaybackException(
-                            "DEVICE_UNAVAILABLE",
-                            "Аудиоустройство отключено или недоступно. Подключите устройство и запустите сценарий повторно.");
+                    runtime.PausedPosition = position;
+                    reportProgress?.Invoke("playing", position);
                 }
 
-                if (!runtime.EndOfStream && !runtime.SkipRequested && !cancellationToken.IsCancellationRequested)
+                if (runtime.EndOfStream)
                 {
-                    throw new PlaybackException(
-                        "AUDIO_OUTPUT_STOPPED",
-                        "Аудиовыход остановился до завершения файла. Проверьте аудиоустройство и сопоставление выхода.");
+                    output.Stop();
+                    break;
                 }
+
+                await Task.Delay(100, cancellationToken);
+                if (output.PlaybackState == PlaybackState.Stopped)
+                    break;
             }
-            finally
+
+            if (!cancellationToken.IsCancellationRequested)
             {
-                try { output.Stop(); }
-                catch (Exception ex) { runtime.MarkOutputError(ex); }
-                runtime.Detach();
+                if (runtime.OutputError is { } stoppedOutputError)
+                    throw CreateOutputFailure(stoppedOutputError);
+
+                if (!_devices.IsDeviceAvailable(deviceId))
+                    throw new PlaybackException(
+                        "DEVICE_UNAVAILABLE",
+                        "Аудиоустройство отключено или недоступно. Подключите устройство и запустите сценарий повторно.");
+            }
+
+            if (!runtime.EndOfStream && !runtime.SkipRequested && !cancellationToken.IsCancellationRequested)
+            {
+                throw new PlaybackException(
+                    "AUDIO_OUTPUT_STOPPED",
+                    "Аудиовыход остановился до завершения файла. Проверьте аудиоустройство и сопоставление выхода.");
             }
         }
         finally
         {
-            translationSource?.Dispose();
+            try { output.Stop(); }
+            catch (Exception ex) { runtime.MarkOutputError(ex); }
+            runtime.Detach();
         }
     }
 
@@ -1253,6 +1366,12 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         return Path.Combine(appDataPath, "Audexa", "Audio", storageFileName);
     }
 
+    private static string GetVideoPath(string storageFileName)
+    {
+        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return Path.Combine(appDataPath, "Audexa", "Video", storageFileName);
+    }
+
     private static WaveStream OpenSource(string path)
     {
         var ext = Path.GetExtension(path).ToLowerInvariant();
@@ -1330,7 +1449,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         public PlaybackRuntime(
             string deviceId,
             Guid roomId,
-            Guid audioFileId,
+            Guid? audioFileId,
             int roomVolume,
             int audioGainDb,
             Guid? translationAudioFileId = null,
@@ -1347,7 +1466,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
 
         public string DeviceId { get; }
         public Guid RoomId { get; }
-        public Guid AudioFileId { get; }
+        public Guid? AudioFileId { get; }
         public Guid? TranslationAudioFileId { get; }
         public Exception? OutputError { get { lock (_sync) return _outputError; } }
         public int RoomVolume { get; private set; }

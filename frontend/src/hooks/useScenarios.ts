@@ -595,7 +595,6 @@ export function useScenarios({
             errors.push(`Шаг ${number}: неизвестный режим аудио видео.`)
           }
           if (step.videoAudioMode === "RoomOutput") {
-            errors.push(`Шаг ${number}: ${t("scenarios.steps.roomOutputNotReady")}`)
             if (!step.roomId || !rooms.some((room) => room.id === step.roomId)) {
               errors.push(`Шаг ${number}: ${t("scenarios.steps.roomRequiredVideo")}`)
             } else if (roomIdsWithoutOutputs.has(step.roomId)) {

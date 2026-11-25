@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>audexa_backend</RootNamespace>
     <UserSecretsId>d7259cfc-bb62-421b-b36b-8a9e0bf3ed8f</UserSecretsId>
+    <FFmpegRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</FFmpegRid>
+    <FFmpegRid Condition="'$(FFmpegRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</FFmpegRid>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +18,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.19" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="NAudio.Asio" Version="2.2.1" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.$(FFmpegRid)" Version="9.0.2.1800" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
   </ItemGroup>

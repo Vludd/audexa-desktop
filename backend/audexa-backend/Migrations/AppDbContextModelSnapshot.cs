@@ -85,6 +85,7 @@ namespace audexa_backend.Migrations
                     b.Property<long?>("DurationMs").HasColumnType("INTEGER");
                     b.Property<string>("FileName").IsRequired().HasMaxLength(255).HasColumnType("TEXT");
                     b.Property<string>("Format").IsRequired().HasMaxLength(16).HasColumnType("TEXT");
+                    b.Property<int>("GainDb").ValueGeneratedOnAdd().HasDefaultValue(0).HasColumnType("INTEGER");
                     b.Property<int?>("Height").HasColumnType("INTEGER");
                     b.Property<string>("Name").IsRequired().HasMaxLength(255).HasColumnType("TEXT");
                     b.Property<string>("Sha256").IsRequired().HasMaxLength(64).HasColumnType("TEXT");

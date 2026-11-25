@@ -10,12 +10,14 @@ export interface VideoFile {
   durationMs: number | null
   width: number | null
   height: number | null
+  gainDb: number
   sha256: string
   createdAt: string
 }
 
 export interface UpdateVideoFileRequest {
-  name: string
+  name?: string
+  gainDb?: number
 }
 
 export const videoApi = {
