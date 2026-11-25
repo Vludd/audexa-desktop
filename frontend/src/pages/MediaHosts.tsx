@@ -20,6 +20,14 @@ import DisplayPlaybackControls from "@/components/media-hosts/DisplayPlaybackCon
 import { useMediaHosts } from "@/hooks/useMediaHosts";
 import { t } from "@/i18n";
 import { mediaHostsApi, type MediaHost, type MediaHostPairingCreated } from "@/api/mediaHosts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 function formatLastSeen(value: string) {
   const date = new Date(value);
@@ -155,25 +163,23 @@ function HostCard({
         </div>
         <div className="flex flex-wrap gap-2">
           {!disabled ? (
-            <button
-              type="button"
+            <Button
+              variant="destructive"
               onClick={() => void revoke()}
               disabled={busy}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-destructive/30 px-2.5 text-[11px] font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50"
             >
               <Unlink className="size-3.5" />
               {t("mediaHosts.actions.unpair")}
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
+            <Button
+              variant="destructive"
               onClick={() => void remove()}
               disabled={busy}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-muted disabled:opacity-50"
             >
               <Trash2 className="size-3.5" />
               {t("mediaHosts.actions.delete")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -210,11 +216,13 @@ function HostCard({
                     {t("mediaHosts.primary")}
                   </span>
                 )}
-                {!disabled && (
-                  <div className="w-full basis-full">
-                    <DisplayPlaybackControls hostId={host.id} displayKey={display.displayKey} />
-                  </div>
-                )}
+                <div className="w-full basis-full">
+                  <DisplayPlaybackControls
+                    hostId={host.id}
+                    displayKey={display.displayKey}
+                    disabled={!online || disabled || busy}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -297,46 +305,43 @@ export default function MediaHosts() {
               {t("mediaHosts.pairing.description")}
             </p>
           </div>
-          <button
-            type="button"
+          <Button
             onClick={() => { setShowPairingForm((value) => !value); setPairingError(""); }}
-            className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90"
           >
             {t("mediaHosts.pairing.addAgent")}
-          </button>
+          </Button>
         </div>
 
         {showPairingForm && (
           <form onSubmit={(event) => void createPairing(event)} className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <label className="grid gap-1.5 text-xs font-medium">
               {t("mediaHosts.pairing.hostName")}
-              <input
+
+              <Input
                 autoFocus
                 required
                 maxLength={200}
                 value={pairingName}
                 onChange={(event) => setPairingName(event.target.value)}
                 placeholder={t("mediaHosts.pairing.hostNamePlaceholder")}
-                className="h-9 rounded-md border bg-background px-3 text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
             <label className="grid gap-1.5 text-xs font-medium">
               {t("mediaHosts.pairing.hostDescription")}
-              <input
+
+              <Input
                 maxLength={1000}
                 value={pairingDescription}
                 onChange={(event) => setPairingDescription(event.target.value)}
                 placeholder={t("mediaHosts.pairing.descriptionPlaceholder")}
-                className="h-9 rounded-md border bg-background px-3 text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
-            <button
+            <Button
               type="submit"
               disabled={pairingBusy || !pairingName.trim()}
-              className="h-9 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-50"
             >
               {pairingBusy ? t("mediaHosts.pairing.creating") : t("mediaHosts.pairing.createCode")}
-            </button>
+            </Button>
             {pairingError && <p className="text-xs text-destructive sm:col-span-3">{pairingError}</p>}
           </form>
         )}
@@ -345,27 +350,39 @@ export default function MediaHosts() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div>
               <p className="text-xs font-semibold">{t("mediaHosts.pairing.codeTitle")}</p>
-              <p className="mt-1 font-mono text-xl font-bold tracking-[0.18em]">{pairing.pairingCode}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {t("mediaHosts.pairing.codeHint")}
               </p>
+              <div className="flex items-center gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          onClick={() => void navigator.clipboard.writeText(pairing.pairingCode)}
+                        >
+                          <span className="mt-1 font-mono text-xl font-bold tracking-[0.18em]">
+                            {pairing.pairingCode}
+                          </span>
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>{t("mediaHosts.pairing.copyCode")}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {t("mediaHosts.pairing.codeCopyHint")}
+              </p>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void navigator.clipboard.writeText(pairing.pairingCode)}
-                className="h-9 rounded-md border bg-card px-3 text-xs font-medium"
-              >
-                {t("mediaHosts.pairing.copyCode")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPairing(null)}
-                className="h-9 rounded-md border bg-card px-3 text-xs font-medium"
-              >
-                {t("mediaHosts.pairing.close")}
-              </button>
-            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => setPairing(null)}
+            >
+              {t("mediaHosts.pairing.close")}
+            </Button>
           </div>
         )}
 

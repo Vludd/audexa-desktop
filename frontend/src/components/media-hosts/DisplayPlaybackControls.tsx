@@ -18,6 +18,13 @@ import {
 } from "@/api/mediaHosts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { t } from "@/i18n"
 
@@ -89,9 +96,11 @@ function getSliderValue(value: number | readonly number[]) {
 export default function DisplayPlaybackControls({
   hostId,
   displayKey,
+  disabled,
 }: {
   hostId: string
   displayKey: string
+  disabled?: boolean
 }) {
   const [state, setState] = useState<PlaybackState | null>(null)
   const [videos, setVideos] = useState<VideoFile[]>([])
@@ -116,7 +125,7 @@ export default function DisplayPlaybackControls({
       })
       .catch((error) => {
         if (!active) return
-        setVideosError(error instanceof Error ? error.message : "Не удалось загрузить видеотеку")
+        setVideosError(error instanceof Error ? error.message : t("mediaHosts.playback.videoLibraryLoadError"))
       })
       .finally(() => { if (active) setVideosLoading(false) })
     return () => { active = false }
@@ -201,6 +210,11 @@ export default function DisplayPlaybackControls({
   async function command(
     payload: PlaybackCommandInput,
   ) {
+    if (hostControlsDisabled) return
+    if (isTransitioning && payload.action !== "stop") return
+    if (payload.action === "play" && (videosLoading || !payload.videoFileId)) return
+    if (payload.action === "seek" && !duration) return
+
     setBusy(true)
     setCommandError(null)
 
@@ -230,17 +244,22 @@ export default function DisplayPlaybackControls({
   const normalizedState = state?.state.toLowerCase()
   const isPlaying = normalizedState === "playing"
   const isPaused = normalizedState === "paused"
+  const isTransitioning = ["opening", "buffering"].includes(normalizedState ?? "")
+  const hostControlsDisabled = disabled || busy
+  const playbackAdjustmentsDisabled = hostControlsDisabled || isTransitioning
   const canStop =
     state != null &&
     !["idle", "stopped", "ended"].includes(normalizedState ?? "")
   const errorMessage = commandError ?? state?.error
 
   function handleSeekChange(value: number | readonly number[]) {
+    if (playbackAdjustmentsDisabled || !duration) return
     isSeeking.current = true
     setSeekDraft(getSliderValue(value))
   }
 
   function handleSeekCommit(value: number | readonly number[]) {
+    if (playbackAdjustmentsDisabled || !duration) return
     const nextPosition = Math.min(
       duration,
       Math.max(0, getSliderValue(value)),
@@ -254,11 +273,13 @@ export default function DisplayPlaybackControls({
   }
 
   function handleVolumeChange(value: number | readonly number[]) {
+    if (playbackAdjustmentsDisabled) return
     isAdjustingVolume.current = true
     setVolumeDraft(Math.min(100, Math.max(0, getSliderValue(value))))
   }
 
   function handleVolumeCommit(value: number | readonly number[]) {
+    if (playbackAdjustmentsDisabled) return
     const nextVolume = Math.min(100, Math.max(0, getSliderValue(value)))
     isAdjustingVolume.current = false
     setVolumeDraft(nextVolume)
@@ -269,6 +290,7 @@ export default function DisplayPlaybackControls({
   }
 
   function handleMute() {
+    if (playbackAdjustmentsDisabled) return
     const muted = !(state?.isMuted ?? false)
     setState((current) => (current ? { ...current, isMuted: muted } : current))
     void command({ action: "mute", muted })
@@ -302,7 +324,7 @@ export default function DisplayPlaybackControls({
           min={0}
           max={Math.max(1, duration)}
           step={1000}
-          disabled={!duration || busy}
+          disabled={!duration || playbackAdjustmentsDisabled}
           onValueChange={handleSeekChange}
           onValueCommitted={handleSeekCommit}
           aria-label={t("mediaHosts.playback.position")}
@@ -315,7 +337,11 @@ export default function DisplayPlaybackControls({
             type="button"
             variant="outline"
             size="icon-sm"
-            disabled={!selectedVideoId || videosLoading || busy || ["opening", "buffering"].includes(normalizedState ?? "")}
+            disabled={
+              hostControlsDisabled ||
+              isTransitioning ||
+              (!isPlaying && !isPaused && (videosLoading || !selectedVideoId))
+            }
             onClick={() => {
               if (isPlaying) {
                 void command({ action: "pause" })
@@ -325,8 +351,8 @@ export default function DisplayPlaybackControls({
                 void command({ action: "play", videoFileId: selectedVideoId })
               }
             }}
-            aria-label={isPlaying ? t("mediaHosts.playback.pause") : isPaused ? t("mediaHosts.playback.resume") : "Запустить"}
-            title={isPlaying ? t("mediaHosts.playback.pause") : isPaused ? t("mediaHosts.playback.resume") : "Запустить выбранное видео"}
+            aria-label={isPlaying ? t("mediaHosts.playback.pause") : isPaused ? t("mediaHosts.playback.resume") : t("mediaHosts.playback.play")}
+            title={isPlaying ? t("mediaHosts.playback.pause") : isPaused ? t("mediaHosts.playback.resume") : t("mediaHosts.playback.playSelectedVideo")}
           >
             {isPlaying ? <Pause /> : <Play />}
           </Button>
@@ -334,7 +360,7 @@ export default function DisplayPlaybackControls({
             type="button"
             variant="outline"
             size="icon-sm"
-            disabled={!canStop || busy}
+            disabled={!canStop || hostControlsDisabled}
             onClick={() => void command({ action: "stop" })}
             aria-label={t("mediaHosts.playback.stop")}
             title={t("mediaHosts.playback.stop")}
@@ -348,7 +374,7 @@ export default function DisplayPlaybackControls({
             type="button"
             variant="ghost"
             size="icon-sm"
-            disabled={busy}
+            disabled={playbackAdjustmentsDisabled}
             onClick={handleMute}
             aria-label={
               state?.isMuted
@@ -369,7 +395,7 @@ export default function DisplayPlaybackControls({
             min={0}
             max={100}
             step={1}
-            disabled={busy}
+            disabled={playbackAdjustmentsDisabled}
             onValueChange={handleVolumeChange}
             onValueCommitted={handleVolumeCommit}
             aria-label={t("mediaHosts.playback.volume")}
@@ -382,28 +408,59 @@ export default function DisplayPlaybackControls({
 
       <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground" htmlFor={`video-library-${hostId}-${displayKey}`}>
-          Видеофайл из медиатеки
+          {t("mediaHosts.playback.videoLibraryLabel")}
         </label>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-          <select
-            id={`video-library-${hostId}-${displayKey}`}
-            value={selectedVideoId}
-            onChange={(event) => setSelectedVideoId(event.currentTarget.value)}
-            disabled={videosLoading || videos.length === 0 || busy}
-            className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          <Select
+            value={selectedVideoId || undefined}
+            onValueChange={(videoId) => {
+              if (videoId == null) return
+              setSelectedVideoId(videoId)
+            }}
+            disabled={
+              playbackAdjustmentsDisabled ||
+              videosLoading ||
+              videos.length === 0
+            }
           >
-            <option value="">
-              {videosLoading ? "Загрузка медиатеки..." : videos.length ? "Выберите видео..." : "Видеотека пуста"}
-            </option>
-            {videos.map((video) => (
-              <option key={video.id} value={video.id}>
-                {video.name} · {video.format} · {(video.size / 1024 / 1024).toFixed(1)} MB
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              id={`video-library-${hostId}-${displayKey}`}
+              className="h-9 w-full min-w-0 flex-1"
+              aria-label={t("mediaHosts.playback.videoLibraryLabel")}
+            >
+              <SelectValue
+                placeholder={
+                  videosLoading
+                    ? t("mediaHosts.playback.videoLibraryLoading")
+                    : videos.length
+                      ? t("mediaHosts.playback.videoLibrarySelect")
+                      : t("mediaHosts.playback.videoLibraryEmpty")
+                }
+              >
+                {videos.find((video) => video.id === selectedVideoId)
+                  ? (() => {
+                      const video = videos.find((item) => item.id === selectedVideoId)!
+                      return `${video.name} · ${video.format} · ${(video.size / 1024 / 1024).toFixed(1)} MB`
+                    })()
+                  : videosLoading
+                    ? t("mediaHosts.playback.videoLibraryLoading")
+                    : videos.length
+                      ? t("mediaHosts.playback.videoLibrarySelect")
+                      : t("mediaHosts.playback.videoLibraryEmpty")}
+              </SelectValue>
+            </SelectTrigger>
+
+            <SelectContent>
+              {videos.map((video) => (
+                <SelectItem key={video.id} value={video.id}>
+                  {video.name} · {video.format} · {(video.size / 1024 / 1024).toFixed(1)} MB
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Перед запуском Agent загрузит видео в локальный кеш и проверит контрольную сумму.
+          {t("mediaHosts.playback.videoLibraryCacheHint")}
         </p>
         {videosError && <p role="alert" className="text-xs text-destructive">{videosError}</p>}
       </div>
