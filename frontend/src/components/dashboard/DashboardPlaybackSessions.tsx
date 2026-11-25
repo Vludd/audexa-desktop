@@ -61,7 +61,7 @@ export default function DashboardPlaybackSessions({ sessions, onSkipStep, onPaus
               </div>
               {current ? (
                 <div className="mt-3 min-w-0">
-                  <div className="truncate text-sm">{current.roomName} · {current.audioFileName}</div>
+                  <div className="truncate text-sm">{current.roomName ?? current.videoFileName ?? "—"} · {current.videoFileName ?? current.audioFileName ?? "—"}</div>
                   {current.status === "delaying" || current.delayRemainingSeconds > 0 ? (
                     <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                       {t("dashboard.playback.delayCountdown", { seconds: current.delayRemainingSeconds.toFixed(1) })}
@@ -92,7 +92,7 @@ export default function DashboardPlaybackSessions({ sessions, onSkipStep, onPaus
                     <div key={`${step.step}-${step.roomId}`} className="flex items-start gap-2 text-[11px]">
                       <span className="w-4 shrink-0 font-mono text-muted-foreground">{step.step}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate">{step.roomName} · {step.audioFileName}</div>
+                        <div className="truncate">{step.roomName ?? step.videoFileName ?? "—"} · {step.videoFileName ?? step.audioFileName ?? "—"}</div>
                         {step.delayMs > 0 && <div className="text-muted-foreground">{t("dashboard.playback.stepDelay", { seconds: (step.delayMs / 1000).toFixed(1) })}</div>}
                       </div>
                       <span className="shrink-0 text-muted-foreground">{t(`dashboard.playback.stepStatus.${step.status}` as never)}</span>

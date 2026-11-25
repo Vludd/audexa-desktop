@@ -92,6 +92,8 @@ builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<MediaHostRegistry>();
 builder.Services.AddScoped<MediaHostPairingService>();
 builder.Services.AddSingleton<PlaybackCommandRegistry>();
+builder.Services.AddSingleton<MediaPlaybackStateRegistry>();
+builder.Services.AddSingleton<MediaScenarioPlaybackService>();
 builder.Services.AddHostedService<MediaHostPresenceService>();
 builder.Services.AddHostedService<BackendDiscoveryService>();
 builder.Services.AddSingleton<IPlaybackEngine, PlaybackEngine>();

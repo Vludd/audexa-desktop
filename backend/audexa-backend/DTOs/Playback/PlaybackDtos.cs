@@ -4,17 +4,22 @@ public sealed record PlaybackStartRequest(Guid ScenarioId);
 
 public sealed record PlaybackStepStateDto(
     int Step,
-    Guid RoomId,
-    string RoomName,
-    Guid AudioFileId,
-    string AudioFileName,
+    Guid? RoomId,
+    string? RoomName,
+    Guid? AudioFileId,
+    string? AudioFileName,
     string Status,
     int DelayMs,
     double DelayRemainingSeconds,
     double PositionSeconds,
     double DurationSeconds,
     string? OutputId,
-    string? Error);
+    string? Error,
+    Guid? VideoFileId = null,
+    string? VideoFileName = null,
+    Guid? MediaHostId = null,
+    string? DisplayKey = null,
+    string? VideoAudioMode = null);
 
 public sealed record PlaybackRoomStateDto(
     Guid RoomId,

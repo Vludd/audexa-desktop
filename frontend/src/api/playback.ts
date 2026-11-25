@@ -39,10 +39,10 @@ export interface PlaybackRoomState {
 
 export interface PlaybackStepState {
   step: number
-  roomId: string
-  roomName: string
-  audioFileId: string
-  audioFileName: string
+  roomId: string | null
+  roomName: string | null
+  audioFileId: string | null
+  audioFileName: string | null
   status: PlaybackStepStatus
   delayMs: number
   delayRemainingSeconds: number
@@ -50,6 +50,11 @@ export interface PlaybackStepState {
   durationSeconds: number
   outputId: string | null
   error: string | null
+  videoFileId: string | null
+  videoFileName: string | null
+  mediaHostId: string | null
+  displayKey: string | null
+  videoAudioMode: "Muted" | "HostOutput" | "RoomOutput" | null
 }
 
 export interface PlaybackState {

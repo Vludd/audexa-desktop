@@ -5,6 +5,8 @@ import { scenariosApi } from "@/api/scenarios"
 import { audioSettingsApi } from "@/api/audioSettings"
 import { playbackApi, type PlaybackSession, type PlaybackState } from "@/api/playback"
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
+import type { VideoFile } from "@/api/video"
+import type { MediaHost } from "@/api/mediaHosts"
 import { t } from "@/i18n"
 import { toast } from "@/lib/toast"
 
@@ -31,6 +33,8 @@ export interface ScenarioValidation {
 interface ScenarioData {
   rooms: Room[]
   audioFiles: AudioFile[]
+  videoFiles: VideoFile[]
+  mediaHosts: MediaHost[]
 }
 
 const ACTIVE_PLAYBACK_STATUSES = new Set(["playing", "paused", "waiting"])
@@ -84,6 +88,8 @@ async function waitForScenarioActivation(
 export function useScenarios({
   rooms,
   audioFiles,
+  videoFiles,
+  mediaHosts,
 }: ScenarioData) {
   const queryClient = useQueryClient()
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
@@ -108,13 +114,13 @@ export function useScenarios({
     return new Set(rooms.filter((room) => !mappedRoomIds.has(room.id)).map((room) => room.id))
   }, [audioSettingsQuery.data, rooms])
 
-  const context = useMemo(() => ({ rooms, audioFiles }), [audioFiles, rooms])
+  const context = useMemo(() => ({ rooms, audioFiles, videoFiles, mediaHosts }), [audioFiles, mediaHosts, rooms, videoFiles])
   const contextKey = JSON.stringify({
     rooms: rooms.map(({ id, name }) => [id, name]),
-    audioFiles: audioFiles.map(({ id, filename, duration }) => [
-      id,
-      filename,
-      duration,
+    audioFiles: audioFiles.map(({ id, filename, duration }) => [id, filename, duration]),
+    videoFiles: videoFiles.map(({ id, name, durationMs }) => [id, name, durationMs]),
+    mediaHosts: mediaHosts.map(({ id, name, status, displays }) => [
+      id, name, status, displays.map(({ displayKey }) => displayKey),
     ]),
   })
   const queryKey = useMemo(
@@ -156,7 +162,7 @@ export function useScenarios({
 
   const saveMutation = useMutation({
     mutationFn: (scenario: Scenario) => {
-      if (!canPersistScenario(scenario, rooms, audioFiles)) {
+      if (!canPersistScenario(scenario, rooms, audioFiles, videoFiles, mediaHosts)) {
         throw new Error(t("scenarios.errors.invalidConfiguration"))
       }
       return scenariosApi.update(scenario, context)
@@ -205,7 +211,7 @@ export function useScenarios({
   const scheduleSave = useCallback(
     (scenario: Scenario) => {
       const id = scenario.id
-      if (!canPersistScenario(scenario, rooms, audioFiles)) {
+      if (!canPersistScenario(scenario, rooms, audioFiles, videoFiles, mediaHosts)) {
         const existing = saveTimers.current[id]
         if (existing) clearTimeout(existing)
         delete saveTimers.current[id]
@@ -226,7 +232,7 @@ export function useScenarios({
             const latest = latestScenarios.current.find(
               (item) => item.id === id,
             )
-            if (!latest || !canPersistScenario(latest, rooms, audioFiles)) {
+            if (!latest || !canPersistScenario(latest, rooms, audioFiles, videoFiles, mediaHosts)) {
               setSaveStatuses((current) => ({ ...current, [id]: "unsaved" }))
               return
             }
@@ -242,7 +248,7 @@ export function useScenarios({
         }).catch(() => undefined)
       }, 450)
     },
-    [audioFiles, rooms, saveMutation],
+    [audioFiles, mediaHosts, rooms, saveMutation, videoFiles],
   )
 
   const updateLocalScenario = useCallback(
@@ -374,6 +380,12 @@ export function useScenarios({
             translationAudioFileId: step?.translationAudioFileId ?? null,
             translationFile: step?.translationFile ?? "",
             translationDuration: step?.translationDuration ?? 0,
+            videoFileId: step?.videoFileId ?? null,
+            videoName: step?.videoName ?? "",
+            mediaHostId: step?.mediaHostId ?? null,
+            mediaHostName: step?.mediaHostName ?? "",
+            displayKey: step?.displayKey ?? null,
+            videoAudioMode: step?.videoAudioMode ?? null,
           }
 
           return { ...scenario, steps: [...scenario.steps, newStep] }
@@ -468,7 +480,7 @@ export function useScenarios({
           throw new Error(t("scenarios.errors.notFound"))
         }
 
-        if (!canPersistScenario(latest, rooms, audioFiles)) {
+        if (!canPersistScenario(latest, rooms, audioFiles, videoFiles, mediaHosts)) {
           throw new Error(t("scenarios.errors.invalidConfiguration"))
         }
 
@@ -505,7 +517,7 @@ export function useScenarios({
         throw error
       }
     },
-    [audioFiles, rooms, queryClient, saveMutation],
+    [audioFiles, mediaHosts, rooms, queryClient, saveMutation, videoFiles],
   )
 
   const playScenario = useCallback(
@@ -540,33 +552,78 @@ export function useScenarios({
 
       if (!scenario.name.trim()) errors.push(t("scenarios.validation.nameRequired"))
       if (scenario.steps.length === 0) errors.push(t("scenarios.validation.stepRequired"))
-      if (!audioSettingsQuery.data) {
-        errors.push(t("scenarios.validation.outputMappingUnavailable"))
-      }
 
       scenario.steps.forEach((step, index) => {
         const number = index + 1
-        if (!step.roomId) errors.push(t("scenarios.validation.roomRequired", { number }))
-        else if (!rooms.some((room) => room.id === step.roomId)) {
-          errors.push(t("scenarios.validation.roomUnavailable", { number }))
-        } else if (audioSettingsQuery.data && roomIdsWithoutOutputs.has(step.roomId)) {
-          errors.push(t("scenarios.validation.roomOutputRequired", { number }))
+        const hasAudio = Boolean(step.audioFileId)
+        const hasVideo = Boolean(step.videoFileId)
+
+        if (!hasAudio && !hasVideo) {
+          errors.push(`Шаг ${number}: ${t("scenarios.steps.mediaStepRequired")}`)
         }
-        if (!step.audioFileId) errors.push(t("scenarios.validation.audioRequired", { number }))
-        else if (!audioFiles.some((file) => file.id === step.audioFileId)) {
-          errors.push(t("scenarios.validation.audioUnavailable", { number }))
+        if (hasAudio && hasVideo) {
+          errors.push(`Шаг ${number}: ${t("scenarios.steps.exclusiveMedia")}`)
         }
-        if (step.delay < 0) {
-          errors.push(t("scenarios.validation.delayNonnegative", { number }))
+
+        if (hasAudio) {
+          if (!step.roomId || !rooms.some((room) => room.id === step.roomId)) {
+            errors.push(`Шаг ${number}: ${t("scenarios.steps.roomUnavailableStep")}`)
+          } else if (roomIdsWithoutOutputs.has(step.roomId)) {
+            errors.push(`Шаг ${number}: ${t("scenarios.steps.roomOutputUnavailable")}`)
+          }
+          if (!audioFiles.some((file) => file.id === step.audioFileId)) {
+            errors.push(`Шаг ${number}: ${t("scenarios.steps.audioUnavailableStep")}`)
+          }
+          if (step.translationAudioFileId && !audioFiles.some((file) => file.id === step.translationAudioFileId)) {
+            errors.push(`Шаг ${number}: ${t("scenarios.steps.translationFileUnavailable")}`)
+          }
         }
-        if (step.duration <= 0) {
-          warnings.push(t("scenarios.validation.durationRequired", { number }))
+
+        if (hasVideo) {
+          const video = videoFiles.find((file) => file.id === step.videoFileId)
+          const host = mediaHosts.find((item) => item.id === step.mediaHostId)
+          if (!video) errors.push(`Шаг ${number}: ${t("scenarios.steps.videoUnavailable")}`)
+          if (!host) errors.push(`Шаг ${number}: ${t("scenarios.steps.hostRequired")}`)
+          else {
+            if (host.status.toLowerCase() !== "online") errors.push(`Шаг ${number}: ${t("scenarios.steps.hostOffline", { name: host.name })}`)
+            if (!step.displayKey || !host.displays.some((display) => display.displayKey === step.displayKey)) {
+              errors.push(`Шаг ${number}: ${t("scenarios.steps.displayRequired")}`)
+            }
+          }
+
+          if (!["Muted", "HostOutput", "RoomOutput"].includes(step.videoAudioMode ?? "Muted")) {
+            errors.push(`Шаг ${number}: неизвестный режим аудио видео.`)
+          }
+          if (step.videoAudioMode === "RoomOutput") {
+            errors.push(`Шаг ${number}: ${t("scenarios.steps.roomOutputNotReady")}`)
+            if (!step.roomId || !rooms.some((room) => room.id === step.roomId)) {
+              errors.push(`Шаг ${number}: ${t("scenarios.steps.roomRequiredVideo")}`)
+            } else if (roomIdsWithoutOutputs.has(step.roomId)) {
+              errors.push(`Шаг ${number}: ${t("scenarios.steps.roomOutputUnavailable")}`)
+            }
+          }
+          if (step.translationAudioFileId) {
+            errors.push(`Шаг ${number}: ${t("scenarios.steps.translationVideoUnsupported")}`)
+          }
+          if (video?.durationMs == null || video.durationMs <= 0) {
+            warnings.push(`Шаг ${number}: ${t("scenarios.steps.videoDurationUnknown")}`)
+          }
         }
+
+        if (step.delay < 0) errors.push(t("scenarios.validation.delayNonnegative", { number }))
+        if (step.duration <= 0 && hasAudio) warnings.push(t("scenarios.validation.durationRequired", { number }))
       })
+
+      const requiresAudioEngine = scenario.steps.some((step) =>
+        Boolean(step.audioFileId) || (Boolean(step.videoFileId) && step.videoAudioMode === "RoomOutput"),
+      )
+      if (requiresAudioEngine && !audioSettingsQuery.data) {
+        errors.push(t("scenarios.validation.outputMappingUnavailable"))
+      }
 
       return { valid: errors.length === 0, errors, warnings }
     },
-    [rooms, audioFiles, audioSettingsQuery.data, roomIdsWithoutOutputs],
+    [audioSettingsQuery.data, audioFiles, mediaHosts, roomIdsWithoutOutputs, rooms, videoFiles],
   )
 
   return {
@@ -596,19 +653,36 @@ function canPersistScenario(
   scenario: Scenario,
   rooms: Room[],
   audioFiles: AudioFile[],
+  videoFiles: VideoFile[],
+  mediaHosts: MediaHost[],
 ): boolean {
   if (!scenario.name.trim()) return false
   if (scenario.status === "active" && scenario.steps.length === 0) return false
 
-  return scenario.steps.every(
-    (step) =>
-      Boolean(step.roomId) &&
-      rooms.some((room) => room.id === step.roomId) &&
-      Boolean(step.audioFileId) &&
-      audioFiles.some((file) => file.id === step.audioFileId) &&
-      (step.translationAudioFileId === null ||
-        audioFiles.some((file) => file.id === step.translationAudioFileId)) &&
-      Number.isFinite(step.delay) &&
-      step.delay >= 0,
-  )
+  return scenario.steps.every((step) => {
+    const hasAudio = Boolean(step.audioFileId)
+    const hasVideo = Boolean(step.videoFileId)
+    if (hasAudio === hasVideo) return false
+    if (!Number.isFinite(step.delay) || step.delay < 0) return false
+
+    if (hasAudio) {
+      return Boolean(step.roomId) &&
+        rooms.some((room) => room.id === step.roomId) &&
+        audioFiles.some((file) => file.id === step.audioFileId) &&
+        (step.translationAudioFileId === null ||
+          audioFiles.some((file) => file.id === step.translationAudioFileId))
+    }
+
+    const host = mediaHosts.find((item) => item.id === step.mediaHostId)
+    const validHost = Boolean(host) &&
+      Boolean(step.displayKey) &&
+      host!.displays.some((display) => display.displayKey === step.displayKey)
+    const validRoomOutput = step.videoAudioMode !== "RoomOutput" ||
+      (Boolean(step.roomId) && rooms.some((room) => room.id === step.roomId))
+    return videoFiles.some((file) => file.id === step.videoFileId) &&
+      validHost &&
+      validRoomOutput &&
+      !step.translationAudioFileId &&
+      ["Muted", "HostOutput", "RoomOutput"].includes(step.videoAudioMode ?? "Muted")
+  })
 }

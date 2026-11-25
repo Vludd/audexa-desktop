@@ -175,6 +175,28 @@ public class AppDbContext : DbContext
             .Property(x => x.Order)
             .IsRequired();
 
+        modelBuilder.Entity<ScenarioStep>()
+            .HasOne(x => x.Room).WithMany()
+            .HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ScenarioStep>()
+            .HasOne(x => x.AudioFile).WithMany()
+            .HasForeignKey(x => x.AudioFileId).OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ScenarioStep>()
+            .HasOne(x => x.VideoFile).WithMany()
+            .HasForeignKey(x => x.VideoFileId).OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ScenarioStep>()
+            .HasOne(x => x.MediaHost).WithMany()
+            .HasForeignKey(x => x.MediaHostId).OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ScenarioStep>()
+            .Property(x => x.DisplayKey).HasMaxLength(256);
+
+        modelBuilder.Entity<ScenarioStep>()
+            .Property(x => x.VideoAudioMode).HasMaxLength(32);
+
 
         modelBuilder.Entity<ScenarioStep>()
             .Property(x => x.DelayMs)

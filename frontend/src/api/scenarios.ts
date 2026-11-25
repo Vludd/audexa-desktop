@@ -1,13 +1,19 @@
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
+import type { VideoFile } from "@/api/video"
+import type { MediaHost } from "@/api/mediaHosts"
 import { apiRequest } from "@/api/client"
 
 interface BackendScenarioStep {
   id: string
   order: number
-  roomId: string
-  audioFileId: string
+  roomId: string | null
+  audioFileId: string | null
   delayMs: number
   translationAudioFileId: string | null
+  videoFileId: string | null
+  mediaHostId: string | null
+  displayKey: string | null
+  videoAudioMode: "Muted" | "HostOutput" | "RoomOutput" | null
 }
 
 interface BackendScenario {
@@ -31,16 +37,22 @@ interface ScenarioPayload {
   repeat: Scenario["repeat"]
   stopPrevious: boolean
   steps: Array<{
-    roomId: string
-    audioFileId: string
+    roomId: string | null
+    audioFileId: string | null
     delayMs: number
     translationAudioFileId: string | null
+    videoFileId: string | null
+    mediaHostId: string | null
+    displayKey: string | null
+    videoAudioMode: "Muted" | "HostOutput" | "RoomOutput" | null
   }>
 }
 
 export interface ScenarioApiContext {
   rooms: Room[]
   audioFiles: AudioFile[]
+  videoFiles: VideoFile[]
+  mediaHosts: MediaHost[]
 }
 
 function mapScenario(
@@ -63,21 +75,29 @@ function mapScenario(
         const audio = context.audioFiles.find(
           (item) => item.id === step.audioFileId,
         )
+        const video = context.videoFiles.find((item) => item.id === step.videoFileId)
+        const mediaHost = context.mediaHosts.find((item) => item.id === step.mediaHostId)
         const translationAudio = context.audioFiles.find(
           (item) => item.id === step.translationAudioFileId,
         )
 
         return {
           id: step.id,
-          roomId: step.roomId,
+          roomId: step.roomId ?? "",
           roomName: room?.name ?? "",
-          audioFileId: step.audioFileId,
+          audioFileId: step.audioFileId ?? null,
           file: audio?.filename ?? "",
           delay: step.delayMs / 1000,
           duration: audio?.duration ?? 0,
           translationAudioFileId: step.translationAudioFileId ?? null,
           translationFile: translationAudio?.filename ?? "",
           translationDuration: translationAudio?.duration ?? 0,
+          videoFileId: step.videoFileId ?? null,
+          videoName: video?.name ?? "",
+          mediaHostId: step.mediaHostId ?? null,
+          mediaHostName: mediaHost?.name ?? "",
+          displayKey: step.displayKey ?? null,
+          videoAudioMode: step.videoAudioMode ?? (step.videoFileId ? "Muted" : null),
         }
       }),
   }
@@ -92,10 +112,14 @@ function toPayload(scenario: Scenario): ScenarioPayload {
     repeat: scenario.repeat,
     stopPrevious: scenario.stopPrevious,
     steps: scenario.steps.map((step) => ({
-      roomId: step.roomId,
-      audioFileId: step.audioFileId ?? "",
+      roomId: step.roomId || null,
+      audioFileId: step.audioFileId ?? null,
       delayMs: Math.round(step.delay * 1000),
       translationAudioFileId: step.translationAudioFileId ?? null,
+      videoFileId: step.videoFileId ?? null,
+      mediaHostId: step.mediaHostId ?? null,
+      displayKey: step.displayKey ?? null,
+      videoAudioMode: step.videoFileId ? (step.videoAudioMode ?? "Muted") : null,
     })),
   }
 }

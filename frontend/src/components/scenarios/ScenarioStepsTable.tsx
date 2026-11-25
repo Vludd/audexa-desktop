@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/table"
 
 import type { AudioFile, Room, ScenarioStep } from "@/types"
+import type { VideoFile } from "@/api/video"
+import type { MediaHost } from "@/api/mediaHosts"
 import { t } from "@/i18n"
 import { formatTime } from "@/lib/audio"
 import { Input } from "@/components/ui/input"
@@ -28,6 +30,8 @@ interface Props {
   steps: ScenarioStep[]
   rooms: Room[]
   audioFiles: AudioFile[]
+  videoFiles: VideoFile[]
+  mediaHosts: MediaHost[]
   roomIdsWithoutOutputs: Set<string>
   onUpdateStep: (stepId: string, patch: Partial<ScenarioStep>) => void
   onRemoveStep: (stepId: string) => void
@@ -81,6 +85,8 @@ export default function ScenarioStepsTable({
   steps,
   rooms,
   audioFiles,
+  videoFiles,
+  mediaHosts,
   roomIdsWithoutOutputs,
   onUpdateStep,
   onRemoveStep,
@@ -105,6 +111,12 @@ export default function ScenarioStepsTable({
       audioFileId: file?.id ?? null,
       file: file?.filename ?? "",
       duration: file?.duration ?? 0,
+      videoFileId: null,
+      videoName: "",
+      mediaHostId: null,
+      mediaHostName: "",
+      displayKey: null,
+      videoAudioMode: null,
     })
   }
 
@@ -142,6 +154,9 @@ export default function ScenarioStepsTable({
               <TableHead className="w-10">{t("scenarios.steps.step")}</TableHead>
               <TableHead>{t("scenarios.steps.room")}</TableHead>
               <TableHead>{t("scenarios.steps.audioFile")}</TableHead>
+              <TableHead>{t("scenarios.steps.videoFile")}</TableHead>
+              <TableHead>{t("scenarios.steps.mediaHost")} / {t("scenarios.steps.display")}</TableHead>
+              <TableHead>{t("scenarios.steps.videoAudioMode")}</TableHead>
               <TableHead>{t("scenarios.steps.translationAudio")}</TableHead>
               <TableHead className="w-[120px]">
                 {t("scenarios.steps.delayBeforeStartSeconds")}
@@ -196,6 +211,7 @@ export default function ScenarioStepsTable({
                     <div className="min-w-[150px] space-y-1">
                       <Select
                         value={step.roomId || undefined}
+                        disabled={Boolean(step.videoFileId) && step.videoAudioMode !== "RoomOutput"}
                         onValueChange={(roomId) => {
                           if (roomId == null) return
                           handleRoomChange(step, roomId)
@@ -220,7 +236,12 @@ export default function ScenarioStepsTable({
                         </SelectContent>
                       </Select>
 
-                      {step.roomId && roomIdsWithoutOutputs.has(step.roomId) && (
+                      {step.videoFileId && step.videoAudioMode !== "RoomOutput" ? (
+                        <p className="text-[10px] leading-tight text-muted-foreground">{t("scenarios.steps.roomNotRequired")}</p>
+                      ) : null}
+                      {step.roomId &&
+                        (!step.videoFileId || step.videoAudioMode === "RoomOutput") &&
+                        roomIdsWithoutOutputs.has(step.roomId) && (
                         <p
                           className="text-[10px] leading-tight text-destructive"
                           role="status"
@@ -266,9 +287,128 @@ export default function ScenarioStepsTable({
                   </TableCell>
 
                   <TableCell>
+                    <Select
+                      value={step.videoFileId ?? "__none__"}
+                      onValueChange={(videoId) => {
+                        if (videoId == null) return
+                        if (videoId === "__none__") {
+                          if (!step.videoFileId) return
+                          onUpdateStep(step.id, {
+                            videoFileId: null,
+                            videoName: "",
+                            duration: 0,
+                            mediaHostId: null,
+                            mediaHostName: "",
+                            displayKey: null,
+                            videoAudioMode: null,
+                          })
+                          return
+                        }
+                        const video = videoFiles.find((item) => item.id === videoId)
+                        onUpdateStep(step.id, {
+                          videoFileId: video?.id ?? null,
+                          videoName: video?.name ?? "",
+                          duration: video?.durationMs ? video.durationMs / 1000 : 0,
+                          audioFileId: null,
+                          file: "",
+                          translationAudioFileId: null,
+                          translationFile: "",
+                          translationDuration: 0,
+                          videoAudioMode: video ? (step.videoAudioMode ?? "Muted") : null,
+                        })
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-full min-w-[180px] text-xs" aria-label={t("scenarios.steps.videoFile")}>
+                        <SelectValue>
+                          {videoFiles.find((file) => file.id === step.videoFileId)?.name ?? t("scenarios.steps.chooseVideoFile")}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">{t("scenarios.steps.noVideo")}</SelectItem>
+                        {videoFiles.map((file) => (
+                          <SelectItem key={file.id} value={file.id}>{file.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+
+                  <TableCell>
+                    <div className="min-w-[190px] space-y-1">
+                      <Select
+                        value={step.mediaHostId ?? "__none__"}
+                        disabled={!step.videoFileId}
+                        onValueChange={(hostId) => {
+                          if (hostId == null) return
+                          const host = mediaHosts.find((item) => item.id === hostId)
+                          onUpdateStep(step.id, {
+                            mediaHostId: host?.id ?? null,
+                            mediaHostName: host?.name ?? "",
+                            displayKey: null,
+                          })
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-full text-xs" aria-label={t("scenarios.steps.mediaHost")}>
+                          <SelectValue>{mediaHosts.find((host) => host.id === step.mediaHostId)?.name ?? t("scenarios.steps.chooseMediaHost")}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">{t("scenarios.steps.chooseMediaHost")}</SelectItem>
+                          {mediaHosts.map((host) => (
+                            <SelectItem key={host.id} value={host.id}>
+                              {host.name} · {host.status}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={step.displayKey ?? "__none__"}
+                        disabled={!step.videoFileId || !step.mediaHostId}
+                        onValueChange={(displayKey) => {
+                          if (displayKey == null) return
+                          onUpdateStep(step.id, { displayKey: displayKey === "__none__" ? null : displayKey })
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-full text-xs" aria-label={t("scenarios.steps.display")}>
+                          <SelectValue>
+                            {mediaHosts.find((host) => host.id === step.mediaHostId)?.displays.find((display) => display.displayKey === step.displayKey)?.friendlyName ?? t("scenarios.steps.chooseDisplay")}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">{t("scenarios.steps.chooseDisplay")}</SelectItem>
+                          {mediaHosts.find((host) => host.id === step.mediaHostId)?.displays.map((display) => (
+                            <SelectItem key={display.id} value={display.displayKey}>
+                              {display.friendlyName || display.deviceName} · {display.width}×{display.height}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TableCell>
+
+                  <TableCell>
+                    <Select
+                      value={step.videoAudioMode ?? "Muted"}
+                      disabled={!step.videoFileId}
+                      onValueChange={(mode) => {
+                        if (mode == null) return
+                        onUpdateStep(step.id, { videoAudioMode: mode as ScenarioStep["videoAudioMode"] })
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[150px] text-xs" aria-label={t("scenarios.steps.videoAudioMode")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Muted">{t("scenarios.steps.videoAudioMuted")}</SelectItem>
+                        <SelectItem value="HostOutput">{t("scenarios.steps.videoAudioHostOutput")}</SelectItem>
+                        <SelectItem value="RoomOutput">{t("scenarios.steps.videoAudioRoomOutput")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+
+                  <TableCell>
                     <div className="min-w-[170px] space-y-1">
                       <Select
                         value={step.translationAudioFileId ?? "__none__"}
+                        disabled={Boolean(step.videoFileId)}
                         onValueChange={(fileId) => {
                           const selected = fileId === "__none__"
                             ? undefined

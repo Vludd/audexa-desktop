@@ -153,16 +153,16 @@ export default function DashboardPlayback({
       </div>
 
       <div className="p-3.5">
-        {playback && current && room ? (
+        {playback && current ? (
           <div className="space-y-3">
             <div className="rounded-md border bg-muted/20 p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("dashboard.playback.current")}</div>
               <div className="mt-1 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-bold">{String(playback.currentStep).padStart(2, "0")} — {room.name}</div>
-                  <div className="truncate text-xs text-muted-foreground">{current.audioFileName}</div>
+                  <div className="font-bold">{String(playback.currentStep).padStart(2, "0")} — {current.roomName ?? room?.name ?? current.videoFileName ?? current.audioFileName ?? "—"}</div>
+                  <div className="truncate text-xs text-muted-foreground">{current.videoFileName ?? current.audioFileName ?? "—"}</div>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">OUT {current.outputId?.split(":").pop() ?? "—"}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{current.videoFileId ? `${current.displayKey ?? "DISPLAY"} · ${current.videoAudioMode ?? "Muted"}` : `OUT ${current.outputId?.split(":").pop() ?? "—"}`}</span>
               </div>
 
               <div className="mt-3">
@@ -180,7 +180,7 @@ export default function DashboardPlayback({
               )}
               {current.status === "waiting" && current.delayRemainingSeconds <= 0 && (
                 <div className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                  {t("dashboard.playback.waitingForRoom")}
+                  {current.roomId ? t("dashboard.playback.waitingForRoom") : t("dashboard.playback.waitingForMediaHost")}
                 </div>
               )}
 
@@ -234,8 +234,8 @@ export default function DashboardPlayback({
             {next && (
               <div className="rounded-md border border-dashed p-3">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("dashboard.playback.next")}</div>
-                <div className="mt-1 font-semibold">{String(next.step).padStart(2, "0")} — {next.roomName}</div>
-                <div className="text-xs text-muted-foreground">{next.audioFileName} · {t("dashboard.playback.nextDelay", { seconds: next.delayMs / 1000 })}</div>
+                <div className="mt-1 font-semibold">{String(next.step).padStart(2, "0")} — {next.roomName ?? next.videoFileName ?? next.audioFileName ?? "—"}</div>
+                <div className="text-xs text-muted-foreground">{next.videoFileName ?? next.audioFileName ?? "—"} · {t("dashboard.playback.nextDelay", { seconds: next.delayMs / 1000 })}</div>
               </div>
             )}
 
@@ -246,7 +246,7 @@ export default function DashboardPlayback({
                   <div key={`${step.step}-${step.roomId}`} className="flex items-start gap-2 text-xs">
                     <span className="w-5 shrink-0 font-mono text-muted-foreground">{String(step.step).padStart(2, "0")}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{step.roomName} · {step.audioFileName}</div>
+                      <div className="truncate font-medium">{step.roomName ?? step.videoFileName ?? "—"} · {step.videoFileName ?? step.audioFileName ?? "—"}</div>
                       {step.delayMs > 0 && <div className="text-muted-foreground">{t("dashboard.playback.stepDelay", { seconds: (step.delayMs / 1000).toFixed(1) })}</div>}
                     </div>
                     <span className={step.status === "playing" ? "shrink-0 text-primary" : step.status === "waiting" || step.status === "delaying" ? "shrink-0 text-amber-600 dark:text-amber-400" : "shrink-0 text-muted-foreground"}>

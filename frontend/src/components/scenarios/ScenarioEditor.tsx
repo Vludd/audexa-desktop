@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
+import type { VideoFile } from "@/api/video"
+import type { MediaHost } from "@/api/mediaHosts"
 import type { ScenarioSaveStatus, ScenarioUpdate, ScenarioValidation } from "@/hooks/useScenarios"
 import ScenarioStepsTable from "./ScenarioStepsTable"
 import { t } from "@/i18n"
@@ -24,6 +26,8 @@ interface Props {
   onRetrySave: () => void
   rooms: Room[]
   audioFiles: AudioFile[]
+  videoFiles: VideoFile[]
+  mediaHosts: MediaHost[]
   onUpdate: (id: string, patch: ScenarioUpdate) => void
   onOpenSettings: () => void
   onAddStep: (scenarioId: string, step?: Partial<ScenarioStep>) => void
@@ -44,6 +48,8 @@ export default function ScenarioEditor({
   onRetrySave,
   rooms,
   audioFiles,
+  videoFiles,
+  mediaHosts,
   onUpdate,
   onOpenSettings,
   onAddStep,
@@ -67,6 +73,12 @@ export default function ScenarioEditor({
       translationAudioFileId: null,
       translationFile: "",
       translationDuration: 0,
+      videoFileId: null,
+      videoName: "",
+      mediaHostId: null,
+      mediaHostName: "",
+      displayKey: null,
+      videoAudioMode: null,
     })
   }
 
@@ -199,6 +211,8 @@ export default function ScenarioEditor({
         steps={scenario.steps}
         rooms={rooms}
         audioFiles={audioFiles}
+        videoFiles={videoFiles}
+        mediaHosts={mediaHosts}
         roomIdsWithoutOutputs={roomIdsWithoutOutputs}
         onUpdateStep={(stepId, patch) =>
           onUpdateStep(scenario.id, stepId, patch)

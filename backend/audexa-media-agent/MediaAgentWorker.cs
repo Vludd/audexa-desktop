@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -28,8 +29,11 @@ public sealed class MediaAgentWorker : BackgroundService
     {
         Timeout = Timeout.InfiniteTimeSpan
     };
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _displayCommandLocks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _pendingPlayCommands = new(StringComparer.OrdinalIgnoreCase);
 
     private HubConnection? _connection;
+    private string? _connectedBackendUrl;
     private IReadOnlyList<MediaDisplayDto> _lastDisplays = Array.Empty<MediaDisplayDto>();
 
     private Guid _hostId;
@@ -87,8 +91,9 @@ public sealed class MediaAgentWorker : BackgroundService
                         continue;
                     }
 
+                    _connectedBackendUrl = backendUrl.TrimEnd('/');
                     var hubUrl = new Uri(
-                        new Uri(backendUrl.TrimEnd('/') + "/"),
+                        new Uri(_connectedBackendUrl + "/"),
                         _options.HubPath.TrimStart('/'));
 
                     _logger.LogInformation("Connecting to {HubUrl}...", hubUrl);
@@ -446,14 +451,66 @@ public sealed class MediaAgentWorker : BackgroundService
 
     private async Task HandlePlaybackCommandAsync(
         PlaybackCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken stoppingToken)
+    {
+        var displayKey = command.DisplayKey.Trim();
+        var normalizedAction = command.Action.Trim().ToLowerInvariant();
+        if (normalizedAction is "stop" or "close" or "play")
+        {
+            if (_pendingPlayCommands.TryGetValue(displayKey, out var pending))
+            {
+                try { pending.Cancel(); }
+                catch (ObjectDisposedException) { }
+            }
+        }
+
+        CancellationTokenSource? playCommandCts = null;
+        if (normalizedAction == "play")
+        {
+            playCommandCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            _pendingPlayCommands[displayKey] = playCommandCts;
+        }
+
+        var gate = _displayCommandLocks.GetOrAdd(displayKey, _ => new SemaphoreSlim(1, 1));
+        var gateEntered = false;
+        try
+        {
+            await gate.WaitAsync(stoppingToken);
+            gateEntered = true;
+            var operationToken = playCommandCts?.Token ?? stoppingToken;
+            if (operationToken.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+            {
+                await TryReportPlaybackCommandResultAsync(
+                    command.CommandId, "Failed", "Playback command was superseded by a newer command.", stoppingToken);
+                return;
+            }
+
+            await HandlePlaybackCommandCoreAsync(command, operationToken, stoppingToken);
+        }
+        finally
+        {
+            if (gateEntered) gate.Release();
+            if (playCommandCts is not null)
+            {
+                if (_pendingPlayCommands.TryGetValue(displayKey, out var current) &&
+                    ReferenceEquals(current, playCommandCts))
+                    _pendingPlayCommands.TryRemove(displayKey, out _);
+                playCommandCts.Dispose();
+            }
+        }
+    }
+
+    private async Task HandlePlaybackCommandCoreAsync(
+        PlaybackCommand command,
+        CancellationToken operationToken,
+        CancellationToken reportingToken)
     {
         _logger.LogInformation(
             "Received playback command {CommandId}: {Action} on {DisplayKey}",
             command.CommandId, command.Action, command.DisplayKey);
 
         await TryReportPlaybackCommandResultAsync(
-            command.CommandId, "Accepted", null, cancellationToken);
+            command.CommandId, "Accepted", null, reportingToken);
 
         try
         {
@@ -463,37 +520,43 @@ public sealed class MediaAgentWorker : BackgroundService
                     if (command.VideoFileId is null)
                         throw new ArgumentException("VideoFileId is required for Play.");
 
-                    var localVideoPath = await DownloadVideoAsync(command, cancellationToken);
+                    var localVideoPath = await DownloadVideoAsync(command, operationToken);
                     await _playerManager.PlayAsync(
-                        command.DisplayKey, localVideoPath, cancellationToken);
+                        command.DisplayKey, localVideoPath, command.Muted, command.Volume, operationToken);
                     break;
                 case "pause":
-                    await _playerManager.PauseAsync(command.DisplayKey, cancellationToken);
+                    await _playerManager.PauseAsync(command.DisplayKey, operationToken);
                     break;
                 case "resume":
-                    await _playerManager.ResumeAsync(command.DisplayKey, cancellationToken);
+                    await _playerManager.ResumeAsync(command.DisplayKey, operationToken);
                     break;
                 case "stop":
-                    await _playerManager.StopPlaybackAsync(command.DisplayKey, cancellationToken);
+                    await _playerManager.StopPlaybackAsync(command.DisplayKey, operationToken);
                     break;
                 case "close":
-                    await _playerManager.CloseAsync(command.DisplayKey, cancellationToken);
+                    await _playerManager.CloseAsync(command.DisplayKey, operationToken);
                     break;
                 case "seek":
-                    await _playerManager.SeekAsync(command.DisplayKey, command.PositionMs ?? 0, cancellationToken);
+                    await _playerManager.SeekAsync(command.DisplayKey, command.PositionMs ?? 0, operationToken);
                     break;
                 case "volume":
-                    await _playerManager.SetVolumeAsync(command.DisplayKey, command.Volume ?? 100, cancellationToken);
+                    await _playerManager.SetVolumeAsync(command.DisplayKey, command.Volume ?? 100, operationToken);
                     break;
                 case "mute":
-                    await _playerManager.SetMuteAsync(command.DisplayKey, command.Muted ?? true, cancellationToken);
+                    await _playerManager.SetMuteAsync(command.DisplayKey, command.Muted ?? true, operationToken);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(command.Action), command.Action, "Unsupported playback action.");
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (operationToken.IsCancellationRequested && !reportingToken.IsCancellationRequested)
+        {
+            await TryReportPlaybackCommandResultAsync(
+                command.CommandId, "Failed", "Playback command was cancelled by a newer command.", reportingToken);
+            return;
+        }
+        catch (OperationCanceledException) when (reportingToken.IsCancellationRequested)
         {
             throw;
         }
@@ -504,12 +567,12 @@ public sealed class MediaAgentWorker : BackgroundService
                 command.CommandId, command.Action, command.DisplayKey);
 
             await TryReportPlaybackCommandResultAsync(
-                command.CommandId, "Failed", ex.Message, cancellationToken);
+                command.CommandId, "Failed", ex.Message, reportingToken);
             return;
         }
 
         await TryReportPlaybackCommandResultAsync(
-            command.CommandId, "Completed", null, cancellationToken);
+            command.CommandId, "Completed", null, reportingToken);
     }
 
     private async Task<string> DownloadVideoAsync(
@@ -556,8 +619,12 @@ public sealed class MediaAgentWorker : BackgroundService
             File.Delete(destinationPath);
         }
 
+        var backendUrl = _connectedBackendUrl ?? _options.BackendUrl.TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(backendUrl))
+            throw new InvalidOperationException("The connected Backend URL is unavailable for video download.");
+
         var downloadUri = new Uri(
-            new Uri(_options.BackendUrl.TrimEnd('/') + "/"),
+            new Uri(backendUrl.TrimEnd('/') + "/"),
             $"api/video/{videoId:D}/agent-download");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);

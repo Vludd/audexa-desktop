@@ -31,7 +31,6 @@ export default function MediaHostCard({
   onRevoke,
   onDelete,
 }: Props) {
-  const online = host.status.toLowerCase() === "online"
   const unpaired = host.status.toLowerCase() === "disabled"
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(host.name)
@@ -204,9 +203,7 @@ export default function MediaHostCard({
             {host.displays.map((display) => (
               <DisplayCard
                 key={display.id}
-                hostId={host.id}
                 display={display}
-                disabled={!online || unpaired || busy}
               />
             ))}
           </div>

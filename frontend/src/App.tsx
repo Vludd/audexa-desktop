@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { subscribeBackendStatus } from "@/api/client"
 import { useAudioSystem } from "@/context/useAudioSystem"
@@ -17,6 +17,8 @@ import { useSchedule } from "./hooks/useSchedule"
 import { usePlayback } from "./hooks/usePlayback"
 import { playbackApi } from "./api/playback"
 import { useLogs } from "./hooks/useLogs"
+import { useMediaHosts } from "./hooks/useMediaHosts"
+import { videoApi } from "./api/video"
 
 import Sidebar from "./components/Sidebar"
 import Toaster from "./components/ui/Toaster"
@@ -87,6 +89,12 @@ export default function App() {
   const { data: playback, sessions: playbackSessions } = usePlayback()
 
   const { files: audioFiles } = useAudioFiles({})
+  const { data: mediaHosts = [] } = useMediaHosts()
+  const { data: videoFiles = [] } = useQuery({
+    queryKey: ["video-files"],
+    queryFn: videoApi.getAll,
+    staleTime: 30_000,
+  })
 
   const {
     rooms,
@@ -133,6 +141,8 @@ export default function App() {
   } = useScenarios({
     rooms,
     audioFiles,
+    videoFiles,
+    mediaHosts,
   })
 
   const {
@@ -274,6 +284,8 @@ export default function App() {
               onRetrySave={retrySaveScenario}
               rooms={rooms}
               audioFiles={audioFiles}
+              videoFiles={videoFiles}
+              mediaHosts={mediaHosts}
               onPlay={playScenario}
               onStop={stopScenario}
               onPause={pauseRoom}

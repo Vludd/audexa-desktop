@@ -33,8 +33,8 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
             "--quiet");
     }
 
-    public Task PlayAsync(string displayKey, string filePath, CancellationToken ct) =>
-        _uiThread.InvokeAsync(() => PlayCore(displayKey, filePath), ct);
+    public Task PlayAsync(string displayKey, string filePath, bool? muted, int? volume, CancellationToken ct) =>
+        _uiThread.InvokeAsync(() => PlayCore(displayKey, filePath, muted, volume), ct);
 
     public Task PauseAsync(string displayKey, CancellationToken ct) =>
         _uiThread.InvokeAsync(() => GetPlayer(displayKey).MediaPlayer.SetPause(true), ct);
@@ -108,7 +108,7 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
                 availableScreens.Length);
         }, ct);
 
-    private void PlayCore(string displayKey, string filePath)
+    private void PlayCore(string displayKey, string filePath, bool? muted, int? volume)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(displayKey);
@@ -136,6 +136,12 @@ public sealed class LibVlcPlayerManager : IAsyncDisposable
         session.Media?.Dispose();
         session.Media = new Media(_libVlc, new Uri(fullPath));
         session.MediaPlayer.Media = session.Media;
+
+        // Apply the selected audio route before starting playback so that the
+        // first decoded audio frames cannot leak to the Media Host speakers.
+        session.MediaPlayer.Mute = muted ?? false;
+        if (volume.HasValue)
+            session.MediaPlayer.Volume = Math.Clamp(volume.Value, 0, 100);
 
         if (!session.MediaPlayer.Play())
             throw new InvalidOperationException($"LibVLC refused to start playback on '{displayKey}'.");

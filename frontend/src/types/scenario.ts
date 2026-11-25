@@ -11,6 +11,12 @@ export interface ScenarioStep {
   translationAudioFileId: EntityId | null
   translationFile: string
   translationDuration: number
+  videoFileId: EntityId | null
+  videoName: string
+  mediaHostId: EntityId | null
+  mediaHostName: string
+  displayKey: string | null
+  videoAudioMode: "Muted" | "HostOutput" | "RoomOutput" | null
 }
 
 export type ScenarioStatus = "active" | "inactive"

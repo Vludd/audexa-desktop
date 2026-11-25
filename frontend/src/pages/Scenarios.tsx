@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import type { BackendConnectionState } from "@/api/client"
 
 import type { AudioFile, Room, Scenario, ScenarioStep } from "@/types"
+import type { VideoFile } from "@/api/video"
+import type { MediaHost } from "@/api/mediaHosts"
 import type { PlaybackSession, PlaybackState } from "@/api/playback"
 import Header from "@/components/Header"
 import { t } from "@/i18n"
@@ -23,6 +25,8 @@ interface Props {
   onRetrySave: (id: string) => void
   rooms: Room[]
   audioFiles: AudioFile[]
+  videoFiles: VideoFile[]
+  mediaHosts: MediaHost[]
   onPlay: (id: string) => void | Promise<void>
   onStop: (scenarioId: string) => void
   onPause: () => void
@@ -69,6 +73,8 @@ export default function Scenarios({
   onRetrySave,
   rooms,
   audioFiles,
+  videoFiles,
+  mediaHosts,
   onPlay,
   onStop,
   onPause,
@@ -244,6 +250,8 @@ export default function Scenarios({
               onRetrySave={() => onRetrySave(scenario.id)}
               rooms={rooms}
               audioFiles={audioFiles}
+              videoFiles={videoFiles}
+              mediaHosts={mediaHosts}
               onUpdate={onUpdate}
               onOpenSettings={() => {
                 setSettingsMode("edit")

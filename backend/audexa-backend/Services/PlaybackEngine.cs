@@ -14,10 +14,12 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IAudioDeviceService _devices;
     private readonly ILogger<PlaybackEngine> _logger;
+    private readonly MediaScenarioPlaybackService _mediaPlayback;
     private readonly object _sync = new();
 
     private readonly Dictionary<Guid, PlaybackSession> _sessions = [];
     private readonly Dictionary<Guid, Guid> _roomOwners = [];
+    private readonly Dictionary<(Guid HostId, string DisplayKey), Guid> _displayOwners = [];
     private TaskCompletionSource<bool> _roomChanged = NewRoomSignal();
     private readonly AsyncLocal<PlaybackSession?> _currentSession = new();
     private PlaybackStateDto _legacyState = new("idle", null, null, 0, null, 0, null, null, [], [], null);
@@ -34,10 +36,15 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         set { if (_currentSession.Value is { } session) session.State = value; else _legacyState = value; }
     }
 
-    public PlaybackEngine(IServiceScopeFactory scopeFactory, IAudioDeviceService devices, ILogger<PlaybackEngine> logger)
+    public PlaybackEngine(
+        IServiceScopeFactory scopeFactory,
+        IAudioDeviceService devices,
+        MediaScenarioPlaybackService mediaPlayback,
+        ILogger<PlaybackEngine> logger)
     {
         _scopeFactory = scopeFactory;
         _devices = devices;
+        _mediaPlayback = mediaPlayback;
         _logger = logger;
     }
 
@@ -71,6 +78,8 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             .Include(x => x.Steps).ThenInclude(x => x.Room)
             .Include(x => x.Steps).ThenInclude(x => x.AudioFile)
             .Include(x => x.Steps).ThenInclude(x => x.TranslationAudioFile)
+            .Include(x => x.Steps).ThenInclude(x => x.VideoFile)
+            .Include(x => x.Steps).ThenInclude(x => x.MediaHost)
             .FirstOrDefaultAsync(x => x.Id == scenarioId, cancellationToken);
 
         if (scenario is null)
@@ -80,63 +89,111 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         if (scenario.Steps.Count == 0)
             throw new PlaybackException("SCENARIO_EMPTY", "Scenario has no steps.");
 
-        var settings = await db.AudioConfigurations.AsNoTracking()
-            .Include(x => x.Mappings)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (settings?.DeviceId is null)
-            throw new PlaybackException("DEVICE_NOT_CONFIGURED", "No audio device is configured.");
-
-        var device = _devices.FindDevice(settings.DeviceId);
-        if (device is null || !string.Equals(device.Status, "online", StringComparison.OrdinalIgnoreCase))
-            throw new PlaybackException("DEVICE_UNAVAILABLE", "Configured audio device is unavailable.");
-
-        var mappings = settings.Mappings
-            .Where(x => !string.IsNullOrWhiteSpace(x.OutputId))
-            .GroupBy(x => x.RoomId)
-            .ToDictionary(x => x.Key, x => x.Select(y => y.OutputId).Distinct(StringComparer.Ordinal).ToList());
         var steps = scenario.Steps.OrderBy(x => x.Order).ToList();
-        var translationOutputId = settings.TranslationOutputId;
+        if (steps.Any(x => x.VideoFileId.HasValue &&
+            string.Equals(x.VideoAudioMode, "RoomOutput", StringComparison.OrdinalIgnoreCase)))
+            throw new PlaybackException(
+                "VIDEO_ROOM_OUTPUT_NOT_READY",
+                "RoomOutput для видеодорожки пока не подключён к ASIO Audio Engine. Используйте Muted или HostOutput.");
 
-        if (steps.Any(x => x.TranslationAudioFileId is not null))
+        var requiresAudioEngine = steps.Any(x => x.AudioFileId.HasValue || x.TranslationAudioFileId.HasValue);
+        var settings = requiresAudioEngine
+            ? await db.AudioConfigurations.AsNoTracking()
+                .Include(x => x.Mappings)
+                .SingleOrDefaultAsync(cancellationToken)
+            : null;
+
+        string? deviceId = null;
+        var mappings = new Dictionary<Guid, List<string>>();
+        string? translationOutputId = null;
+
+        if (requiresAudioEngine)
         {
-            if (string.IsNullOrWhiteSpace(translationOutputId))
-                throw new PlaybackException("TRANSLATION_OUTPUT_NOT_CONFIGURED", "Для синхронного перевода не настроен отдельный аудиовыход.");
+            if (settings?.DeviceId is null)
+                throw new PlaybackException("DEVICE_NOT_CONFIGURED", "No audio device is configured.");
 
-            if (mappings.Values.Any(ids => ids.Contains(translationOutputId, StringComparer.Ordinal)))
-                throw new PlaybackException("TRANSLATION_OUTPUT_ASSIGNED_TO_ROOM", "Выход перевода не должен быть назначен комнате.");
+            var device = _devices.FindDevice(settings.DeviceId);
+            if (device is null || !string.Equals(device.Status, "online", StringComparison.OrdinalIgnoreCase))
+                throw new PlaybackException("DEVICE_UNAVAILABLE", "Configured audio device is unavailable.");
 
-            if (!_devices.HasOutput(settings.DeviceId, translationOutputId))
-                throw new PlaybackException("TRANSLATION_OUTPUT_UNAVAILABLE", $"Выход перевода '{translationOutputId}' недоступен.");
+            deviceId = settings.DeviceId;
+            mappings = settings.Mappings
+                .Where(x => !string.IsNullOrWhiteSpace(x.OutputId))
+                .GroupBy(x => x.RoomId)
+                .ToDictionary(x => x.Key, x => x.Select(y => y.OutputId).Distinct(StringComparer.Ordinal).ToList());
+            translationOutputId = settings.TranslationOutputId;
+
+            if (steps.Any(x => x.TranslationAudioFileId is not null))
+            {
+                if (string.IsNullOrWhiteSpace(translationOutputId))
+                    throw new PlaybackException("TRANSLATION_OUTPUT_NOT_CONFIGURED", "Для синхронного перевода не настроен отдельный аудиовыход.");
+                if (mappings.Values.Any(ids => ids.Contains(translationOutputId, StringComparer.Ordinal)))
+                    throw new PlaybackException("TRANSLATION_OUTPUT_ASSIGNED_TO_ROOM", "Выход перевода не должен быть назначен комнате.");
+                if (!_devices.HasOutput(deviceId, translationOutputId))
+                    throw new PlaybackException("TRANSLATION_OUTPUT_UNAVAILABLE", $"Выход перевода '{translationOutputId}' недоступен.");
+            }
         }
 
         foreach (var step in steps)
         {
-            if (!mappings.TryGetValue(step.RoomId, out var outputIds) || outputIds.Count == 0)
-                throw new PlaybackException("OUTPUT_NOT_MAPPED", $"Room '{step.Room.Name}' has no audio output mapping.");
-            foreach (var outputId in outputIds)
+            if (step.AudioFileId.HasValue == step.VideoFileId.HasValue)
+                throw new PlaybackException("INVALID_STEP_SOURCE", "Each scenario step must contain exactly one audio or video source.");
+            if (step.VideoFileId.HasValue)
             {
-                if (!_devices.HasOutput(settings.DeviceId, outputId))
-                    throw new PlaybackException("OUTPUT_UNAVAILABLE", $"Output '{outputId}' is not available.");
+                var videoMode = step.VideoAudioMode ?? "Muted";
+                if (!new[] { "Muted", "HostOutput", "RoomOutput" }.Contains(videoMode, StringComparer.OrdinalIgnoreCase))
+                    throw new PlaybackException("INVALID_VIDEO_AUDIO_MODE", $"Unsupported video audio mode '{videoMode}'.");
+                if (step.TranslationAudioFileId.HasValue)
+                    throw new PlaybackException("INVALID_VIDEO_TRANSLATION", "A video step cannot use a separate translation audio file.");
             }
+            if (step.AudioFileId.HasValue)
+            {
+                if (step.RoomId is null || step.Room is null)
+                    throw new PlaybackException("ROOM_NOT_FOUND", $"Room '{step.RoomId}' was not found.");
+                if (!mappings.TryGetValue(step.RoomId.Value, out var outputIds) || outputIds.Count == 0)
+                    throw new PlaybackException("OUTPUT_NOT_MAPPED", $"Room '{step.Room.Name}' has no audio output mapping.");
+                foreach (var outputId in outputIds)
+                    if (!_devices.HasOutput(deviceId!, outputId))
+                        throw new PlaybackException("OUTPUT_UNAVAILABLE", $"Output '{outputId}' is not available.");
 
-            var path = GetAudioPath(step.AudioFile.StorageFileName);
-            if (!File.Exists(path))
-                throw new PlaybackException("AUDIO_FILE_MISSING", $"Audio file '{step.AudioFile.FileName}' is missing.");
+                if (step.AudioFile is null)
+                    throw new PlaybackException("AUDIO_FILE_NOT_FOUND", $"Audio file '{step.AudioFileId}' was not found.");
+                var path = GetAudioPath(step.AudioFile.StorageFileName);
+                if (!File.Exists(path))
+                    throw new PlaybackException("AUDIO_FILE_MISSING", $"Audio file '{step.AudioFile.FileName}' is missing.");
+            }
 
             if (step.TranslationAudioFile is not null)
             {
                 if (step.TranslationAudioFileId == step.AudioFileId)
                     throw new PlaybackException("INVALID_TRANSLATION_AUDIO", "Основная дорожка и перевод должны быть разными аудиофайлами.");
-
                 var translationPath = GetAudioPath(step.TranslationAudioFile.StorageFileName);
                 if (!File.Exists(translationPath))
                     throw new PlaybackException("TRANSLATION_FILE_MISSING", $"Translation audio file '{step.TranslationAudioFile.FileName}' is missing.");
             }
+
+            if (step.VideoFileId.HasValue)
+            {
+                if (step.VideoFile is null)
+                    throw new PlaybackException("VIDEO_FILE_NOT_FOUND", $"Video file '{step.VideoFileId}' was not found.");
+                if (step.MediaHost is null ||
+                    !string.Equals(step.MediaHost.Status, "Online", StringComparison.OrdinalIgnoreCase))
+                    throw new PlaybackException("MEDIA_HOST_UNAVAILABLE", $"Media Host '{step.MediaHost?.Name ?? step.MediaHostId?.ToString()}' is unavailable.");
+                var videoPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Audexa", "Video", step.VideoFile.StorageFileName);
+                if (!File.Exists(videoPath))
+                    throw new PlaybackException("VIDEO_FILE_MISSING", $"Video file '{step.VideoFile.FileName}' is missing from storage.");
+                if (string.IsNullOrWhiteSpace(step.DisplayKey))
+                    throw new PlaybackException("DISPLAY_NOT_CONFIGURED", "A display must be selected for video playback.");
+                var displayExists = await db.DisplayDevices.AsNoTracking().AnyAsync(
+                    x => x.MediaHostId == step.MediaHostId && x.DisplayKey == step.DisplayKey,
+                    cancellationToken);
+                if (!displayExists)
+                    throw new PlaybackException("DISPLAY_UNAVAILABLE", $"Display '{step.DisplayKey}' is not registered on the selected Media Host.");
+            }
         }
 
-        // StopPrevious retains its original meaning: when enabled, this scenario
-        // replaces all active sessions. Otherwise it may run alongside them.
         if (scenario.StopPrevious && HasActiveSessions())
             await StopAsync(cancellationToken);
 
@@ -145,45 +202,49 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         var stepStates = steps.Select((step, index) => new PlaybackStepStateDto(
             index + 1,
             step.RoomId,
-            step.Room.Name,
+            step.Room?.Name,
             step.AudioFileId,
-            step.AudioFile.FileName,
-            index == 0 ? "pending" : "pending",
+            step.AudioFile?.FileName,
+            "pending",
             step.DelayMs,
             0,
             0,
-            Math.Max(0.001, Math.Max(
-                step.AudioFile.Duration.TotalSeconds,
-                step.TranslationAudioFile?.Duration.TotalSeconds ?? 0)),
-            step.TranslationAudioFile is null
-                ? string.Join(",", mappings[step.RoomId])
-                : $"{string.Join(",", mappings[step.RoomId])}; translation={translationOutputId}",
-            null)).ToList();
+            step.VideoFile?.DurationMs is long videoDuration
+                ? Math.Max(0.001, videoDuration / 1000d)
+                : step.AudioFile is not null
+                    ? Math.Max(0.001, Math.Max(step.AudioFile.Duration.TotalSeconds, step.TranslationAudioFile?.Duration.TotalSeconds ?? 0))
+                    : 0,
+            step.AudioFile is not null && step.RoomId.HasValue && mappings.TryGetValue(step.RoomId.Value, out var outputs)
+                ? step.TranslationAudioFile is null ? string.Join(",", outputs) : $"{string.Join(",", outputs)}; translation={translationOutputId}"
+                : null,
+            null,
+            step.VideoFileId,
+            step.VideoFile?.FileName,
+            step.MediaHostId,
+            step.DisplayKey,
+            step.VideoAudioMode ?? (step.VideoFileId.HasValue ? "Muted" : null))).ToList();
 
         var session = new PlaybackSession(sessionId, cts, new PlaybackStateDto(
-            "starting",
-            scenario.Id,
-            scenario.Name,
-            0,
-            steps.Count > 0 ? 1 : null,
-            steps.Count,
-            DateTime.UtcNow,
-            null,
-            [],
-            stepStates,
-            null));
+            "starting", scenario.Id, scenario.Name, 0, steps.Count > 0 ? 1 : null,
+            steps.Count, DateTime.UtcNow, null, [], stepStates, null));
 
         lock (_sync)
         {
             PruneCompletedSessions();
             _sessions.Add(sessionId, session);
         }
-        _logger.LogInformation(new EventId(7001, "scenario.started"), "Scenario started. ScenarioId={ScenarioId}; ScenarioName={ScenarioName}; SessionId={SessionId}; StepCount={StepCount}; DeviceId={DeviceId}", scenario.Id, scenario.Name, sessionId, steps.Count, settings.DeviceId);
+
+        _logger.LogInformation(new EventId(7001, "scenario.started"),
+            "Scenario started. ScenarioId={ScenarioId}; ScenarioName={ScenarioName}; SessionId={SessionId}; StepCount={StepCount}; DeviceId={DeviceId}",
+            scenario.Id, scenario.Name, sessionId, steps.Count, deviceId ?? "none");
+
         var previous = _currentSession.Value;
         _currentSession.Value = session;
         try
         {
-            session.Task = Task.Run(() => RunScenarioAsync(scenario, settings.DeviceId, mappings, translationOutputId, cts.Token), CancellationToken.None);
+            session.Task = Task.Run(
+                () => RunScenarioAsync(scenario, deviceId, mappings, translationOutputId, cts.Token),
+                CancellationToken.None);
         }
         finally { _currentSession.Value = previous; }
 
@@ -265,6 +326,16 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                     return Task.CompletedTask;
                 }
 
+                if (session.State.Status == "playing" && session.ActiveVideo is not null)
+                {
+                    session.PauseRequested = true;
+                    var pausedSteps = session.State.Steps.ToList();
+                    var pausedIndex = pausedSteps.FindIndex(x => x.Step == session.State.CurrentStep);
+                    if (pausedIndex >= 0) pausedSteps[pausedIndex] = pausedSteps[pausedIndex] with { Status = "paused" };
+                    session.State = session.State with { Status = "paused", Steps = pausedSteps };
+                    return Task.CompletedTask;
+                }
+
                 // A session waiting for a room can be paused without acquiring
                 // the room. It keeps waiting and resumes when explicitly asked.
                 if (session.State.Status == "waiting" && session.Active is null)
@@ -283,6 +354,14 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             {
                 session.Active.Resume();
                 session.State = session.State with { Status = "playing" };
+            }
+            else if (session.ActiveVideo is not null)
+            {
+                session.PauseRequested = false;
+                var resumedSteps = session.State.Steps.ToList();
+                var resumedIndex = resumedSteps.FindIndex(x => x.Step == session.State.CurrentStep);
+                if (resumedIndex >= 0) resumedSteps[resumedIndex] = resumedSteps[resumedIndex] with { Status = "playing" };
+                session.State = session.State with { Status = "playing", Steps = resumedSteps };
             }
             else
             {
@@ -316,8 +395,10 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             // be waiting to reserve its room and therefore have no runtime yet.
             session.SkipRequestedStep = stepNumber;
             _logger.LogInformation(new EventId(7004, "scenario.step_skipped"), "Scenario step skip requested. SessionId={SessionId}; ScenarioId={ScenarioId}; StepNumber={StepNumber}", sessionId, session.State.ScenarioId, stepNumber);
-            if (session.Active is { } active && active.RoomId == step.RoomId)
+            if (session.Active is { } active && step.RoomId.HasValue && active.RoomId == step.RoomId.Value)
                 active.RequestSkip();
+            if (session.ActiveVideo is { } activeVideo && activeVideo.StepNumber == stepNumber)
+                activeVideo.RequestSkip();
 
             // Wake room waiters so a skipped step does not start later when its
             // room becomes free. The signal is shared, so all waiters re-check
@@ -454,6 +535,70 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         }
     }
 
+    private async Task<bool> ReserveDisplayAsync(
+        PlaybackSession session,
+        Guid hostId,
+        string displayKey,
+        int stepNumber,
+        CancellationToken token)
+    {
+        var key = (hostId, displayKey.Trim().ToUpperInvariant());
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            lock (_sync)
+            {
+                if (session.SkipRequestedStep == stepNumber)
+                {
+                    session.SkipRequestedStep = null;
+                    return false;
+                }
+                if (session.PauseRequested)
+                {
+                    // The session remains paused without claiming the display.
+                }
+                else if (!_displayOwners.TryGetValue(key, out var owner) || owner == session.Id)
+                {
+                    _displayOwners[key] = session.Id;
+                    return true;
+                }
+            }
+
+            SetStepState(stepNumber, session.PauseRequested ? "paused" : "waiting", 0, 0);
+            Task waitTask;
+            lock (_sync) waitTask = _roomChanged.Task;
+            await Task.WhenAny(waitTask, Task.Delay(100, token));
+        }
+    }
+
+    private void ReleaseDisplay(Guid hostId, string displayKey, Guid sessionId)
+    {
+        var key = (hostId, displayKey.Trim().ToUpperInvariant());
+        lock (_sync)
+        {
+            if (_displayOwners.TryGetValue(key, out var owner) && owner == sessionId)
+            {
+                _displayOwners.Remove(key);
+                var previous = _roomChanged;
+                _roomChanged = NewRoomSignal();
+                previous.TrySetResult(true);
+            }
+        }
+    }
+
+    private void ReleaseSessionDisplays(Guid sessionId)
+    {
+        lock (_sync)
+        {
+            var displays = _displayOwners.Where(x => x.Value == sessionId).Select(x => x.Key).ToList();
+            if (displays.Count == 0) return;
+            foreach (var display in displays) _displayOwners.Remove(display);
+            var previous = _roomChanged;
+            _roomChanged = NewRoomSignal();
+            previous.TrySetResult(true);
+        }
+    }
+
     private void ReleaseRoom(Guid roomId, Guid sessionId)
     {
         lock (_sync)
@@ -487,6 +632,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         public CancellationTokenSource Cts { get; set; } = cts;
         public Task? Task { get; set; }
         public PlaybackRuntime? Active { get; set; }
+        public VideoPlaybackRuntime? ActiveVideo { get; set; }
         public bool PauseRequested { get; set; }
         public int? SkipRequestedStep { get; set; }
         public PlaybackStateDto State { get; set; } = state;
@@ -494,7 +640,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
 
     private async Task RunScenarioAsync(
         Scenario scenario,
-        string deviceId,
+        string? deviceId,
         Dictionary<Guid, List<string>> mappings,
         string? translationOutputId,
         CancellationToken cancellationToken)
@@ -513,51 +659,66 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                     cancellationToken.ThrowIfCancellationRequested();
                     var step = steps[i];
                     var stepNumber = i + 1;
+                    var roomReserved = false;
 
-                    // Reserve the room before applying this step's delay. A step
-                    // waiting on another session starts from the beginning once released.
-                    var roomReserved = await ReserveRoomAsync(session, step.RoomId, stepNumber, cancellationToken);
-                    if (!roomReserved)
+                    if (step.AudioFileId.HasValue)
                     {
-                        SetStepState(stepNumber, "stopped", 0, 0);
-                        continue;
+                        roomReserved = await ReserveRoomAsync(session, step.RoomId!.Value, stepNumber, cancellationToken);
+                        if (!roomReserved)
+                        {
+                            SetStepState(stepNumber, "stopped", 0, 0);
+                            continue;
+                        }
                     }
 
-                    var runtime = new PlaybackRuntime(
-                        deviceId,
-                        step.RoomId,
-                        step.AudioFileId,
-                        step.Room.Volume,
-                        step.AudioFile.VolumeDb,
-                        step.TranslationAudioFileId,
-                        step.TranslationAudioFile?.VolumeDb ?? 0);
+                    var displayReserved = false;
+                    if (step.VideoFileId.HasValue)
+                    {
+                        displayReserved = await ReserveDisplayAsync(
+                            session,
+                            step.MediaHostId!.Value,
+                            step.DisplayKey!,
+                            stepNumber,
+                            cancellationToken);
+                        if (!displayReserved)
+                        {
+                            SetStepState(stepNumber, "stopped", 0, 0);
+                            continue;
+                        }
+                    }
 
-                    lock (_sync) _active = runtime;
+                    PlaybackRuntime? runtime = null;
+                    if (step.AudioFileId.HasValue)
+                    {
+                        runtime = new PlaybackRuntime(
+                            deviceId!,
+                            step.RoomId!.Value,
+                            step.AudioFileId.Value,
+                            step.Room!.Volume,
+                            step.AudioFile!.VolumeDb,
+                            step.TranslationAudioFileId,
+                            step.TranslationAudioFile?.VolumeDb ?? 0);
+                        lock (_sync) _active = runtime;
+                    }
 
-                    // Delay belongs to the step itself: it is the time to wait
-                    // BEFORE this step starts. This also makes the first step
-                    // support an intentional startup delay.
                     if (step.DelayMs > 0)
                     {
                         var remaining = step.DelayMs / 1000d;
                         SetStepState(stepNumber, "delaying", 0, remaining);
-
                         var delayStart = DateTime.UtcNow;
                         while (remaining > 0)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-
-                            lock (_sync)
-                            {
-                                if (runtime.SkipRequested) break;
-                            }
-
+                            if (runtime?.SkipRequested == true || session.SkipRequestedStep == stepNumber ||
+                                (session.ActiveVideo?.StepNumber == stepNumber && session.ActiveVideo.SkipRequested))
+                                break;
                             await Task.Delay(100, cancellationToken);
                             remaining = Math.Max(0, step.DelayMs / 1000d - (DateTime.UtcNow - delayStart).TotalSeconds);
                             SetStepState(stepNumber, "delaying", 0, remaining);
                         }
 
-                        if (runtime.SkipRequested)
+                        if (runtime?.SkipRequested == true || session.SkipRequestedStep == stepNumber ||
+                                (session.ActiveVideo?.StepNumber == stepNumber && session.ActiveVideo.SkipRequested))
                         {
                             lock (_sync)
                             {
@@ -565,16 +726,58 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                                 if (session.SkipRequestedStep == stepNumber) session.SkipRequestedStep = null;
                             }
                             SetStepState(stepNumber, "stopped", 0, 0);
-                            ReleaseRoom(step.RoomId, session.Id);
+                            if (roomReserved) ReleaseRoom(step.RoomId!.Value, session.Id);
+                            if (displayReserved) ReleaseDisplay(step.MediaHostId!.Value, step.DisplayKey!, session.Id);
                             continue;
                         }
                     }
 
                     SetStepState(stepNumber, "playing", 0, 0);
+                    if (step.VideoFileId.HasValue)
+                    {
+                        var videoRuntime = new VideoPlaybackRuntime(stepNumber);
+                        lock (_sync) session.ActiveVideo = videoRuntime;
+                        try
+                        {
+                            var mode = step.VideoAudioMode ?? "Muted";
+                            await _mediaPlayback.PlayAsync(
+                                step.MediaHostId!.Value,
+                                step.DisplayKey!,
+                                step.VideoFile!,
+                                mode,
+                                () => session.PauseRequested,
+                                () => videoRuntime.SkipRequested,
+                                (position, duration) => SetStepState(
+                                    stepNumber,
+                                    session.PauseRequested ? "paused" : "playing",
+                                    position,
+                                    0,
+                                    duration),
+                                cancellationToken);
+                        }
+                        finally
+                        {
+                            lock (_sync)
+                            {
+                                if (session.ActiveVideo == videoRuntime) session.ActiveVideo = null;
+                                if (session.SkipRequestedStep == stepNumber) session.SkipRequestedStep = null;
+                            }
+                        }
+
+                        if (videoRuntime.SkipRequested)
+                            SetStepState(stepNumber, "stopped", 0, 0);
+                        else
+                            SetStepState(stepNumber, "finished", step.VideoFile?.DurationMs is long duration ? duration / 1000d : 0, 0);
+                        if (displayReserved) ReleaseDisplay(step.MediaHostId!.Value, step.DisplayKey!, session.Id);
+                        continue;
+                    }
+
+                    if (runtime is null || step.AudioFile is null || deviceId is null)
+                        throw new PlaybackException("INVALID_STEP", $"Scenario step {stepNumber} has no valid playback source.");
 
                     await PlayFileAsync(
                         deviceId,
-                        mappings[step.RoomId],
+                        mappings[step.RoomId!.Value],
                         step.AudioFile,
                         step.TranslationAudioFile,
                         translationOutputId,
@@ -593,7 +796,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                             if (session.SkipRequestedStep == stepNumber) session.SkipRequestedStep = null;
                         }
                         SetStepState(stepNumber, "stopped", 0, 0);
-                        ReleaseRoom(step.RoomId, session.Id);
+                        ReleaseRoom(step.RoomId!.Value, session.Id);
                         continue;
                     }
 
@@ -606,7 +809,7 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
                         if (_active == runtime) _active = null;
                         if (session.SkipRequestedStep == stepNumber) session.SkipRequestedStep = null;
                     }
-                    ReleaseRoom(step.RoomId, session.Id);
+                    ReleaseRoom(step.RoomId!.Value, session.Id);
                 }
             } while (string.Equals(scenario.Repeat, "loop", StringComparison.OrdinalIgnoreCase));
 
@@ -626,7 +829,13 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         }
         finally
         {
+            if (session.ActiveVideo is { } activeVideo)
+            {
+                activeVideo.RequestSkip();
+                session.ActiveVideo = null;
+            }
             ReleaseSessionRooms(session.Id);
+            ReleaseSessionDisplays(session.Id);
             lock (_sync)
             {
                 _active?.Stop();
@@ -813,7 +1022,12 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
         }
     }
 
-    private void SetStepState(int stepNumber, string status, double position, double delayRemaining)
+    private void SetStepState(
+        int stepNumber,
+        string status,
+        double position,
+        double delayRemaining,
+        double? durationSeconds = null)
     {
         lock (_sync)
         {
@@ -828,7 +1042,8 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             {
                 Status = status,
                 PositionSeconds = position,
-                DelayRemainingSeconds = delayRemaining
+                DelayRemainingSeconds = delayRemaining,
+                DurationSeconds = durationSeconds ?? current.DurationSeconds
             };
 
             var next = status is "playing" or "waiting" or "delaying"
@@ -896,10 +1111,10 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             if (active is null) return [];
 
             var current = steps.FirstOrDefault(x => x.Step == _state.CurrentStep);
-            if (current is null) return [];
+            if (current?.RoomId is not Guid roomId) return [];
 
             return [new PlaybackRoomStateDto(
-                current.RoomId,
+                roomId,
                 ToRoomStatus(current.Status),
                 _state.ScenarioId,
                 _state.ScenarioName,
@@ -1095,6 +1310,13 @@ public sealed class PlaybackEngine : IPlaybackEngine, IDisposable
             return index;
 
         throw new PlaybackException("INVALID_OUTPUT", $"Cannot determine output channel from '{outputId}'.");
+    }
+
+    private sealed class VideoPlaybackRuntime(int stepNumber)
+    {
+        public int StepNumber { get; } = stepNumber;
+        public bool SkipRequested { get; private set; }
+        public void RequestSkip() => SkipRequested = true;
     }
 
     private sealed class PlaybackRuntime

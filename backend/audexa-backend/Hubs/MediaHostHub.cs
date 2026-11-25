@@ -9,7 +9,8 @@ public sealed class MediaHostHub(
     MediaHostPairingService pairingService,
     ILogger<MediaHostHub> logger,
     IHubContext<MediaHostsUiHub> uiHub,
-    PlaybackCommandRegistry playbackCommands) : Hub
+    PlaybackCommandRegistry playbackCommands,
+    MediaPlaybackStateRegistry playbackStates) : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -79,6 +80,9 @@ public sealed class MediaHostHub(
     public async Task ReportPlaybackStates(IReadOnlyCollection<AgentPlaybackStateDto> states)
     {
         var hostId = GetHostId();
+        foreach (var state in states)
+            playbackStates.Update(hostId, state);
+
         var payload = states.Select(state => new PlaybackStateDto(hostId, state.DisplayKey, state.State, state.Media,
             state.PositionMs, state.DurationMs, state.Volume, state.IsMuted, state.Error, DateTime.UtcNow)).ToArray();
         await uiHub.Clients.All.SendAsync("PlaybackStatesUpdated", payload, Context.ConnectionAborted);

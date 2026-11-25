@@ -232,7 +232,17 @@ namespace audexa_backend.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("RoomId")
+                    b.Property<Guid?>("RoomId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("VideoFileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("MediaHostId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("VideoAudioMode")
+                        .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -319,7 +329,11 @@ namespace audexa_backend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("AudioFileId")
+                    b.Property<Guid?>("AudioFileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayKey")
+                        .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("DelayMs")
@@ -330,7 +344,17 @@ namespace audexa_backend.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("INTEGER");
 
-                    b.Property<Guid>("RoomId")
+                    b.Property<Guid?>("RoomId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("VideoFileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("MediaHostId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("VideoAudioMode")
+                        .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("ScenarioId")
@@ -349,6 +373,10 @@ namespace audexa_backend.Migrations
                         .IsUnique();
 
                     b.HasIndex("TranslationAudioFileId");
+
+                    b.HasIndex("VideoFileId");
+
+                    b.HasIndex("MediaHostId");
 
                     b.ToTable("ScenarioSteps");
                 });
@@ -386,14 +414,22 @@ namespace audexa_backend.Migrations
                     b.HasOne("audexa_backend.Models.AudioFile", "AudioFile")
                         .WithMany()
                         .HasForeignKey("AudioFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("audexa_backend.Models.Room", "Room")
                         .WithMany()
                         .HasForeignKey("RoomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("audexa_backend.Models.VideoFile", "VideoFile")
+                        .WithMany()
+                        .HasForeignKey("VideoFileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("audexa_backend.Models.MediaHost", "MediaHost")
+                        .WithMany()
+                        .HasForeignKey("MediaHostId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("audexa_backend.Models.Scenario", "Scenario")
                         .WithMany("Steps")
@@ -404,6 +440,10 @@ namespace audexa_backend.Migrations
                     b.Navigation("AudioFile");
 
                     b.Navigation("Room");
+
+                    b.Navigation("VideoFile");
+
+                    b.Navigation("MediaHost");
 
                     b.Navigation("Scenario");
                 });
