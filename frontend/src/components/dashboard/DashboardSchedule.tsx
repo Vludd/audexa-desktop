@@ -41,14 +41,6 @@ export default function DashboardSchedule({
             <div className="text-sm text-muted-foreground">
               {t("dashboard.schedule.empty")}
             </div>
-
-            {/* <Button
-              variant="link"
-              className="mt-1 h-auto p-0 text-xs"
-              onClick={() => onNavigate("schedule")}
-            >
-              {t("dashboard.schedule.open")}
-            </Button> */}
           </div>
         ) : (
           <div className="flex flex-col">
@@ -59,8 +51,7 @@ export default function DashboardSchedule({
                   onClick={() => onNavigate("schedule")}
                   className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-muted/60"
                 >
-                  <span className="flex w-12 shrink-0 items-center gap-1.5 text-sm font-bold tabular-nums text-primary">
-                    <Clock3 className="size-3.5" />
+                  <span className="flex w-12 pl-2 shrink-0 items-center text-sm font-bold tabular-nums text-primary">
                     {item.time}
                   </span>
 

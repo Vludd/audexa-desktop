@@ -472,11 +472,10 @@ function MenuItem({
   hidden?: boolean
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant={"ghost"}
       className={cn(
-        "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent",
-
+        "flex w-full items-center transition-colors",
         destructive
           ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
           : disabled
@@ -487,8 +486,10 @@ function MenuItem({
       disabled={disabled}
       hidden={hidden}
     >
-      {icon}
-      {label}
-    </button>
+      <div className="flex text-left w-full items-center gap-2">
+        {icon}
+        {label}
+      </div>
+    </Button>
   )
 }

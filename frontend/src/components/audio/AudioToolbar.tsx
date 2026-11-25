@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { t } from "@/i18n"
+import { cn } from "cn"
 
 export const ALL_FILE_TYPES = "__all_file_types__"
 
@@ -116,31 +117,39 @@ export default function AudioToolbar({
       </Select>
 
       <div className="flex items-center gap-1 rounded-lg border bg-background p-1">
-        <Button
+        <button
           type="button"
-          size="icon"
-          variant={viewGrid ? "secondary" : "ghost"}
-          className="size-7"
           disabled={disabled}
           onClick={() => onViewChange(true)}
           aria-label={t("audio.toolbar.showGrid")}
           title={t("audio.toolbar.showGrid")}
+          className={cn(
+            "size-7 h-6 rounded px-1.5 text-[10px] font-semibold transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            viewGrid
+              ? "bg-secondary text-secondary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
           <LayoutGrid className="size-4" />
-        </Button>
+        </button>
 
-        <Button
+        <button
           type="button"
-          size="icon"
-          variant={!viewGrid ? "secondary" : "ghost"}
-          className="size-7"
           disabled={disabled}
           onClick={() => onViewChange(false)}
           aria-label={t("audio.toolbar.showList")}
           title={t("audio.toolbar.showList")}
+          className={cn(
+            "size-7 h-6 rounded px-1.5 text-[10px] font-semibold transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !viewGrid
+              ? "bg-secondary text-secondary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
           <List className="size-4" />
-        </Button>
+        </button>
       </div>
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground">

@@ -33,7 +33,7 @@ export default function ConfirmDialog({
   loading = false,
   onConfirm,
 }: ConfirmDialogProps) {
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (loading) return

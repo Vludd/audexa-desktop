@@ -53,7 +53,7 @@ export default function RoomDialog({
   }
 
   const handleSubmit = async (
-    event: React.FormEvent<HTMLFormElement>,
+    event: React.SubmitEvent<HTMLFormElement>,
   ) => {
     event.preventDefault()
     const normalizedName = name.trim()

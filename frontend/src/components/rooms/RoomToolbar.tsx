@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { t } from "@/i18n"
+import { cn } from "cn"
 
 interface Props {
   query: string
@@ -38,29 +39,39 @@ export default function RoomToolbar({
       <div className="flex-1" />
       
       <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
-        <Button
+        <button
           type="button"
-          size="icon"
-          variant={viewGrid ? "secondary" : "ghost"}
-          className="size-8"
           disabled={disabled}
           onClick={() => onViewChange(true)}
-          aria-label={t("rooms.toolbar.showGrid")}
+          aria-label={t("audio.toolbar.showList")}
+          title={t("audio.toolbar.showList")}
+          className={cn(
+            "size-7 h-6 rounded px-1.5 text-[10px] font-semibold transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            viewGrid
+              ? "bg-secondary text-secondary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
           <LayoutGrid className="size-4" />
-        </Button>
+        </button>
 
-        <Button
+        <button
           type="button"
-          size="icon"
-          variant={!viewGrid ? "secondary" : "ghost"}
-          className="size-8"
           disabled={disabled}
           onClick={() => onViewChange(false)}
-          aria-label={t("rooms.toolbar.showList")}
+          aria-label={t("audio.toolbar.showList")}
+          title={t("audio.toolbar.showList")}
+          className={cn(
+            "size-7 h-6 rounded px-1.5 text-[10px] font-semibold transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !viewGrid
+              ? "bg-secondary text-secondary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
           <List className="size-4" />
-        </Button>
+        </button>
       </div>
 
 

@@ -136,8 +136,8 @@ export default function DashboardRooms({
 
               return (
                 <div key={room.id}>
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
                     onClick={() => onNavigate("rooms")}
                     className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/60"
                   >
@@ -167,7 +167,7 @@ export default function DashboardRooms({
                         {t(status.labelKey)}
                       </Badge>
                     </div>
-                  </button>
+                  </Button>
 
                   {index < visibleRooms.length - 1 && (
                     <div className="h-px bg-border" />
