@@ -28,10 +28,7 @@ export default function MediaLibrary({ audioFileCount, connectionState, onRetry 
         subtitle={t("pages.mediaLibrary.subtitle")}
       />
 
-      <BackendStatusBanner
-        connectionState={connectionState}
-        onRetry={() => { void onRetry?.() }}
-      />
+
 
       <div role="group" aria-label={t("mediaLibrary.tabs.label")} className="flex shrink-0 items-center gap-1 border-b bg-card px-4 pt-2">
         <button
@@ -56,6 +53,11 @@ export default function MediaLibrary({ audioFileCount, connectionState, onRetry 
         </button>
       </div>
 
+      <BackendStatusBanner
+        connectionState={connectionState}
+        onRetry={() => { void onRetry?.() }}
+      />
+
       {activeTab === "audio" ? (
         <AudioLibraryPanel connectionState={connectionState} onRetry={onRetry} />
       ) : (
@@ -63,6 +65,7 @@ export default function MediaLibrary({ audioFileCount, connectionState, onRetry 
           videoFiles={video.files}
           loading={video.isLoading}
           loadError={video.error}
+          connectionState={connectionState}
           onReload={video.reload}
         />
       )}

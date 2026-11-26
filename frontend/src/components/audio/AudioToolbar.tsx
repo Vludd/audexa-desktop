@@ -93,6 +93,7 @@ export default function AudioToolbar({
         onValueChange={(value) => {
           if (value !== null) onFileTypeFilterChange(value)
         }}
+        disabled={disabled}
       >
         <SelectTrigger
           aria-label={t("audio.toolbar.fileType")}
@@ -129,6 +130,7 @@ export default function AudioToolbar({
             viewGrid
               ? "bg-secondary text-secondary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
+            disabled && "opacity-50",
           )}
         >
           <LayoutGrid className="size-4" />
@@ -146,6 +148,7 @@ export default function AudioToolbar({
             !viewGrid
               ? "bg-secondary text-secondary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
+            disabled && "opacity-50",
           )}
         >
           <List className="size-4" />

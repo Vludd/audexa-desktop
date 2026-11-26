@@ -24,6 +24,8 @@ interface Props {
   isUploading: boolean
   isAddPending: boolean
   onAdd: () => void
+
+  disabled?: boolean
 }
 
 export default function VideoToolbar({
@@ -37,12 +39,13 @@ export default function VideoToolbar({
   isUploading,
   isAddPending,
   onAdd,
+  disabled = false,
 }: Props) {
   const isAddBusy = isAddPending || isUploading
 
   return (
     <div className="flex min-h-[49px] flex-wrap items-center px-4 pt-4 gap-2">
-      <Button size="sm" onClick={onAdd} disabled={isAddBusy} aria-busy={isAddBusy}>
+      <Button size="sm" onClick={onAdd} disabled={isAddBusy || disabled} aria-busy={isAddBusy}>
         {isAddBusy ? (
           <Loader2 className="size-3.5 animate-spin" />
         ) : (
@@ -62,6 +65,7 @@ export default function VideoToolbar({
         onValueChange={(value) => {
           if (value !== null) onFileTypeFilterChange(value)
         }}
+        disabled={disabled}
       >
         <SelectTrigger
           aria-label={t("mediaLibrary.videoToolbar.fileType")}
@@ -102,6 +106,7 @@ export default function VideoToolbar({
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={t("mediaLibrary.videoToolbar.search")}
           className="h-8 pl-8 text-xs"
+          disabled={disabled}
         />
       </div>
     </div>

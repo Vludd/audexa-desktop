@@ -17,10 +17,22 @@ import { useMediaHostPairing } from "@/hooks/useMediaHostPairing"
 import { useMediaHosts } from "@/hooks/useMediaHosts"
 import { t } from "@/i18n"
 import { filterMediaHosts, getMediaHostSummary } from "@/lib/mediaHosts"
+import BackendStatusBanner from "@/components/BackendStatusBanner"
+import { BackendConnectionState } from "@/api/client"
 
-export default function MediaHosts() {
+interface Props {
+  connectionState: BackendConnectionState
+  onRetry?: () => void
+}
+
+export default function MediaHosts({
+  connectionState, 
+  onRetry, 
+}: Props) {
   const [search, setSearch] = useState("")
   const { data = [], isLoading, isFetching, error, refetch } = useMediaHosts()
+  const backendUnavailable = connectionState !== "online"
+  const controlsBlocked = backendUnavailable
   const {
     showPairingForm,
     pairingName,
@@ -49,6 +61,12 @@ export default function MediaHosts() {
         title={t("pages.mediaHosts.title")}
         subtitle={t("pages.mediaHosts.subtitle")}
       />
+
+      <BackendStatusBanner
+        connectionState={connectionState}
+        onRetry={() => { void onRetry?.() }}
+      />
+
       <main className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -61,12 +79,13 @@ export default function MediaHosts() {
           </div>
           <Button
             onClick={togglePairingForm}
+            disabled={controlsBlocked}
           >
             {t("mediaHosts.pairing.addAgent")}
           </Button>
         </div>
 
-        {showPairingForm && (
+        {showPairingForm && !controlsBlocked && (
           <form
             onSubmit={(event) => {
               event.preventDefault()
@@ -81,6 +100,7 @@ export default function MediaHosts() {
                 required
                 maxLength={200}
                 value={pairingName}
+                disabled={controlsBlocked}
                 onChange={(event) => setPairingName(event.target.value)}
                 placeholder={t("mediaHosts.pairing.hostNamePlaceholder")}
               />
@@ -90,13 +110,14 @@ export default function MediaHosts() {
               <Input
                 maxLength={1000}
                 value={pairingDescription}
+                disabled={controlsBlocked}
                 onChange={(event) => setPairingDescription(event.target.value)}
                 placeholder={t("mediaHosts.pairing.descriptionPlaceholder")}
               />
             </label>
             <Button
               type="submit"
-              disabled={pairingBusy || !pairingName.trim()}
+              disabled={pairingBusy || !pairingName.trim() || controlsBlocked}
             >
               {pairingBusy
                 ? t("mediaHosts.pairing.creating")
@@ -110,7 +131,7 @@ export default function MediaHosts() {
           </form>
         )}
 
-        {pairing && (
+        {pairing && !controlsBlocked && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div>
               <p className="text-xs font-semibold">
@@ -150,7 +171,7 @@ export default function MediaHosts() {
               </p>
             </div>
 
-            <Button variant="outline" onClick={closePairing}>
+            <Button variant="outline" onClick={closePairing} disabled={controlsBlocked}>
               {t("mediaHosts.pairing.close")}
             </Button>
           </div>
@@ -228,6 +249,7 @@ export default function MediaHosts() {
                 onRename={renameHost}
                 onRevoke={revokeHost}
                 onDelete={deleteHost}
+                disabled={controlsBlocked}
               />
             ))}
           </div>

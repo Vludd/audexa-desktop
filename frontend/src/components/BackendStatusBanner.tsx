@@ -72,6 +72,7 @@ export default function BackendStatusBanner({
         size="sm"
         variant="outline"
         onClick={onRetry}
+        hidden
         className="h-8 shrink-0 gap-2 px-2.5 text-xs sm:px-3"
       >
         <RotateCcw className="size-3.5" />

@@ -362,7 +362,14 @@ export default function App() {
             />
           )}
 
-          {page === "mediahosts" && <MediaHosts />}
+          {page === "mediahosts" && (
+            <MediaHosts 
+              connectionState={connectionState}
+              onRetry={() => { 
+                void queryClient.invalidateQueries({ queryKey: ["media-hosts"] }) 
+              }} 
+            />
+          )}
 
           {page === "settings" && (
             <Settings rooms={rooms} onOpenOnboarding={() => setIsOnboardingOpen(true)} />

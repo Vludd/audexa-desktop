@@ -24,6 +24,7 @@ import VideoToolbar, {
   ALL_VIDEO_FILE_TYPES,
 } from "@/components/media/VideoToolbar";
 import { t } from "@/i18n";
+import { BackendConnectionState } from "@/api/client";
 
 const ACCEPTED = [
   ".mp4",
@@ -73,6 +74,7 @@ interface Props {
   videoFiles: VideoFile[];
   loading: boolean;
   loadError: unknown;
+  connectionState: BackendConnectionState
   onReload: () => Promise<unknown>;
 }
 
@@ -80,6 +82,7 @@ export default function VideoLibraryPanel({
   videoFiles,
   loading,
   loadError,
+  connectionState,
   onReload,
 }: Props) {
   const { uploadFile, updateFile, deleteFile: removeFile } = useVideoLibrary();
@@ -91,6 +94,8 @@ export default function VideoLibraryPanel({
   const [editingName, setEditingName] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewVideo, setPreviewVideo] = useState<VideoFile | null>(null);
+  const backendUnavailable = connectionState !== "online"
+  const controlsBlocked = backendUnavailable
 
   const fileTypes = useMemo(
     () =>
@@ -233,9 +238,7 @@ export default function VideoLibraryPanel({
   };
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col overflow-hidden"
-    >
+    <div inert={controlsBlocked} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <input {...filePicker.inputProps} disabled={uploading} />
 
       <div className="shrink-0">
@@ -252,6 +255,7 @@ export default function VideoLibraryPanel({
           onAdd={() => {
             void filePicker.open();
           }}
+          disabled={controlsBlocked}
         />
       </div>
 

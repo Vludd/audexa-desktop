@@ -49,7 +49,7 @@ export const en: Widen<typeof ru> = {
     closeNotification: "Dismiss notification",
     backendUnavailable: "Backend is unavailable.",
     backendReconnecting: "Reconnecting to the backend.",
-    backendControlsBlocked: "Some features are unavailable; the last loaded data remains on screen.",
+    backendControlsBlocked: "Some features are unavailable. The last loaded data remains on screen.",
     retryLoading: "Retry loading",
     scenariosRefreshFailed: "Failed to refresh scenarios.",
     scenariosLoading: "Loading scenarios…",

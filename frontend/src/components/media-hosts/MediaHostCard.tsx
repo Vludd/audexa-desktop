@@ -22,6 +22,7 @@ interface Props {
   onRename: (hostId: string, name: string) => Promise<void>
   onRevoke: (hostId: string) => Promise<void>
   onDelete: (hostId: string) => Promise<void>
+  disabled?: boolean
 }
 
 export default function MediaHostCard({
@@ -30,6 +31,7 @@ export default function MediaHostCard({
   onRename,
   onRevoke,
   onDelete,
+  disabled = false,
 }: Props) {
   const unpaired = host.status.toLowerCase() === "disabled"
   const [editing, setEditing] = useState(false)
@@ -110,7 +112,7 @@ export default function MediaHostCard({
                 />
                 <Button
                   type="submit"
-                  disabled={busy || !name.trim()}
+                  disabled={busy || !name.trim() || disabled}
                   title={t("mediaHosts.actions.save")}
                   className="inline-flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"
                 >
@@ -118,7 +120,7 @@ export default function MediaHostCard({
                 </Button>
                 <Button
                   variant="ghost"
-                  disabled={busy}
+                  disabled={busy || disabled}
                   onClick={() => {
                     setEditing(false)
                     setName(host.name)
@@ -137,7 +139,7 @@ export default function MediaHostCard({
                 </h2>
                 <Button
                   variant="ghost"
-                  disabled={busy}
+                  disabled={busy || disabled}
                   onClick={() => {
                     setName(host.name)
                     setEditing(true)
@@ -164,7 +166,7 @@ export default function MediaHostCard({
           <Button
             variant="destructive"
             onClick={() => void revoke()}
-            disabled={busy}
+            disabled={busy || disabled}
           >
             <Unlink className="size-3.5" />
             {t("mediaHosts.actions.unpair")}
@@ -173,7 +175,7 @@ export default function MediaHostCard({
           <Button
             variant="destructive"
             onClick={() => void remove()}
-            disabled={busy}
+            disabled={busy || disabled}
           >
             <Trash2 className="size-3.5" />
             {t("mediaHosts.actions.delete")}
