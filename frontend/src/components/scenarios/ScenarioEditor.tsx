@@ -61,6 +61,8 @@ export default function ScenarioEditor({
 }: Props) {
   const duration = getScenarioDuration(scenario)
   const validation = onValidate(scenario)
+  const visibleErrors = validation.errors.slice(0, 3)
+  const hiddenErrors = validation.errors.slice(3)
 
   const handleAddStep = () => {
     onAddStep(scenario.id, {
@@ -83,7 +85,7 @@ export default function ScenarioEditor({
   }
 
   return (
-    <section className="min-w-0 flex-none overflow-auto p-4 xl:flex-1">
+    <section className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
       <div className="mb-4 flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -171,41 +173,82 @@ export default function ScenarioEditor({
         </div>
       </div>
 
-      <div
-        className={
+      <section
+        className={[
+          "mb-3 overflow-hidden rounded-lg border",
           validation.valid
-            ? "mb-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-2"
-            : "mb-3 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2"
+            ? "border-emerald-500/20 bg-emerald-500/[0.045]"
+            : "border-destructive/25 bg-destructive/[0.045]",
+        ].join(" ")}
+        role={validation.valid ? "status" : "alert"}
+        aria-live="polite"
+        aria-atomic="false"
+        aria-label={
+          validation.valid
+            ? t("scenarios.editor.ready")
+            : t("scenarios.editor.needsFixes")
         }
       >
         {validation.valid ? (
-          <>
-            <CheckCircle2 className="size-4 text-emerald-500" />
-            <span className="text-xs">{t("scenarios.editor.ready")}</span>
-          </>
+          <div className="flex min-h-10 items-center gap-2.5 px-3 py-2">
+            <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              {t("scenarios.editor.ready")}
+            </span>
+          </div>
         ) : (
-          <>
-            <TriangleAlert className="size-4 text-destructive" />
-            <div className="min-w-0">
-              <div className="text-xs font-semibold">
+          <div className="p-3">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <TriangleAlert className="size-4 shrink-0 text-destructive" />
+              <h3 className="text-xs font-semibold text-foreground">
                 {t("scenarios.editor.needsFixes")}
-              </div>
-              <ul className="mt-1 list-inside list-disc text-[11px] text-muted-foreground">
-                {validation.errors.slice(0, 3).map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-              {validation.errors.length > 3 && (
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  {t("scenarios.editor.moreErrors", {
-                    count: validation.errors.length - 3,
-                  })}
-                </div>
-              )}
+              </h3>
+              <span className="inline-flex h-5 items-center rounded-full bg-destructive/10 px-2 text-[10px] font-semibold tabular-nums text-destructive">
+                {validation.errors.length}
+              </span>
             </div>
-          </>
+
+            <ul className="mt-2.5 grid gap-1.5">
+              {visibleErrors.map((error, index) => (
+                <li
+                  key={`${index}-${error}`}
+                  className="flex min-w-0 items-start gap-2 rounded-md bg-background/55 px-2.5 py-2 text-xs leading-snug text-foreground/85"
+                >
+                  <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-destructive/80" />
+                  <span className="min-w-0">{error}</span>
+                </li>
+              ))}
+            </ul>
+
+            {hiddenErrors.length > 0 && (
+              <details className="group mt-2">
+                <summary className="inline-flex min-h-7 cursor-pointer list-none items-center gap-1.5 rounded px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                  {t("scenarios.editor.moreErrors", {
+                    count: hiddenErrors.length,
+                  })}
+                  <span
+                    aria-hidden="true"
+                    className="text-[10px] transition-transform group-open:rotate-180"
+                  >
+                    ▾
+                  </span>
+                </summary>
+                <ul className="mt-1.5 grid gap-1.5">
+                  {hiddenErrors.map((error, index) => (
+                    <li
+                      key={`${index + 3}-${error}`}
+                      className="flex min-w-0 items-start gap-2 rounded-md bg-background/55 px-2.5 py-2 text-xs leading-snug text-foreground/85"
+                    >
+                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-destructive/80" />
+                      <span className="min-w-0">{error}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         )}
-      </div>
+      </section>
 
       <ScenarioStepsTable
         steps={scenario.steps}
