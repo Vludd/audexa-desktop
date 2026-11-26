@@ -4,6 +4,7 @@ import {
   Film,
   Loader2,
   Pencil,
+  Play,
   Search,
   Trash2,
   Upload,
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { useVideoLibrary } from "@/hooks/useVideoLibrary";
 import { useFilePicker } from "@/hooks/useFilePicker";
 import VideoGainControl from "@/components/media/VideoGainControl";
+import VideoPreviewDialog from "@/components/media/VideoPreviewDialog";
 import VideoToolbar, {
   ALL_VIDEO_FILE_TYPES,
 } from "@/components/media/VideoToolbar";
@@ -68,6 +70,7 @@ export default function VideoLibraryPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [previewVideo, setPreviewVideo] = useState<VideoFile | null>(null);
 
   const fileTypes = useMemo(
     () =>
@@ -320,7 +323,7 @@ export default function VideoLibraryPanel({
           </div>
         ) : (
           <div className="rounded-lg border bg-card">
-            <div className="grid grid-cols-[minmax(0,1fr)_90px_100px] items-center gap-3 border-b px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="grid grid-cols-[minmax(0,1fr)_90px_132px] items-center gap-3 border-b px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>{t("mediaLibrary.videoPanel.table.file")}</span>
               <span>{t("mediaLibrary.videoPanel.table.size")}</span>
               <span className="text-right">
@@ -331,7 +334,7 @@ export default function VideoLibraryPanel({
               {visibleFiles.map((item) => (
                 <div
                   key={item.id}
-                  className="grid grid-cols-[minmax(0,1fr)_90px_100px] items-center gap-3 px-4 py-3"
+                  className="grid grid-cols-[minmax(0,1fr)_90px_132px] items-center gap-3 px-4 py-3"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
@@ -398,6 +401,21 @@ export default function VideoLibraryPanel({
                       variant="ghost"
                       size="icon"
                       className="size-8"
+                      disabled={editingId !== null}
+                      onClick={() => setPreviewVideo(item)}
+                      aria-label={t("mediaLibrary.videoPanel.preview.open", {
+                        name: item.name,
+                      })}
+                      title={t("mediaLibrary.videoPanel.preview.open", {
+                        name: item.name,
+                      })}
+                    >
+                      <Play className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
                       disabled={busyId === item.id || editingId !== null}
                       onClick={() => {
                         setEditingId(item.id);
@@ -428,6 +446,13 @@ export default function VideoLibraryPanel({
           </div>
         )}
       </div>
+
+      <VideoPreviewDialog
+        video={previewVideo}
+        onOpenChange={(open) => {
+          if (!open) setPreviewVideo(null);
+        }}
+      />
     </div>
   );
 }

@@ -13,7 +13,7 @@ export const en: Widen<typeof ru> = {
 
   theme: {
     title: "Interface theme",
-    description: "Choose a light, dark, or system theme for the application",
+    description: "Choose the application theme",
     light: "Light",
     dark: "Dark",
     system: "System",
@@ -184,6 +184,11 @@ export const en: Widen<typeof ru> = {
       noResults: "No videos found",
       noResultsDescription: "Try changing the search query or file type filter.",
       chooseFiles: "Choose files",
+      preview: {
+        open: "Preview “{name}”",
+        playbackError: "This video could not be played.",
+        formatHint: "The browser may not support this container or video codec. For best compatibility, use MP4 with H.264 video and AAC audio.",
+      },
       table: {
         file: "File",
         size: "Size",

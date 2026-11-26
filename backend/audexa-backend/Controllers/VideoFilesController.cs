@@ -55,6 +55,7 @@ public sealed class VideoFilesController : ControllerBase
         var contentType = item.Format switch
         {
             "MP4" or "M4V" => "video/mp4",
+            "MKV" => "video/x-matroska",
             "WEBM" => "video/webm",
             "MOV" => "video/quicktime",
             "AVI" => "video/x-msvideo",
