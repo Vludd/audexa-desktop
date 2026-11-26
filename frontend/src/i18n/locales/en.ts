@@ -188,6 +188,9 @@ export const en: Widen<typeof ru> = {
         open: "Preview “{name}”",
         playbackError: "This video could not be played.",
         formatHint: "The browser may not support this container or video codec. For best compatibility, use MP4 with H.264 video and AAC audio.",
+        duration: "Duration",
+        resolution: "Resolution",
+        size: "Size",
       },
       table: {
         file: "File",

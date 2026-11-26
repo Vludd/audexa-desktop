@@ -88,7 +88,10 @@ function mapScenario(
           audioFileId: step.audioFileId ?? null,
           file: audio?.filename ?? "",
           delay: step.delayMs / 1000,
-          duration: audio?.duration ?? 0,
+          duration:
+            video?.durationMs != null
+              ? video.durationMs / 1000
+              : audio?.duration ?? 0,
           translationAudioFileId: step.translationAudioFileId ?? null,
           translationFile: translationAudio?.filename ?? "",
           translationDuration: translationAudio?.duration ?? 0,

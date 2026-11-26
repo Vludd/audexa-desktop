@@ -15,18 +15,47 @@ public sealed class VideoFileService
 
     private const long MaxFileSize = 4L * 1024 * 1024 * 1024;
     private readonly AppDbContext _db;
+    private readonly ILogger<VideoFileService> _logger;
     private readonly string _videoDirectory;
 
-    public VideoFileService(AppDbContext db)
+    public VideoFileService(AppDbContext db, ILogger<VideoFileService> logger)
     {
         _db = db;
+        _logger = logger;
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         _videoDirectory = Path.Combine(appData, "Audexa", "Video");
         Directory.CreateDirectory(_videoDirectory);
     }
 
-    public async Task<IReadOnlyCollection<VideoFile>> GetAllAsync(CancellationToken ct = default) =>
-        await _db.VideoFiles.AsNoTracking().OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+    public async Task<IReadOnlyCollection<VideoFile>> GetAllAsync(CancellationToken ct = default)
+    {
+        var files = await _db.VideoFiles.OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        var updated = false;
+
+        foreach (var video in files.Where(x => x.DurationMs is null))
+        {
+            var path = Path.Combine(_videoDirectory, video.StorageFileName);
+            if (!File.Exists(path))
+            {
+                _logger.LogWarning("Cannot read metadata for video {VideoId}: stored file {Path} is missing.", video.Id, path);
+                continue;
+            }
+
+            var metadata = await TryReadMetadataAsync(path, video.FileName, ct);
+            if (metadata?.DurationMs is not long durationMs)
+                continue;
+
+            video.DurationMs = durationMs;
+            video.Width = metadata.Width;
+            video.Height = metadata.Height;
+            updated = true;
+        }
+
+        if (updated)
+            await _db.SaveChangesAsync(ct);
+
+        return files;
+    }
 
     public Task<VideoFile?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         _db.VideoFiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -55,6 +84,8 @@ public sealed class VideoFileService
                 await file.CopyToAsync(output, ct);
             }
 
+            var metadata = await TryReadMetadataAsync(storagePath, originalName, ct);
+
             string sha256;
             await using (var input = new FileStream(storagePath, FileMode.Open, FileAccess.Read, FileShare.Read,
                 1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
@@ -71,6 +102,9 @@ public sealed class VideoFileService
                 StorageFileName = storageName,
                 Format = extension.TrimStart('.').ToUpperInvariant(),
                 Size = file.Length,
+                DurationMs = metadata?.DurationMs,
+                Width = metadata?.Width,
+                Height = metadata?.Height,
                 Sha256 = sha256,
                 CreatedAt = DateTime.UtcNow
             };
@@ -83,6 +117,22 @@ public sealed class VideoFileService
         {
             if (File.Exists(storagePath)) File.Delete(storagePath);
             throw;
+        }
+    }
+
+    private async Task<VideoMetadata?> TryReadMetadataAsync(string path, string fileName, CancellationToken ct)
+    {
+        try
+        {
+            var metadata = await VideoMetadataProbe.ReadAsync(path, ct);
+            if (metadata.DurationMs is null)
+                _logger.LogWarning("Video duration could not be determined for {VideoFileName}.", fileName);
+            return metadata;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Could not read metadata for video {VideoFileName}.", fileName);
+            return null;
         }
     }
 

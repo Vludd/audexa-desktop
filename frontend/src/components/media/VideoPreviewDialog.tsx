@@ -96,17 +96,23 @@ export default function VideoPreviewDialog({ video, onOpenChange }: Props) {
                 <span className="font-medium text-foreground">{video.format}</span>
               </span>
               <span>
-                <span className="mr-1 text-muted-foreground/70">Duration</span>
+                <span className="mr-1 text-muted-foreground/70">
+                  {t("mediaLibrary.videoPanel.preview.duration")}
+                </span>
                 {formatDuration(video.durationMs)}
               </span>
               {video.width && video.height && (
                 <span>
-                  <span className="mr-1 text-muted-foreground/70">Resolution</span>
+                  <span className="mr-1 text-muted-foreground/70">
+                    {t("mediaLibrary.videoPanel.preview.resolution")}
+                  </span>
                   {video.width} × {video.height}
                 </span>
               )}
               <span>
-                <span className="mr-1 text-muted-foreground/70">Size</span>
+                <span className="mr-1 text-muted-foreground/70">
+                  {t("mediaLibrary.videoPanel.preview.size")}
+                </span>
                 {formatBytes(video.size)}
               </span>
             </div>
