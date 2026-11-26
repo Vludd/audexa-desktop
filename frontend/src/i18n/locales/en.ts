@@ -70,7 +70,7 @@ export const en: Widen<typeof ru> = {
     rooms: "Rooms",
     scenarios: "Scenarios",
     schedule: "Schedule",
-    audioFiles: "Media Library",
+    mediaLibrary: "Media Library",
     mediaHosts: "Media Hosts",
     settings: "Settings",
     logs: "Event log",
@@ -132,7 +132,7 @@ export const en: Widen<typeof ru> = {
       title: "Media Hosts",
       subtitle: "Playback computers and connected displays",
     },
-    audioFiles: {
+    mediaLibrary: {
       title: "Media Library",
       subtitle: "Manage the system audio and video assets",
     },
@@ -146,7 +146,53 @@ export const en: Widen<typeof ru> = {
       records: "Records",
     },
   },
-
+  mediaLibrary: {
+    tabs: {
+      label: "Media type",
+      audio: "Audio",
+      video: "Video",
+    },
+    videoToolbar: {
+      add: "Add video",
+      opening: "Opening...",
+      uploading: "Uploading...",
+      fileCount: "Files: {count}",
+      storageUsed: "Storage: {size} {unit}",
+      search: "Search videos...",
+      fileType: "File type",
+      allFileTypes: "All types",
+      refresh: "Refresh video library",
+    },
+    videoPanel: {
+      errors: {
+        load: "Could not load the video library",
+        upload: "upload failed",
+        refresh: "Could not refresh the video library",
+        emptyName: "The name cannot be empty.",
+        rename: "Could not rename the video",
+        gain: "Could not change the video audio gain",
+        delete: "Could not delete the video",
+      },
+      confirmDelete: "Delete “{name}” from the video library? This cannot be undone.",
+      dragDrop: {
+        title: "Drop video files here",
+        formats: "MP4, MKV, MOV, AVI, WebM, and MPEG",
+      },
+      loading: "Loading video library...",
+      empty: "The video library is empty",
+      emptyDescription: "Add video files or drop them here. They will be stored in Audexa.",
+      noResults: "No videos found",
+      noResultsDescription: "Try changing the search query or file type filter.",
+      chooseFiles: "Choose files",
+      table: {
+        file: "File",
+        size: "Size",
+        actions: "Actions",
+      },
+      renameFile: "Rename “{name}”",
+      deleteFile: "Delete “{name}”",
+    },
+  },
   mediaHosts: {
     ipAddress: "IP address",
     agentVersion: "Agent version",
@@ -391,7 +437,7 @@ export const en: Widen<typeof ru> = {
 
   audio: {
     toolbar: {
-      add: "Add file",
+      add: "Add audio",
       opening: "Opening...",
       deleteSelected: "Delete selected",
       fileCount: "Files: {count}",

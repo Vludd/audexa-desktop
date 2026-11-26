@@ -17,7 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { t } from "@/i18n"
 import { Checkbox } from "../ui/checkbox"
-// import OutputDiagnostics from "./OutputDiagnostics"
 
 type Mapping = AudioOutputMapping
 

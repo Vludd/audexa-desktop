@@ -23,7 +23,7 @@ const NAV: { page: Page; labelKey: TranslationKey; Icon: typeof Home }[] = [
   { page: "rooms", labelKey: "nav.rooms", Icon: DoorOpen },
   { page: "scenarios", labelKey: "nav.scenarios", Icon: List },
   { page: "schedule", labelKey: "nav.schedule", Icon: Calendar },
-  { page: "audiofiles", labelKey: "nav.audioFiles", Icon: Music },
+  { page: "medialibrary", labelKey: "nav.mediaLibrary", Icon: Music },
   { page: "mediahosts", labelKey: "nav.mediaHosts", Icon: Monitor },
 ]
 

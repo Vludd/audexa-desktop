@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { subscribeBackendStatus } from "@/api/client"
 import { useAudioSystem } from "@/context/useAudioSystem"
@@ -18,7 +18,7 @@ import { usePlayback } from "./hooks/usePlayback"
 import { playbackApi } from "./api/playback"
 import { useLogs } from "./hooks/useLogs"
 import { useMediaHosts } from "./hooks/useMediaHosts"
-import { videoApi } from "./api/video"
+import { useVideoFiles, VIDEO_FILES_QUERY_KEY } from "./hooks/useVideoFiles"
 
 import Sidebar from "./components/Sidebar"
 import Toaster from "./components/ui/Toaster"
@@ -29,7 +29,7 @@ import Dashboard from "./pages/Dashboard"
 import Rooms from "./pages/Rooms"
 import Scenarios from "./pages/Scenarios"
 import Schedule from "./pages/Schedule"
-import AudioFiles from "./pages/AudioFiles"
+import MediaLibrary from "./pages/MediaLibrary"
 import Settings from "./pages/Settings"
 import Logs from "./pages/Logs"
 import MediaHosts from "./pages/MediaHosts"
@@ -90,11 +90,7 @@ export default function App() {
 
   const { files: audioFiles } = useAudioFiles({})
   const { data: mediaHosts = [] } = useMediaHosts()
-  const { data: videoFiles = [] } = useQuery({
-    queryKey: ["video-files"],
-    queryFn: videoApi.getAll,
-    staleTime: 30_000,
-  })
+  const { files: videoFiles } = useVideoFiles()
 
   const {
     rooms,
@@ -355,11 +351,13 @@ export default function App() {
             />
           )}
 
-          {page === "audiofiles" && (
-            <AudioFiles
+          {page === "medialibrary" && (
+            <MediaLibrary
+              audioFileCount={audioFiles.length}
               connectionState={connectionState}
               onRetry={() => {
                 void queryClient.invalidateQueries({ queryKey: ["audio-files"] })
+                void queryClient.invalidateQueries({ queryKey: VIDEO_FILES_QUERY_KEY })
               }}
             />
           )}

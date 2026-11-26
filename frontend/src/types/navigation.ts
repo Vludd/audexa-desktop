@@ -3,7 +3,7 @@ export type Page =
   | "rooms"
   | "scenarios"
   | "schedule"
-  | "audiofiles"
+  | "medialibrary"
   | "mediahosts"
   | "settings"
   | "logs"

@@ -61,7 +61,7 @@ export const ru = {
     rooms: "Комнаты",
     scenarios: "Сценарии",
     schedule: "Расписание",
-    audioFiles: "Медиатека",
+    mediaLibrary: "Медиатека",
     mediaHosts: "Медиа-хосты",
     settings: "Настройки",
     logs: "Журнал событий",
@@ -119,7 +119,7 @@ export const ru = {
       title: "Медиа-хосты",
       subtitle: "Компьютеры воспроизведения и подключённые дисплеи",
     },
-    audioFiles: {
+    mediaLibrary: {
       title: "Медиатека",
       subtitle: "Управление аудио- и видеоматериалами системы",
     },
@@ -131,6 +131,53 @@ export const ru = {
       title: "Журнал событий",
       subtitle: "Frontend: действия интерфейса, API, сеть и ошибки выполнения",
       records: "Записей",
+    },
+  },
+  mediaLibrary: {
+    tabs: {
+      label: "Тип медиафайлов",
+      audio: "Аудио",
+      video: "Видео",
+    },
+    videoToolbar: {
+      add: "Добавить видео",
+      opening: "Открытие...",
+      uploading: "Загрузка...",
+      fileCount: "Файлов: {count}",
+      storageUsed: "Занято: {size} {unit}",
+      search: "Поиск видео...",
+      fileType: "Тип файла",
+      allFileTypes: "Все типы",
+      refresh: "Обновить видеотеку",
+    },
+    videoPanel: {
+      errors: {
+        load: "Не удалось загрузить видеотеку",
+        upload: "ошибка загрузки",
+        refresh: "Не удалось обновить видеотеку",
+        emptyName: "Название не может быть пустым.",
+        rename: "Не удалось переименовать видео",
+        gain: "Не удалось изменить усиление видео",
+        delete: "Не удалось удалить видео",
+      },
+      confirmDelete: "Удалить «{name}» из видеотеки? Это действие нельзя отменить.",
+      dragDrop: {
+        title: "Перетащите видеофайлы сюда",
+        formats: "MP4, MKV, MOV, AVI, WebM и MPEG",
+      },
+      loading: "Загрузка видеотеки...",
+      empty: "Видеотека пока пуста",
+      emptyDescription: "Добавьте видеофайлы или перетащите их сюда. Они будут сохранены в хранилище Audexa.",
+      noResults: "Ничего не найдено",
+      noResultsDescription: "Попробуйте изменить поисковый запрос или фильтр.",
+      chooseFiles: "Выбрать файлы",
+      table: {
+        file: "Файл",
+        size: "Размер",
+        actions: "Действия",
+      },
+      renameFile: "Переименовать «{name}»",
+      deleteFile: "Удалить «{name}»",
     },
   },
   mediaHosts: {
@@ -379,7 +426,7 @@ export const ru = {
   },
   audio: {
     toolbar: {
-      add: "Добавить файл",
+      add: "Добавить аудио",
       opening: "Открытие...",
       deleteSelected: "Удалить выбранные",
       fileCount: "Файлов: {count}",

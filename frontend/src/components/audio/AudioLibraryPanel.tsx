@@ -7,16 +7,12 @@ import {
   RotateCcw,
   Upload,
   X,
-  Film,
-  Music2,
 } from "lucide-react"
 
-import Header from "@/components/Header"
 import { t } from "@/i18n"
 import AudioToolbar, { ALL_FILE_TYPES } from "@/components/audio/AudioToolbar"
 import AudioTable from "@/components/audio/AudioTable"
 import AudioPlayer from "@/components/audio/AudioPlayer"
-import VideoLibraryPanel from "@/components/media/VideoLibraryPanel"
 
 import ConfirmDialog from "@/components/ui/confirm-dialog"
 import {
@@ -33,14 +29,13 @@ import { Input } from "@/components/ui/input"
 import { useConfirm } from "@/hooks/useConfirm"
 import { useAudioFiles } from "@/hooks/useAudioFiles"
 import { useFilePicker } from "@/hooks/useFilePicker"
-import BackendStatusBanner from "@/components/BackendStatusBanner"
 
 interface Props {
   connectionState: BackendConnectionState
   onRetry?: () => void
 }
 
-export default function AudioFiles({ connectionState, onRetry }: Props) {
+export default function AudioLibraryPanel({ connectionState, onRetry }: Props) {
   const audio = useAudioFiles({})
 
   const filePicker = useFilePicker({
@@ -58,7 +53,6 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
 
   const [renameName, setRenameName] = useState("")
   const [viewGrid, setViewGrid] = useState(true)
-  const [activeMediaTab, setActiveMediaTab] = useState<"audio" | "video">("audio")
   const [fileTypeFilter, setFileTypeFilter] = useState(ALL_FILE_TYPES)
 
   const fileTypes = useMemo(
@@ -170,41 +164,6 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <Header
-        title={t("pages.audioFiles.title")}
-        subtitle={t("pages.audioFiles.subtitle")}
-      />
-
-      <BackendStatusBanner
-        connectionState={connectionState}
-        onRetry={() => { void onRetry?.() }}
-      />
-
-      <div className="flex shrink-0 items-center gap-1 border-b bg-card px-4 pt-2">
-        <button
-          type="button"
-          onClick={() => setActiveMediaTab("audio")}
-          className={`inline-flex h-9 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors ${activeMediaTab === "audio" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          aria-pressed={activeMediaTab === "audio"}
-        >
-          <Music2 className="size-4" /> Аудио
-          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">{audio.files.length}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveMediaTab("video")}
-          className={`inline-flex h-9 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors ${activeMediaTab === "video" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          aria-pressed={activeMediaTab === "video"}
-        >
-          <Film className="size-4" /> Видео
-        </button>
-      </div>
-
-      {activeMediaTab === "video" ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
-          <VideoLibraryPanel />
-        </div>
-      ) : <>
       <div inert={controlsBlocked} aria-disabled={controlsBlocked || undefined} className="shrink-0">
         <AudioToolbar
           query={audio.query}
@@ -406,10 +365,9 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
           onSkip={audio.skip}
         />
       </div>
-      </>}
 
       <ConfirmDialog
-        open={activeMediaTab === "audio" && confirm.open && !controlsBlocked}
+        open={confirm.open && !controlsBlocked}
         onOpenChange={(open) => {
           if (!open) {
             confirm.close()
@@ -425,7 +383,7 @@ export default function AudioFiles({ connectionState, onRetry }: Props) {
       />
 
       <Dialog
-        open={activeMediaTab === "audio" && renameFileId !== null && !controlsBlocked}
+        open={renameFileId !== null && !controlsBlocked}
         onOpenChange={(open) => {
           if (!open) {
             setRenameFileId(null)

@@ -128,11 +128,6 @@ export default function LoggingSettings() {
               {storage.description}
             </div>
 
-            {storage.type === "file" && (
-              <div className="mt-2 break-all rounded bg-background px-2 py-1.5 font-mono text-xs">
-                {storage.path}
-              </div>
-            )}
           </div>
         </div>
 
