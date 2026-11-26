@@ -53,14 +53,23 @@ dotnet build .\backend\audexa-backend.sln
 dotnet run --project .\backend\audexa-backend\audexa-backend.csproj
 ```
 
-The Backend listens on all network interfaces. The default configuration is:
+The Backend listens on all network interfaces so paired Media Agents can connect over the LAN. The default configuration is:
 
 | Purpose | Protocol | Port |
 |---|---:|---:|
 | HTTP API and SignalR | TCP | `18080` |
 | Media Agent discovery | UDP | `18081` |
 
-The HTTP port can be changed with `Network:Port`; the discovery port can be changed with `Network:DiscoveryPort`. Keep the Backend reachable only from trusted networks and configure the host firewall accordingly.
+The HTTP port can be changed with `Network:Port`; the discovery port can be changed with `Network:DiscoveryPort`.
+
+The network boundary is enforced by the Backend:
+
+- All ordinary REST endpoints and `/hubs/media-hosts-ui` accept loopback connections only (`127.0.0.1` / `::1`). This includes the Desktop UI, administration, library, playback, settings, logs, diagnostics, and update APIs.
+- Only explicitly marked Media Agent endpoints are reachable over the LAN: one-time pairing, saved-credential validation, protected video download, and `/hubs/media-hosts`.
+- Every Media Agent endpoint still validates its one-time pairing code or device-specific credential. Marking an endpoint as LAN-accessible does not disable its authentication.
+- UDP discovery remains available on the LAN and only returns a candidate Backend address; it is not authentication.
+
+Configure Windows Firewall to allow TCP `18080` and UDP `18081` only on the intended Private network profile/subnet. Do not expose these ports through a router or public firewall.
 
 Swagger UI is enabled in the Development environment at `http://localhost:18080/swagger`.
 
@@ -117,7 +126,7 @@ Media Agents are paired individually:
 4. The Backend stores a hash of that secret; the Agent stores the secret protected with Windows DPAPI (`CurrentUser`).
 5. Agent SignalR connections and protected media downloads are validated against the individual credential.
 
-Pairing creation, invitation revocation, host rename/revoke, and selected administrative cleanup operations are restricted to loopback requests. Pairing attempts are rate-limited per remote IP.
+All administrative Media Host management endpoints are loopback-only. The LAN pairing endpoint accepts only a short-lived, single-use code and is rate-limited per remote IP. Saved-credential validation, Agent SignalR connections, and protected video downloads require the paired host's individual secret.
 
 UDP discovery on port `18081` only returns a candidate Backend address. It is not authentication. The current Backend uses HTTP rather than TLS, so pairing codes and Agent credentials must only traverse a trusted LAN. Do not expose the Backend or pairing flow to an untrusted network until HTTPS with appropriate certificate validation or pinning is implemented.
 

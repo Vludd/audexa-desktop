@@ -5,6 +5,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using audexa_backend.Logging;
 using audexa_backend.Hubs;
+using audexa_backend.Security;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -117,15 +119,47 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Audexa runs as a local desktop backend.
-// The React frontend connects to the loopback HTTP endpoint.
+// Resolve endpoint metadata before applying the network access boundary.
+app.UseRouting();
+
+// The Desktop UI and all administrative REST endpoints are loopback-only.
+// Only explicitly marked Media Agent endpoints may be reached over the LAN;
+// those endpoints must enforce their own pairing/device credentials.
+app.Use(async (context, next) =>
+{
+    var endpoint = context.GetEndpoint();
+    if (endpoint is not null &&
+        endpoint.Metadata.GetMetadata<LanAccessibleAttribute>() is null &&
+        !IsLoopback(context.Connection.RemoteIpAddress))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = "This endpoint is available only to the local Audexa Desktop application."
+        });
+        return;
+    }
+
+    await next();
+});
+
 app.UseCors("Frontend");
 app.UseRateLimiter();
 
-app.UseAuthorization();
-
 app.MapControllers();
-app.MapHub<MediaHostHub>("/hubs/media-hosts");
+app.MapHub<MediaHostHub>("/hubs/media-hosts")
+    .WithMetadata(new LanAccessibleAttribute());
 app.MapHub<MediaHostsUiHub>("/hubs/media-hosts-ui");
 
 app.Run();
+
+static bool IsLoopback(IPAddress? address)
+{
+    if (address is null)
+        return false;
+
+    if (address.IsIPv4MappedToIPv6)
+        address = address.MapToIPv4();
+
+    return IPAddress.IsLoopback(address);
+}

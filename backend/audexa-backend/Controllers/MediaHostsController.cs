@@ -4,6 +4,7 @@ using audexa_backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.RateLimiting;
+using audexa_backend.Security;
 
 namespace audexa_backend.Controllers;
 
@@ -67,6 +68,7 @@ public sealed class MediaHostsController(
     // Used by a saved Media Agent before opening SignalR. If its registration
     // was revoked or deleted while it was offline, it can safely return to first-run pairing.
     [HttpGet("{hostId:guid}/agent-credential")]
+    [LanAccessible]
     public async Task<IActionResult> ValidateAgentCredential(Guid hostId, CancellationToken ct)
     {
         Response.Headers["Cache-Control"] = "no-store";
@@ -78,6 +80,7 @@ public sealed class MediaHostsController(
     }
 
     [HttpPost("pair")]
+    [LanAccessible]
     [EnableRateLimiting("media-host-pair")]
     public async Task<IActionResult> Pair(
         [FromBody] MediaHostPairRequest request,

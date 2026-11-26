@@ -171,7 +171,8 @@ public sealed class MediaHostPairingService(AppDbContext db)
         var hosts = await db.MediaHosts
             .Include(x => x.Displays)
             .Include(x => x.Credentials)
-            .Where(x => !x.Credentials.Any())
+            .Where(x => !x.Credentials.Any() &&
+                        !db.ScenarioSteps.Any(step => step.MediaHostId == x.Id))
             .ToListAsync(ct);
 
         if (hosts.Count == 0)
@@ -196,6 +197,34 @@ public sealed class MediaHostPairingService(AppDbContext db)
         if (host.Credentials.Any(x => x.RevokedAtUtc is null))
             throw new InvalidOperationException(
                 "The Media Host must be unpaired before it can be removed.");
+
+        // ScenarioSteps intentionally use Restrict for MediaHostId: deleting a host
+        // must not silently delete or corrupt scenario steps that target its displays.
+        // Check this explicitly so the API can return an actionable 409 instead of
+        // leaking a SQLite foreign-key exception as HTTP 500.
+        var scenarioUsages = await db.ScenarioSteps
+            .AsNoTracking()
+            .Where(x => x.MediaHostId == hostId)
+            .Select(x => new
+            {
+                x.ScenarioId,
+                ScenarioName = x.Scenario.Name,
+                x.Order
+            })
+            .OrderBy(x => x.ScenarioName)
+            .ThenBy(x => x.Order)
+            .ToListAsync(ct);
+
+        if (scenarioUsages.Count > 0)
+        {
+            var scenarioDetails = scenarioUsages
+                .GroupBy(x => new { x.ScenarioId, x.ScenarioName })
+                .Select(group => $"'{group.Key.ScenarioName}' ({group.Count()} step(s))");
+
+            throw new InvalidOperationException(
+                $"Cannot delete Media Host '{host.Name}' because it is referenced by scenario(s): " +
+                $"{string.Join(", ", scenarioDetails)}. Reassign or remove the Media Host from those scenario steps first.");
+        }
 
         db.MediaHosts.Remove(host);
         await db.SaveChangesAsync(ct);

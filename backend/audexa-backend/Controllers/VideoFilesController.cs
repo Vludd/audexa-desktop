@@ -2,6 +2,7 @@ using audexa_backend.DTOs.VideoFiles;
 using audexa_backend.Models;
 using audexa_backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using audexa_backend.Security;
 
 namespace audexa_backend.Controllers;
 
@@ -77,6 +78,7 @@ public sealed class VideoFilesController : ControllerBase
 
     // Agent-only endpoint. Each paired Media Host uses its own device credential.
     [HttpGet("{id:guid}/agent-download")]
+    [LanAccessible]
     public async Task<IActionResult> AgentDownload(Guid id, CancellationToken ct)
     {
         var supplied = Request.Headers["X-Audexa-Agent-Token"].ToString();
