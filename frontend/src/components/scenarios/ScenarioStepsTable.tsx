@@ -141,6 +141,12 @@ export default function ScenarioStepsTable({
             (display) => display.displayKey === step.displayKey,
           )
           const isVideoStep = Boolean(step.videoFileId)
+          const videoAudioMode = step.videoAudioMode ?? "Muted"
+          const videoAudioModeLabel = {
+            Muted: t("scenarios.steps.videoAudioMuted"),
+            HostOutput: t("scenarios.steps.videoAudioHostOutput"),
+            RoomOutput: t("scenarios.steps.videoAudioRoomOutput"),
+          }[videoAudioMode]
           const hasRoomOutputIssue =
             Boolean(step.roomId) &&
             (!isVideoStep || step.videoAudioMode === "RoomOutput") &&
@@ -340,14 +346,14 @@ export default function ScenarioStepsTable({
 
                     <Field label={t("scenarios.steps.videoAudioMode")}>
                       <Select
-                        value={step.videoAudioMode ?? "Muted"}
+                        value={videoAudioMode}
                         disabled={!isVideoStep}
                         onValueChange={(mode) => {
                           if (mode != null) onUpdateStep(step.id, { videoAudioMode: mode as ScenarioStep["videoAudioMode"] })
                         }}
                       >
                         <SelectTrigger className="h-9 w-full min-w-0 text-xs" aria-label={t("scenarios.steps.videoAudioMode")}>
-                          <SelectValue />
+                          <SelectValue>{videoAudioModeLabel}</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Muted">{t("scenarios.steps.videoAudioMuted")}</SelectItem>
