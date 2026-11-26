@@ -50,4 +50,8 @@ export const videoApi = {
   getStreamUrl(id: string): string {
     return apiUrl(`/api/video/${id}/stream`)
   },
+
+  getThumbnailUrl(id: string): string {
+    return apiUrl(`/api/video/${id}/thumbnail`)
+  },
 }

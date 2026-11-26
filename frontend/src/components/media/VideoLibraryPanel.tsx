@@ -13,7 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-import type { VideoFile } from "@/api/video";
+import { videoApi, type VideoFile } from "@/api/video";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVideoLibrary } from "@/hooks/useVideoLibrary";
@@ -47,6 +47,26 @@ function getLoadErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
     : t("mediaLibrary.videoPanel.errors.load");
+}
+
+function VideoThumbnail({ video }: { video: VideoFile }) {
+  const [unavailable, setUnavailable] = useState(false);
+
+  return (
+    <div className="flex aspect-video w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted text-muted-foreground">
+      {unavailable ? (
+        <FileVideo className="size-5" />
+      ) : (
+        <img
+          src={videoApi.getThumbnailUrl(video.id)}
+          alt=""
+          loading="lazy"
+          className="size-full object-cover"
+          onError={() => setUnavailable(true)}
+        />
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -337,9 +357,7 @@ export default function VideoLibraryPanel({
                   className="grid grid-cols-[minmax(0,1fr)_90px_132px] items-center gap-3 px-4 py-3"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                      <FileVideo className="size-5" />
-                    </div>
+                    <VideoThumbnail video={item} />
                     <div className="min-w-0 flex-1">
                       {editingId === item.id ? (
                         <div className="flex items-center gap-2">

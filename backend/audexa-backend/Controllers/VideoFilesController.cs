@@ -29,6 +29,13 @@ public sealed class VideoFilesController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    [HttpGet("{id:guid}/thumbnail")]
+    public async Task<IActionResult> Thumbnail(Guid id, CancellationToken ct)
+    {
+        var path = await _service.GetThumbnailPathAsync(id, ct);
+        return path is null ? NotFound() : PhysicalFile(path, "image/jpeg");
+    }
+
     [HttpPost("upload")]
     [RequestSizeLimit(4L * 1024 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 4L * 1024 * 1024 * 1024)]
