@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="audexa-bg" x1="8" y1="4" x2="120" y2="124" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0879D9"/>
+      <stop offset="0.5" stop-color="#102D8C"/>
+      <stop offset="1" stop-color="#3910C9"/>
+    </linearGradient>
+    <linearGradient id="audexa-ring" x1="25" y1="30" x2="103" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00E5FF"/>
+      <stop offset="0.5" stop-color="#9DEBFF"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <linearGradient id="audexa-white" x1="48" y1="50" x2="80" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#C8DFFF"/>
+    </linearGradient>
+    <linearGradient id="audexa-wave" x1="0" y1="90" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00C8FF"/>
+      <stop offset="0.55" stop-color="#1555E8"/>
+      <stop offset="1" stop-color="#862BFF"/>
+    </linearGradient>
+    <clipPath id="audexa-clip">
+      <rect width="128" height="128" rx="24"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#audexa-clip)">
+    <rect width="128" height="128" fill="url(#audexa-bg)"/>
+    <path d="M0 87 C20 89 25 105 47 114 C70 124 99 108 128 91 V128 H0Z" fill="#0754D7" opacity="0.7"/>
+    <path d="M0 87 C18 91 27 108 49 116 C76 126 102 103 128 90 V128 H0Z" fill="url(#audexa-wave)" opacity="0.85"/>
+    <path d="M29.5 92 A45 45 0 1 1 98.5 92" stroke="url(#audexa-ring)" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M40.3 83 A31 31 0 1 1 87.7 83" stroke="url(#audexa-ring)" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M53 52 C53 49.7 55.5 48.4 57.5 49.6 L74.6 59.3 C76.8 60.6 76.8 63.4 74.6 64.7 L57.5 74.4 C55.5 75.6 53 74.3 53 72 Z" fill="url(#audexa-white)"/>
+    <g fill="url(#audexa-white)">
+      <rect x="42" y="92" width="5" height="9" rx="2.5"/>
+      <rect x="52" y="84" width="5" height="17" rx="2.5"/>
+      <rect x="62" y="76" width="5" height="25" rx="2.5"/>
+      <rect x="72" y="84" width="5" height="17" rx="2.5"/>
+      <rect x="82" y="92" width="5" height="9" rx="2.5"/>
+    </g>
+  </g>
+</svg>

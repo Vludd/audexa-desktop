@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils"
 import { t, type TranslationKey } from "@/i18n"
 import type { Page } from "../types"
+import audexaIcon from "../../../assets/branding/audexa-icon.svg"
 
 interface Props {
   current: Page
@@ -37,17 +38,13 @@ export default function Sidebar({ current, onChange }: Props) {
     <aside className="flex w-16 shrink-0 flex-col border-r bg-card lg:w-[228px]">
       <div className="border-b px-2 pb-3.5 pt-4 lg:px-4">
         <div className="flex items-center justify-center gap-2.5 lg:justify-start">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#17345f] to-[#2563eb] shadow-sm">
-            <svg width="21" height="21" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-              <path d="M3 11 C3 6.5 6.5 3 11 3 C15.5 3 19 6.5 19 11" stroke="white" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="11" cy="11" r="3" fill="white" />
-              <path d="M7 15 L5 18 M15 15 L17 18 M11 14 L11 18" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+          <div className="size-9 shrink-0 overflow-hidden rounded-lg shadow-sm">
+            <img src={audexaIcon} alt="" className="size-full" />
           </div>
 
           <div className="hidden min-w-0 lg:block">
             <div className="text-[13px] font-bold leading-4 text-foreground">AUDEXA</div>
-            <div className="text-[10px] font-bold tracking-[0.04em] leading-3 text-primary">AUDIO CONTROL</div>
+            <div className="text-[10px] font-bold tracking-[0.04em] leading-3 text-primary">MEDIA CONTROL</div>
           </div>
         </div>
 

@@ -1,5 +1,4 @@
-﻿
-#define AppName "Audexa"
+﻿#define AppName "Audexa"
 #ifndef AppVersion
   #error "AppVersion must be supplied, e.g. /DAppVersion=1.0.16"
 #endif
@@ -17,6 +16,7 @@ PrivilegesRequired=lowest
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\assets\branding\audexa-icon.ico
 UninstallDisplayIcon={app}\Audexa.Desktop.exe
 
 [Files]

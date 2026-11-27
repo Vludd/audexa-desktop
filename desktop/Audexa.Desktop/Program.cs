@@ -35,6 +35,11 @@ internal sealed class MainForm : Form
     public MainForm()
     {
         Text = "Audexa";
+
+        Icon = Icon.ExtractAssociatedIcon(
+            Application.ExecutablePath
+        ) ?? SystemIcons.Application;
+
         Width = 1440;
         Height = 900;
         StartPosition = FormStartPosition.CenterScreen;

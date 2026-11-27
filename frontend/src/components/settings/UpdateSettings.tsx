@@ -26,6 +26,85 @@ interface WebViewBridge {
   ) => void
 }
 
+type VersionComparison = -1 | 0 | 1
+
+function compareVersions(
+  left: string,
+  right: string,
+): VersionComparison | null {
+  const normalize = (version: string) => {
+    const value = version.trim().replace(/^v/i, "").split("+", 1)[0]
+    const prereleaseSeparator = value.indexOf("-")
+    const release =
+      prereleaseSeparator === -1
+        ? value
+        : value.slice(0, prereleaseSeparator)
+    const prerelease =
+      prereleaseSeparator === -1
+        ? null
+        : value.slice(prereleaseSeparator + 1)
+    const parts = release.split(".")
+
+    if (
+      parts.length === 0 ||
+      parts.some((part) => !/^\d+$/.test(part))
+    ) {
+      return null
+    }
+
+    return {
+      parts: parts.map(Number),
+      prerelease: prerelease?.split(".") ?? null,
+    }
+  }
+
+  const a = normalize(left)
+  const b = normalize(right)
+
+  if (!a || !b) return null
+
+  const length = Math.max(a.parts.length, b.parts.length)
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = a.parts[index] ?? 0
+    const rightPart = b.parts[index] ?? 0
+
+    if (leftPart !== rightPart) {
+      return leftPart > rightPart ? 1 : -1
+    }
+  }
+
+  if (a.prerelease === null && b.prerelease === null) return 0
+  if (a.prerelease === null) return 1
+  if (b.prerelease === null) return -1
+
+  const prereleaseLength = Math.max(
+    a.prerelease.length,
+    b.prerelease.length,
+  )
+
+  for (let index = 0; index < prereleaseLength; index += 1) {
+    const leftPart = a.prerelease[index]
+    const rightPart = b.prerelease[index]
+
+    if (leftPart === undefined) return -1
+    if (rightPart === undefined) return 1
+    if (leftPart === rightPart) continue
+
+    const leftNumeric = /^\d+$/.test(leftPart)
+    const rightNumeric = /^\d+$/.test(rightPart)
+
+    if (leftNumeric && rightNumeric) {
+      return Number(leftPart) > Number(rightPart) ? 1 : -1
+    }
+
+    if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1
+    return leftPart > rightPart ? 1 : -1
+  }
+
+  return 0
+}
+
 function getWebViewBridge(): WebViewBridge | null {
   const windowWithBridge = window as Window & {
     chrome?: { webview?: WebViewBridge }
@@ -51,6 +130,9 @@ export default function UpdateSettings() {
   )
 
   const isLoading = isChecking || (isDesktop && !hasLoaded)
+  const versionComparison = update
+    ? compareVersions(update.currentVersion, update.latestVersion)
+    : null
 
   const checkForUpdates = useCallback(
     async (force = false) => {
@@ -207,11 +289,25 @@ export default function UpdateSettings() {
 
             {!isLoading && update && !update.updateAvailable && (
               <p
-                className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"
+                className={`flex items-center gap-2 text-sm ${
+                  versionComparison === 1
+                    ? "text-sky-600 dark:text-sky-400"
+                    : versionComparison === 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-amber-600 dark:text-amber-400"
+                }`}
                 role="status"
               >
-                <CheckCircle2 className="size-4" />
-                {t("settings.updates.upToDate")}
+                {versionComparison === 0 ? (
+                  <CheckCircle2 className="size-4" />
+                ) : (
+                  <AlertCircle className="size-4" />
+                )}
+                {versionComparison === 1
+                  ? t("settings.updates.newerThanLatest")
+                  : versionComparison === 0
+                    ? t("settings.updates.upToDate")
+                    : t("settings.updates.versionComparisonUnavailable")}
               </p>
             )}
 

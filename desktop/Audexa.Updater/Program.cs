@@ -252,6 +252,7 @@ internal static class Program
             _previewMode = previewMode;
 
             Text = "Audexa Update";
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
